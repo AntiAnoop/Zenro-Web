@@ -9,6 +9,7 @@ import { TestReport } from './components/TestReport';
 import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole } from './components/TeacherViews';
 import { AdminDashboard, AdminUserManagement, AdminFinancials } from './components/AdminViews';
 import { LiveProvider } from './context/LiveContext';
+import { supabase } from './services/supabaseClient';
 
 // --- MOCK DATA ---
 const CREDENTIALS: Record<string, {pass: string, role: UserRole, name: string, id: string}> = {
@@ -42,6 +43,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -62,25 +64,66 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
             name: account.name,
             role: account.role,
             email: `${id}@zenro.jp`,
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`,
+            batch: '2024-A',
+            phone: 'N/A'
         });
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const account = CREDENTIALS[identifier];
-    
-    if (account && account.pass === password) {
-      onLogin({
-        id: account.id,
-        name: account.name,
-        role: account.role,
-        email: `${identifier}@zenro.jp`,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`
-      });
-    } else {
-      setError('Invalid credentials. Please try again.');
+    setLoading(true);
+    setError('');
+
+    try {
+        // 1. Check Hardcoded Mocks First
+        const account = CREDENTIALS[identifier];
+        if (account && account.pass === password) {
+            onLogin({
+                id: account.id,
+                name: account.name,
+                role: account.role,
+                email: `${identifier}@zenro.jp`,
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`
+            });
+            setLoading(false);
+            return;
+        }
+
+        // 2. Check Supabase 'profiles' table
+        // We look up by 'student_id' column for students, or maybe email.
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('student_id', identifier)
+            .single();
+
+        if (error || !data) {
+            throw new Error('User not found');
+        }
+
+        // Simple password check (in real app, use hashing/auth service)
+        if (data.password === password) {
+             onLogin({
+                id: data.id,
+                name: data.full_name,
+                role: data.role as UserRole,
+                email: data.email,
+                avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.full_name)}&background=random`,
+                batch: data.batch,
+                phone: data.phone,
+                rollNumber: data.student_id
+            });
+        } else {
+            setError('Invalid password.');
+        }
+
+    } catch (err) {
+        console.error(err);
+        setError('Invalid credentials or user does not exist.');
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -142,9 +185,10 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
 
           <button 
             type="submit" 
-            className="w-full bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-brand-600/20"
+            disabled={loading}
+            className="w-full bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50"
           >
-            Sign In (ログイン)
+            {loading ? 'Authenticating...' : 'Sign In (ログイン)'}
           </button>
         </form>
       </div>

@@ -1,22 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
-  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp
+  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save
 } from 'lucide-react';
 import { User, UserRole, Course, FeeRecord } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from 'recharts';
+import { supabase } from '../services/supabaseClient';
 
 // --- MOCK DATA EXTENDED FOR ADMIN ---
-
-const MOCK_ALL_USERS: User[] = [
-  { id: 's1', name: 'Alex Student', role: UserRole.STUDENT, email: 'alex@zenro.jp', avatar: 'https://ui-avatars.com/api/?name=Alex&background=BC002D&color=fff', batch: '2024-A', phone: '+91 98765 43210' },
-  { id: 't1', name: 'Tanaka Sensei', role: UserRole.TEACHER, email: 'tanaka@zenro.jp', avatar: 'https://ui-avatars.com/api/?name=Tanaka&background=0f172a&color=fff', phone: '+81 90 1234 5678' },
-  { id: 's2', name: 'Riya Patel', role: UserRole.STUDENT, email: 'riya@zenro.jp', avatar: 'https://ui-avatars.com/api/?name=Riya&background=C5A059&color=fff', batch: '2024-B', phone: '+91 98765 11111' },
-  { id: 's3', name: 'Kenji Sato', role: UserRole.STUDENT, email: 'kenji@zenro.jp', avatar: 'https://ui-avatars.com/api/?name=Kenji&background=BC002D&color=fff', batch: '2024-A', phone: '+91 98765 22222' },
-  { id: 'a1', name: 'System Admin', role: UserRole.ADMIN, email: 'admin@zenro.jp', avatar: 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff' },
-];
-
 const REVENUE_DATA = [
   { month: 'Jan', phase1: 4000, phase2: 2400 },
   { month: 'Feb', phase1: 3000, phase2: 1398 },
@@ -149,48 +141,134 @@ export const AdminDashboard = () => {
 // --- USER MANAGEMENT ---
 
 export const AdminUserManagement = () => {
-  const [users, setUsers] = useState<User[]>(MOCK_ALL_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
-  const [sortConfig, setSortConfig] = useState<{ key: keyof User, direction: 'asc' | 'desc' } | null>(null);
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    role: 'STUDENT',
+    student_id: '',
+    batch: '',
+    password: '',
+    phone: ''
+  });
 
-  // Sorting Logic
-  const handleSort = (key: keyof User) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (data) {
+      // Map DB fields to UI type
+      const mappedUsers = data.map((u: any) => ({
+        id: u.id,
+        name: u.full_name,
+        role: u.role as UserRole,
+        email: u.email,
+        avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name)}&background=random`,
+        batch: u.batch,
+        phone: u.phone,
+        rollNumber: u.student_id
+      }));
+      setUsers(mappedUsers);
     }
-    setSortConfig({ key, direction });
+    setLoading(false);
   };
 
   const filteredUsers = useMemo(() => {
-    let result = users.filter(u => 
+    return users.filter(u => 
       (u.name.toLowerCase().includes(filter.toLowerCase()) || u.email.toLowerCase().includes(filter.toLowerCase())) &&
       (roleFilter === 'ALL' || u.role === roleFilter)
     );
+  }, [users, filter, roleFilter]);
 
-    if (sortConfig) {
-      result.sort((a, b) => {
-        if (a[sortConfig.key]! < b[sortConfig.key]!) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (a[sortConfig.key]! > b[sortConfig.key]!) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+  const handleOpenModal = (user: any = null) => {
+    if (user) {
+      setEditingUser(user);
+      setFormData({
+        full_name: user.name,
+        email: user.email,
+        role: user.role,
+        student_id: user.rollNumber || '',
+        batch: user.batch || '',
+        password: '', // Don't show existing password
+        phone: user.phone || ''
+      });
+    } else {
+      setEditingUser(null);
+      setFormData({
+        full_name: '',
+        email: '',
+        role: 'STUDENT',
+        student_id: '',
+        batch: '',
+        password: '',
+        phone: ''
       });
     }
-    return result;
-  }, [users, filter, roleFilter, sortConfig]);
+    setIsModalOpen(true);
+  };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      setUsers(users.filter(u => u.id !== id));
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const payload: any = {
+      full_name: formData.full_name,
+      email: formData.email,
+      role: formData.role,
+      student_id: formData.student_id,
+      batch: formData.batch,
+      phone: formData.phone
+    };
+
+    if (formData.password) {
+      payload.password = formData.password;
+    }
+
+    try {
+      if (editingUser) {
+        // Update
+        const { error } = await supabase.from('profiles').update(payload).eq('id', editingUser.id);
+        if (error) throw error;
+      } else {
+        // Create
+        // Note: In a real app with Supabase Auth, you'd use signUp() or admin.createUser()
+        // Here we just insert into our custom profiles table for the demo.
+        const { error } = await supabase.from('profiles').insert([payload]);
+        if (error) throw error;
+      }
+      
+      setIsModalOpen(false);
+      fetchUsers();
+    } catch (err: any) {
+      alert("Error saving user: " + err.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this user?')) {
+      await supabase.from('profiles').delete().eq('id', id);
+      fetchUsers();
     }
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
        <AdminHeader 
         title="User Management" 
         action={
-          <button className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
+          <button 
+            onClick={() => handleOpenModal()}
+            className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"
+          >
             <Plus className="w-5 h-5" /> Add New User
           </button>
         }
@@ -226,18 +304,16 @@ export const AdminUserManagement = () => {
            <table className="w-full text-left text-sm text-gray-400">
              <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
                <tr>
-                 <th className="px-6 py-4 cursor-pointer hover:text-brand-500 select-none" onClick={() => handleSort('name')}>
-                   User Profile {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <ChevronUp className="inline w-3 h-3"/> : <ChevronDown className="inline w-3 h-3"/>)}
-                 </th>
-                 <th className="px-6 py-4 cursor-pointer hover:text-brand-500 select-none" onClick={() => handleSort('role')}>Role</th>
+                 <th className="px-6 py-4">User Profile</th>
+                 <th className="px-6 py-4">Role</th>
                  <th className="px-6 py-4">Contact</th>
                  <th className="px-6 py-4">Batch/ID</th>
-                 <th className="px-6 py-4">Status</th>
                  <th className="px-6 py-4 text-right">Actions</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-dark-700">
-               {filteredUsers.map(user => (
+               {loading ? <tr><td colSpan={5} className="p-8 text-center">Loading...</td></tr> : 
+                filteredUsers.map(user => (
                  <tr key={user.id} className="hover:bg-dark-700/50 transition group">
                    <td className="px-6 py-4">
                      <div className="flex items-center gap-3">
@@ -260,20 +336,17 @@ export const AdminUserManagement = () => {
                    <td className="px-6 py-4 font-mono text-xs">{user.phone || 'N/A'}</td>
                    <td className="px-6 py-4">
                      {user.batch ? (
-                       <span className="bg-dark-900 px-2 py-1 rounded border border-dark-600 text-xs text-gray-300">{user.batch}</span>
+                       <div className="flex flex-col gap-1">
+                           <span className="bg-dark-900 px-2 py-1 rounded border border-dark-600 text-xs text-gray-300 text-center">{user.batch}</span>
+                           <span className="text-[10px] text-gray-500 text-center">{user.rollNumber}</span>
+                       </div>
                      ) : (
                        <span className="text-gray-600">-</span>
                      )}
                    </td>
-                   <td className="px-6 py-4">
-                     <div className="flex items-center gap-2">
-                       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                       <span className="text-green-500 font-medium text-xs">Active</span>
-                     </div>
-                   </td>
                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
-                        <button className="p-2 bg-dark-900 hover:bg-blue-900/30 text-blue-500 rounded border border-dark-600 hover:border-blue-500/30 transition" title="Edit">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleOpenModal(user)} className="p-2 bg-dark-900 hover:bg-blue-900/30 text-blue-500 rounded border border-dark-600 hover:border-blue-500/30 transition" title="Edit">
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
@@ -290,14 +363,72 @@ export const AdminUserManagement = () => {
              </tbody>
            </table>
          </div>
-         <div className="p-4 border-t border-dark-700 bg-dark-900/50 flex justify-between items-center text-xs text-gray-500">
-            <span>Displaying 1-{filteredUsers.length} of {filteredUsers.length} records</span>
-            <div className="flex gap-2">
-              <button className="px-3 py-1 rounded bg-dark-800 border border-dark-600 hover:text-white disabled:opacity-50" disabled>Previous</button>
-              <button className="px-3 py-1 rounded bg-dark-800 border border-dark-600 hover:text-white disabled:opacity-50" disabled>Next</button>
-            </div>
-         </div>
       </div>
+
+      {/* CREATE/EDIT MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-dark-800 w-full max-w-lg rounded-2xl border border-dark-700 shadow-2xl overflow-hidden">
+                <div className="flex justify-between items-center p-6 border-b border-dark-700 bg-dark-900">
+                    <h2 className="text-xl font-bold text-white">{editingUser ? 'Edit User' : 'Create New User'}</h2>
+                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X className="w-6 h-6" /></button>
+                </div>
+                
+                <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name</label>
+                            <input required type="text" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="John Doe" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role</label>
+                            <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm">
+                                <option value="STUDENT">Student</option>
+                                <option value="TEACHER">Teacher</option>
+                                <option value="ADMIN">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address</label>
+                        <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="john@example.com" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label>
+                            <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="+91..." />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
+                            <input type="text" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder={editingUser ? "(Unchanged)" : "Create Password"} />
+                        </div>
+                    </div>
+
+                    {formData.role === 'STUDENT' && (
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-dark-700">
+                            <div>
+                                <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Batch Assignment</label>
+                                <input type="text" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="e.g. 2024-A" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Student ID (Login)</label>
+                                <input type="text" value={formData.student_id} onChange={e => setFormData({...formData, student_id: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="e.g. 99999..." />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="pt-4 flex justify-end gap-3">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded text-gray-400 hover:text-white">Cancel</button>
+                        <button type="submit" className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded font-bold flex items-center gap-2">
+                            <Save className="w-4 h-4" /> Save User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

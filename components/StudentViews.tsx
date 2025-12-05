@@ -693,10 +693,44 @@ export const StudentActivityPage = () => {
 
 
 export const StudentProfilePage = ({ user }: { user: User }) => {
+    const [testStats, setTestStats] = useState({ attempts: 0, avgScore: 0, passed: 0 });
+    const [recentTests, setRecentTests] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            const { data } = await supabase
+                .from('submissions')
+                .select('score, total_score, status, completed_at, tests(title)')
+                .eq('student_id', user.id) // Assuming user.id matches profile id
+                .eq('status', 'COMPLETED');
+            
+            if (data && data.length > 0) {
+                const total = data.length;
+                const totalScorePct = data.reduce((acc, curr) => acc + (curr.score / curr.total_score), 0);
+                const passedCount = data.filter(d => (d.score / d.total_score) > 0.4).length; // assuming 40% pass
+
+                setTestStats({
+                    attempts: total,
+                    avgScore: Math.round((totalScorePct / total) * 100),
+                    passed: passedCount
+                });
+                setRecentTests(data.slice(0, 3));
+            }
+        };
+        // Only fetch if it's a real user ID (not mock 's1') or if you have real data for 's1'
+        // For this demo, let's try fetching anyway
+        fetchStats();
+    }, [user.id]);
+
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="relative h-48 bg-gradient-to-r from-brand-900 to-dark-800 rounded-xl overflow-hidden border border-brand-500/30">
                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-30"></div>
+                 <div className="absolute bottom-4 right-4 flex gap-2">
+                     <span className="bg-black/50 backdrop-blur px-3 py-1 rounded text-xs text-white border border-white/20">
+                         Batch: {user.batch || 'Unassigned'}
+                     </span>
+                 </div>
             </div>
             
             <div className="relative px-8 -mt-16 flex flex-col md:flex-row items-end gap-6">
@@ -708,7 +742,7 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
                     <p className="text-gray-400 flex items-center gap-2">
                         <span className="bg-brand-500/20 text-brand-500 px-2 py-0.5 rounded text-xs font-bold border border-brand-500/30 uppercase">{user.role}</span>
                         <span>•</span>
-                        <span>Batch 2024-A</span>
+                        <span>ID: {user.rollNumber || user.id.slice(0, 8).toUpperCase()}</span>
                     </p>
                 </div>
                 <div className="mb-4 flex gap-3">
@@ -729,31 +763,56 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
                             </div>
                              <div>
                                 <label className="text-xs text-gray-500 uppercase font-bold">Phone Number</label>
-                                <p className="text-white font-medium mt-1">{user.phone || '+91 98765 43210'}</p>
+                                <p className="text-white font-medium mt-1">{user.phone || 'N/A'}</p>
                             </div>
                              <div>
                                 <label className="text-xs text-gray-500 uppercase font-bold">Student ID</label>
-                                <p className="text-white font-mono font-medium mt-1">{user.id.toUpperCase()}</p>
+                                <p className="text-white font-mono font-medium mt-1">{user.rollNumber || user.id.toUpperCase()}</p>
                             </div>
                              <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Enrolled Date</label>
-                                <p className="text-white font-medium mt-1">Aug 01, 2023</p>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Enrolled Batch</label>
+                                <p className="text-white font-medium mt-1">{user.batch || 'N/A'}</p>
                             </div>
                         </div>
                      </div>
 
                      <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
                         <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                            <Briefcase className="w-5 h-5 text-gray-400" /> Placement Status
+                            <Activity className="w-5 h-5 text-gray-400" /> Academic Performance
                         </h3>
-                        <div className="bg-dark-900 rounded-lg p-4 border border-dark-700 flex items-center gap-4">
-                             <div className="p-3 bg-blue-500/20 text-blue-500 rounded-full">
-                                 <Globe className="w-6 h-6" />
-                             </div>
-                             <div>
-                                 <h4 className="text-white font-bold">Target: Japan Engineering Visa</h4>
-                                 <p className="text-sm text-gray-400">Documentation Phase (Waiting for N4 Result)</p>
-                             </div>
+                        
+                        <div className="grid grid-cols-3 gap-4 mb-6">
+                            <div className="bg-dark-900 p-4 rounded-lg text-center">
+                                <div className="text-2xl font-bold text-white">{testStats.attempts}</div>
+                                <div className="text-xs text-gray-500 uppercase">Tests Taken</div>
+                            </div>
+                            <div className="bg-dark-900 p-4 rounded-lg text-center">
+                                <div className="text-2xl font-bold text-brand-500">{testStats.avgScore}%</div>
+                                <div className="text-xs text-gray-500 uppercase">Avg Score</div>
+                            </div>
+                            <div className="bg-dark-900 p-4 rounded-lg text-center">
+                                <div className="text-2xl font-bold text-green-500">{testStats.passed}</div>
+                                <div className="text-xs text-gray-500 uppercase">Tests Passed</div>
+                            </div>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-gray-400 mb-3">Recent Results</h4>
+                        <div className="space-y-2">
+                            {recentTests.length === 0 ? (
+                                <p className="text-sm text-gray-500 italic">No test history found.</p>
+                            ) : (
+                                recentTests.map((t, i) => (
+                                    <div key={i} className="flex justify-between items-center p-3 bg-dark-900 rounded border border-dark-700">
+                                        <span className="text-white text-sm font-medium">{t.tests?.title}</span>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-xs text-gray-500">{new Date(t.completed_at).toLocaleDateString()}</span>
+                                            <span className={`text-xs font-bold px-2 py-1 rounded ${t.score/t.total_score > 0.4 ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                                {t.score}/{t.total_score}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                      </div>
                 </div>
