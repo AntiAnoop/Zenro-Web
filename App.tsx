@@ -237,6 +237,10 @@ const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
                <BookOpen className="w-5 h-5" />
                Course Mgmt
              </Link>
+             <Link to="/admin/reports" className={`flex items-center gap-3 px-4 py-3 rounded-r-lg transition-all ${isActive('/admin/reports')}`}>
+               <BarChart2 className="w-5 h-5" />
+               Test Results
+             </Link>
              <Link to="/admin/finance" className={`flex items-center gap-3 px-4 py-3 rounded-r-lg transition-all ${isActive('/admin/finance')}`}>
                <DollarSign className="w-5 h-5" />
                Financials
@@ -330,6 +334,7 @@ export default function App() {
               <Route path="/admin/users" element={<AdminUserManagement />} />
               <Route path="/admin/finance" element={<AdminFinancials />} />
               <Route path="/admin/courses" element={<TeacherCoursesPage />} />
+              <Route path="/admin/reports" element={<TeacherReportsPage />} />
               <Route path="/admin/settings" element={<div className="text-center p-12 text-gray-500">Settings Module Loading...</div>} />
 
               <Route path="*" element={<Navigate to="/" />} />

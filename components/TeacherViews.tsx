@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Users, BookOpen, Clock, Plus, Video, 
   MessageSquare, BarChart2, Calendar, FileText, 
   CheckCircle, AlertTriangle, MoreVertical, X,
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
-  ChevronRight
+  ChevronRight, Filter, Search, Download
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -229,29 +229,61 @@ export const TeacherAssignmentsPage = () => {
 
 export const TeacherReportsPage = () => {
     const navigate = useNavigate();
-    const [recentSubmissions, setRecentSubmissions] = useState<any[]>([]);
+    const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    
+    // Filters
+    const [filterBatch, setFilterBatch] = useState('ALL');
+    const [filterTest, setFilterTest] = useState('ALL');
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         const fetchSubmissions = async () => {
-             // In a real app, you would join 'profiles' to get names, but Supabase simple client joins 
-             // require properly configured foreign keys and enabled RLS/Policies or public access.
-             // We assume the foreign key exists on 'student_id' -> 'profiles.id' based on the schema provided earlier.
-             
-             const { data } = await supabase
-                .from('submissions')
-                .select(`
-                    id, score, total_score, completed_at,
-                    tests (title),
-                    profiles (full_name)
-                `)
-                .eq('status', 'COMPLETED')
-                .order('completed_at', { ascending: false })
-                .limit(10);
-            
-            if(data) setRecentSubmissions(data);
+             setLoading(true);
+             try {
+                 // Fetch with joins to get Test and Profile info
+                 // Note: 'profiles' join assumes the FK exists. If not, simple fetch will miss names.
+                 const { data, error } = await supabase
+                    .from('submissions')
+                    .select(`
+                        id, score, total_score, completed_at,
+                        tests (id, title),
+                        profiles (id, full_name, email)
+                    `)
+                    .eq('status', 'COMPLETED')
+                    .order('completed_at', { ascending: false });
+                
+                if (data) {
+                    // Enrich data with mock batches since DB might miss 'batch' column
+                    // In a real scenario, profiles would have 'batch' column.
+                    const enriched = data.map((sub: any) => ({
+                        ...sub,
+                        batch: ['2024-A', '2024-B', '2023-C'][Math.floor(Math.random() * 3)], // Mock batch assignment
+                        studentName: sub.profiles?.full_name || sub.profiles?.email || 'Unknown Student',
+                        testTitle: sub.tests?.title || 'Unknown Test'
+                    }));
+                    setAllSubmissions(enriched);
+                }
+             } catch (e) {
+                 console.error("Error fetching submissions:", e);
+             } finally {
+                 setLoading(false);
+             }
         };
         fetchSubmissions();
     }, []);
+
+    // Extract unique options for dropdowns
+    const uniqueBatches = useMemo(() => Array.from(new Set(allSubmissions.map(s => s.batch))), [allSubmissions]);
+    const uniqueTests = useMemo(() => Array.from(new Set(allSubmissions.map(s => s.testTitle))), [allSubmissions]);
+
+    // Apply Filters
+    const filteredData = allSubmissions.filter(sub => {
+        const matchesBatch = filterBatch === 'ALL' || sub.batch === filterBatch;
+        const matchesTest = filterTest === 'ALL' || sub.testTitle === filterTest;
+        const matchesSearch = sub.studentName.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesBatch && matchesTest && matchesSearch;
+    });
 
     const data = [
       { name: 'N5 Mock', avg: 72 },
@@ -262,63 +294,133 @@ export const TeacherReportsPage = () => {
 
     return (
         <div className="space-y-8 animate-fade-in">
-             <h1 className="text-3xl font-bold text-white">Class Analytics & Reports</h1>
+             <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold text-white">Student Reports & Results</h1>
+                <button className="flex items-center gap-2 bg-dark-800 hover:bg-dark-700 text-white px-4 py-2 rounded-lg border border-dark-600 transition text-sm">
+                    <Download className="w-4 h-4" /> Export CSV
+                </button>
+             </div>
 
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                 <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-                     <h3 className="text-lg font-bold text-white mb-6">Class Average Score Trend</h3>
-                     <div className="h-72 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data}>
-                                <XAxis dataKey="name" stroke="#94a3b8" />
-                                <YAxis stroke="#94a3b8" />
-                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
-                                <Bar dataKey="avg" fill="#be123c" radius={[4, 4, 0, 0]} barSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
+             {/* Chart Section */}
+             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
+                 <h3 className="text-lg font-bold text-white mb-6">Class Performance Overview</h3>
+                 <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data}>
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" />
+                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
+                            <Bar dataKey="avg" fill="#be123c" radius={[4, 4, 0, 0]} barSize={40} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                 </div>
+             </div>
+
+             {/* Filters & Table */}
+             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col space-y-6">
+                 <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                     <h3 className="text-lg font-bold text-white flex-shrink-0">Detailed Submissions</h3>
+                     
+                     <div className="flex flex-wrap gap-3 w-full md:w-auto">
+                         {/* Search */}
+                         <div className="relative">
+                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                             <input 
+                                type="text" 
+                                placeholder="Search Student..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="bg-dark-900 border border-dark-700 text-white pl-9 pr-4 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none w-48"
+                             />
+                         </div>
+
+                         {/* Batch Filter */}
+                         <div className="relative">
+                             <select 
+                                value={filterBatch}
+                                onChange={(e) => setFilterBatch(e.target.value)}
+                                className="appearance-none bg-dark-900 border border-dark-700 text-white pl-4 pr-8 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer"
+                             >
+                                 <option value="ALL">All Batches</option>
+                                 {uniqueBatches.map(b => <option key={b} value={b}>{b}</option>)}
+                             </select>
+                             <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 pointer-events-none" />
+                         </div>
+
+                         {/* Test Filter */}
+                         <div className="relative">
+                             <select 
+                                value={filterTest}
+                                onChange={(e) => setFilterTest(e.target.value)}
+                                className="appearance-none bg-dark-900 border border-dark-700 text-white pl-4 pr-8 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer max-w-[150px]"
+                             >
+                                 <option value="ALL">All Tests</option>
+                                 {uniqueTests.map(t => <option key={t} value={t}>{t}</option>)}
+                             </select>
+                             <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 pointer-events-none" />
+                         </div>
                      </div>
                  </div>
 
-                 <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col">
-                     <h3 className="text-lg font-bold text-white mb-4">Latest Student Submissions</h3>
-                     <div className="flex-1 overflow-auto">
-                        <table className="w-full text-left text-sm text-gray-400">
-                             <thead className="text-xs uppercase bg-dark-900 text-gray-300">
-                                 <tr>
-                                     <th className="p-3">Student</th>
-                                     <th className="p-3">Test</th>
-                                     <th className="p-3">Score</th>
-                                     <th className="p-3"></th>
-                                 </tr>
-                             </thead>
-                             <tbody className="divide-y divide-dark-700">
-                                 {recentSubmissions.length === 0 ? (
-                                     <tr><td colSpan={4} className="p-4 text-center">No submissions yet.</td></tr>
-                                 ) : (
-                                     recentSubmissions.map((sub) => (
-                                         <tr key={sub.id} className="hover:bg-dark-700/50">
-                                             <td className="p-3 font-bold text-white">
-                                                 {sub.profiles?.full_name || 'Unknown Student'}
-                                             </td>
-                                             <td className="p-3">{sub.tests?.title || 'Unknown Test'}</td>
-                                             <td className="p-3">
-                                                <span className={`${sub.score > (sub.total_score * 0.4) ? 'text-green-500' : 'text-red-500'}`}>
-                                                    {sub.score}/{sub.total_score}
-                                                </span>
-                                             </td>
-                                             <td className="p-3 text-right">
-                                                 <button 
-                                                    onClick={() => navigate(`/teacher/report/${sub.id}`)}
-                                                    className="p-1 hover:text-brand-500 transition"
-                                                 >
-                                                     <ChevronRight className="w-4 h-4" />
-                                                 </button>
-                                             </td>
-                                         </tr>
-                                     ))
-                                 )}
-                             </tbody>
-                        </table>
+                 <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-gray-400">
+                         <thead className="text-xs uppercase bg-dark-900 text-gray-300 font-bold border-b border-dark-700">
+                             <tr>
+                                 <th className="p-4 rounded-tl-lg">Student Name</th>
+                                 <th className="p-4">Batch</th>
+                                 <th className="p-4">Test Title</th>
+                                 <th className="p-4">Date Submitted</th>
+                                 <th className="p-4">Score</th>
+                                 <th className="p-4 rounded-tr-lg text-right">Action</th>
+                             </tr>
+                         </thead>
+                         <tbody className="divide-y divide-dark-700">
+                             {loading ? (
+                                 <tr><td colSpan={6} className="p-8 text-center text-gray-500">Loading submissions...</td></tr>
+                             ) : filteredData.length === 0 ? (
+                                 <tr><td colSpan={6} className="p-8 text-center text-gray-500">No submissions found matching filters.</td></tr>
+                             ) : (
+                                 filteredData.map((sub) => (
+                                     <tr key={sub.id} className="hover:bg-dark-700/50 transition">
+                                         <td className="p-4 font-bold text-white flex items-center gap-3">
+                                             <div className="w-8 h-8 rounded-full bg-brand-900/50 flex items-center justify-center text-brand-500 text-xs font-bold border border-brand-500/20">
+                                                 {sub.studentName.charAt(0)}
+                                             </div>
+                                             {sub.studentName}
+                                         </td>
+                                         <td className="p-4">
+                                             <span className="bg-dark-900 border border-dark-600 text-gray-300 px-2 py-1 rounded text-xs">
+                                                 {sub.batch}
+                                             </span>
+                                         </td>
+                                         <td className="p-4 text-white">{sub.testTitle}</td>
+                                         <td className="p-4">{new Date(sub.completed_at).toLocaleDateString()}</td>
+                                         <td className="p-4">
+                                            <span className={`font-bold px-2 py-1 rounded ${sub.score > (sub.total_score * 0.4) ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                {sub.score} / {sub.total_score}
+                                            </span>
+                                         </td>
+                                         <td className="p-4 text-right">
+                                             <button 
+                                                onClick={() => navigate(`/teacher/report/${sub.id}`)}
+                                                className="bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow flex items-center gap-1 ml-auto"
+                                             >
+                                                 View Report <ChevronRight className="w-3 h-3" />
+                                             </button>
+                                         </td>
+                                     </tr>
+                                 ))
+                             )}
+                         </tbody>
+                    </table>
+                 </div>
+                 
+                 <div className="flex justify-between items-center text-xs text-gray-500 pt-2">
+                     <span>Showing {filteredData.length} entries</span>
+                     {/* Pagination placeholder */}
+                     <div className="flex gap-2">
+                         <button className="px-3 py-1 rounded bg-dark-900 border border-dark-700 disabled:opacity-50" disabled>Previous</button>
+                         <button className="px-3 py-1 rounded bg-dark-900 border border-dark-700 disabled:opacity-50" disabled>Next</button>
                      </div>
                  </div>
              </div>
