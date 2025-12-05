@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
-  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save
+  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key
 } from 'lucide-react';
 import { User, UserRole, Course, FeeRecord } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from 'recharts';
@@ -217,9 +217,27 @@ export const AdminUserManagement = () => {
     setIsModalOpen(true);
   };
 
+  const generatePassword = () => {
+    // Generate a 6-digit number or simple alphanumeric string
+    const chars = "0123456789";
+    let pass = "";
+    for(let i=0; i<6; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+    setFormData(prev => ({...prev, password: pass}));
+  };
+
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validations
+    if (formData.role === 'STUDENT' && !formData.student_id) {
+        alert("Student ID is required for Students.");
+        return;
+    }
+    if (!editingUser && !formData.password) {
+        alert("Password is required for new users.");
+        return;
+    }
+
     const payload: any = {
       full_name: formData.full_name,
       email: formData.email,
@@ -240,10 +258,12 @@ export const AdminUserManagement = () => {
         if (error) throw error;
       } else {
         // Create
-        // Note: In a real app with Supabase Auth, you'd use signUp() or admin.createUser()
-        // Here we just insert into our custom profiles table for the demo.
+        // Insert into custom profiles table
         const { error } = await supabase.from('profiles').insert([payload]);
-        if (error) throw error;
+        if (error) {
+            if (error.code === '23505') throw new Error("Student ID or Email already exists.");
+            throw error;
+        }
       }
       
       setIsModalOpen(false);
@@ -370,19 +390,22 @@ export const AdminUserManagement = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-dark-800 w-full max-w-lg rounded-2xl border border-dark-700 shadow-2xl overflow-hidden">
                 <div className="flex justify-between items-center p-6 border-b border-dark-700 bg-dark-900">
-                    <h2 className="text-xl font-bold text-white">{editingUser ? 'Edit User' : 'Create New User'}</h2>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        {editingUser ? <Edit2 className="w-5 h-5 text-brand-500" /> : <Plus className="w-5 h-5 text-green-500" />}
+                        {editingUser ? 'Edit User Profile' : 'Create New Profile'}
+                    </h2>
                     <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X className="w-6 h-6" /></button>
                 </div>
                 
                 <form onSubmit={handleSaveUser} className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name</label>
-                            <input required type="text" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="John Doe" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name *</label>
+                            <input required type="text" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="John Doe" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role</label>
-                            <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role *</label>
+                            <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none">
                                 <option value="STUDENT">Student</option>
                                 <option value="TEACHER">Teacher</option>
                                 <option value="ADMIN">Admin</option>
@@ -391,38 +414,56 @@ export const AdminUserManagement = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address</label>
-                        <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="john@example.com" />
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address *</label>
+                        <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="john@example.com" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label>
-                            <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="+91..." />
+                            <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="+91..." />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
-                            <input type="text" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder={editingUser ? "(Unchanged)" : "Create Password"} />
+                            <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Login Password *</label>
+                            <div className="relative">
+                                <Key className="absolute left-2 top-2.5 w-4 h-4 text-gray-500" />
+                                <input 
+                                    type="text" 
+                                    value={formData.password} 
+                                    onChange={e => setFormData({...formData, password: e.target.value})} 
+                                    className="w-full bg-dark-900 border border-dark-700 rounded p-2 pl-8 text-white text-sm font-mono focus:border-brand-500 outline-none" 
+                                    placeholder={editingUser ? "(Unchanged)" : "Required"} 
+                                />
+                                <button type="button" onClick={generatePassword} className="absolute right-2 top-2 text-gray-400 hover:text-brand-500" title="Generate Random Password">
+                                    <RefreshCw className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     {formData.role === 'STUDENT' && (
-                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-dark-700">
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dark-700 mt-4">
                             <div>
                                 <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Batch Assignment</label>
-                                <input type="text" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="e.g. 2024-A" />
+                                <input type="text" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="e.g. 2024-A" />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Student ID (Login)</label>
-                                <input type="text" value={formData.student_id} onChange={e => setFormData({...formData, student_id: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm" placeholder="e.g. 99999..." />
+                                <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Student ID (Login) *</label>
+                                <input 
+                                    type="text" 
+                                    value={formData.student_id} 
+                                    onChange={e => setFormData({...formData, student_id: e.target.value})} 
+                                    className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" 
+                                    placeholder="e.g. 99999..." 
+                                />
                             </div>
                         </div>
                     )}
 
-                    <div className="pt-4 flex justify-end gap-3">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded text-gray-400 hover:text-white">Cancel</button>
-                        <button type="submit" className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded font-bold flex items-center gap-2">
-                            <Save className="w-4 h-4" /> Save User
+                    <div className="pt-6 flex justify-end gap-3">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
+                        <button type="submit" className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition">
+                            <Save className="w-4 h-4" /> {editingUser ? 'Update Profile' : 'Create Profile'}
                         </button>
                     </div>
                 </form>

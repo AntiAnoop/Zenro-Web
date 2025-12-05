@@ -46,14 +46,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
   const [loading, setLoading] = useState(false);
 
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (/^\d*$/.test(val)) {
-      if (val.length <= 10) {
-        setIdentifier(val);
-      }
-    } else {
-      setIdentifier(val);
-    }
+    setIdentifier(e.target.value);
   };
 
   const loginAs = (id: string) => {
@@ -77,7 +70,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
     setError('');
 
     try {
-        // 1. Check Hardcoded Mocks First
+        // 1. Check Hardcoded Mocks First (Quick Fallback)
         const account = CREDENTIALS[identifier];
         if (account && account.pass === password) {
             onLogin({
@@ -85,25 +78,27 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
                 name: account.name,
                 role: account.role,
                 email: `${identifier}@zenro.jp`,
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`,
+                batch: '2024-A' // Mock batch
             });
             setLoading(false);
             return;
         }
 
         // 2. Check Supabase 'profiles' table
-        // We look up by 'student_id' column for students, or maybe email.
+        // Robust query: Check if student_id matches OR email matches OR phone matches
+        // This makes the profile accessible via multiple identifiers.
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('student_id', identifier)
+            .or(`student_id.eq.${identifier},email.eq.${identifier},phone.eq.${identifier}`)
             .single();
 
         if (error || !data) {
-            throw new Error('User not found');
+            throw new Error('User not found in registry');
         }
 
-        // Simple password check (in real app, use hashing/auth service)
+        // Simple password check (Note: Production apps should use hashing/Supabase Auth)
         if (data.password === password) {
              onLogin({
                 id: data.id,
@@ -120,7 +115,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         }
 
     } catch (err) {
-        console.error(err);
+        console.error("Login Error:", err);
         setError('Invalid credentials or user does not exist.');
     } finally {
         setLoading(false);
@@ -157,13 +152,13 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Student ID / Number</label>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Student ID / Email / Phone</label>
             <input 
               type="text" 
               value={identifier}
               onChange={handleIdentifierChange}
               className="w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:outline-none placeholder-gray-600 transition"
-              placeholder="Enter ID"
+              placeholder="Enter your registered ID..."
               
             />
           </div>
