@@ -316,8 +316,9 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
 
         } catch (e: any) {
             console.error("Course Creation Failed:", e);
-            if (e.code === '42P01' || e.code === '42703') { // 42P01=Table missing, 42703=Column missing
-                alert("DATABASE SCHEMA ERROR: Tables or Columns are missing (e.g. instructor_name). Please run the 'db_schema.sql' script in your Supabase SQL Editor.");
+            // 42P01: Table missing, 42703: Column missing, PGRST204: Schema cache stale/column missing
+            if (e.code === '42P01' || e.code === '42703' || e.code === 'PGRST204') { 
+                alert("DATABASE SCHEMA ERROR: Tables or Columns (like 'level') are missing. Please run the 'db_schema.sql' script in your Supabase SQL Editor to update your database structure.");
             } else {
                 alert(`Failed to create course: ${e.message || 'Check console'}`);
             }
