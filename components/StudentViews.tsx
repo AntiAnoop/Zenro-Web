@@ -203,6 +203,21 @@ export const StudentCoursesPage = () => {
   const navigate = useNavigate();
   const { isLive, topic } = useLiveSession();
   const liveCourse = MOCK_COURSES.find(c => c.isLive); // Ideally match by ID from context, but mocking for now
+  
+  // Fake loading state for demo robustness
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+      const t = setTimeout(() => setLoading(false), 500);
+      return () => clearTimeout(t);
+  }, []);
+
+  if (loading) {
+      return (
+          <div className="h-full flex items-center justify-center">
+              <Loader2 className="w-12 h-12 text-brand-500 animate-spin" />
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -531,33 +546,49 @@ export const StudentTestsPage = () => {
     const [activeTests, setActiveTests] = useState<any[]>([]);
     const [pastSubmissions, setPastSubmissions] = useState<any[]>([]);
     const [tab, setTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+    const [loading, setLoading] = useState(true);
     
     useEffect(() => {
         const fetchData = async () => {
-            // Fetch Active Tests
-            const { data: tests } = await supabase.from('tests').select('*').eq('is_active', true);
-            if(tests) setActiveTests(tests);
+            setLoading(true);
+            try {
+                // Fetch Active Tests
+                const { data: tests } = await supabase.from('tests').select('*').eq('is_active', true);
+                if(tests) setActiveTests(tests);
 
-            // Fetch Past Submissions
-            const { data: subs } = await supabase
-                .from('submissions')
-                .select(`
-                    id, score, total_score, completed_at,
-                    tests (title, duration_minutes)
-                `)
-                .eq('status', 'COMPLETED')
-                .order('completed_at', { ascending: false });
-            
-            if(subs) setPastSubmissions(subs);
+                // Fetch Past Submissions
+                const { data: subs } = await supabase
+                    .from('submissions')
+                    .select(`
+                        id, score, total_score, completed_at,
+                        tests (title, duration_minutes)
+                    `)
+                    .eq('status', 'COMPLETED')
+                    .order('completed_at', { ascending: false });
+                
+                if(subs) setPastSubmissions(subs);
+            } catch (error) {
+                console.error("Fetch tests error:", error);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchData();
     }, []);
 
-    // Merge Mock data if DB is empty for demo
+    // Merge Mock data if DB is empty for demo, but ONLY after loading
     const displayTests = activeTests.length > 0 ? activeTests : [
         { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', title: 'JLPT N4 Mock Exam (Demo)', duration_minutes: 30, subject: 'Grammar', date: 'Available Now' },
         ...MOCK_TESTS
     ];
+
+    if (loading) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="w-12 h-12 text-brand-500 animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-fade-in">

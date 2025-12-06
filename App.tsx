@@ -64,6 +64,22 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
     }
   };
 
+  const checkLocalUsers = (id: string, pass: string) => {
+      try {
+          const local = localStorage.getItem('zenro_demo_users');
+          if (local) {
+              const users = JSON.parse(local);
+              const found = users.find((u: any) => 
+                  (u.student_id === id || u.email === id || u.phone === id)
+              );
+              if (found && found.password === pass) {
+                  return found;
+              }
+          }
+      } catch (e) { console.error("Local login check failed", e); }
+      return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -85,9 +101,24 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
             return;
         }
 
-        // 2. Check Supabase 'profiles' table
-        // Robust query: Check if student_id matches OR email matches OR phone matches
-        // This makes the profile accessible via multiple identifiers.
+        // 2. Check Local Storage (For Robust Demo Mode)
+        const localUser = checkLocalUsers(identifier, password);
+        if (localUser) {
+             onLogin({
+                id: localUser.id,
+                name: localUser.full_name,
+                role: localUser.role as UserRole,
+                email: localUser.email,
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(localUser.full_name)}&background=random`,
+                batch: localUser.batch,
+                phone: localUser.phone,
+                rollNumber: localUser.student_id
+            });
+            setLoading(false);
+            return;
+        }
+
+        // 3. Check Supabase 'profiles' table
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -98,7 +129,6 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
             throw new Error('User not found in registry');
         }
 
-        // Simple password check (Note: Production apps should use hashing/Supabase Auth)
         if (data.password === password) {
              onLogin({
                 id: data.id,
@@ -308,6 +338,24 @@ const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
   );
 };
 
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles: UserRole[];
+  user: User;
+}
+
+// 3. Protected Route Wrapper
+const ProtectedRoute = ({ children, allowedRoles, user }: ProtectedRouteProps) => {
+  if (!allowedRoles.includes(user.role)) {
+    // Redirect to appropriate dashboard based on actual role
+    if (user.role === UserRole.STUDENT) return <Navigate to="/student/dashboard" replace />;
+    if (user.role === UserRole.TEACHER) return <Navigate to="/teacher/dashboard" replace />;
+    if (user.role === UserRole.ADMIN) return <Navigate to="/admin/dashboard" replace />;
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
@@ -337,44 +385,46 @@ export default function App() {
               } />
               
               {/* Student Routes */}
-              <Route path="/student/dashboard" element={<StudentDashboardHome />} />
-              <Route path="/student/courses" element={<StudentCoursesPage />} />
-              <Route path="/student/live" element={<StudentLiveRoom user={user} />} />
-              <Route path="/student/tests" element={<StudentTestsPage />} />
-              <Route path="/student/test/:testId" element={<StudentTestPlayer />} />
-              <Route path="/student/report/:submissionId" element={<TestReport role="STUDENT" />} /> {/* NEW ROUTE */}
-              <Route path="/student/activities" element={<StudentActivityPage />} />
-              <Route path="/student/fees" element={<StudentFeesPage />} />
-              <Route path="/student/profile" element={<StudentProfilePage user={user} />} />
+              <Route path="/student/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentDashboardHome /></ProtectedRoute>} />
+              <Route path="/student/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursesPage /></ProtectedRoute>} />
+              <Route path="/student/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentLiveRoom user={user} /></ProtectedRoute>} />
+              <Route path="/student/tests" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestsPage /></ProtectedRoute>} />
+              <Route path="/student/test/:testId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestPlayer /></ProtectedRoute>} />
+              <Route path="/student/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><TestReport role="STUDENT" /></ProtectedRoute>} />
+              <Route path="/student/activities" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentActivityPage /></ProtectedRoute>} />
+              <Route path="/student/fees" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentFeesPage /></ProtectedRoute>} />
+              <Route path="/student/profile" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentProfilePage user={user} /></ProtectedRoute>} />
               
               <Route path="/exam-intro" element={
-                 <div className="p-8 flex justify-center items-center h-full">
-                     <div className="bg-dark-800 p-8 rounded-xl max-w-md text-center border border-dark-700">
-                         <ShieldAlert className="w-16 h-16 text-brand-500 mx-auto mb-4" />
-                         <h1 className="text-2xl font-bold mb-2">JLPT Mock Exam</h1>
-                         <p className="text-gray-400 mb-6">Duration: 60 mins • N4 Level</p>
-                         <button onClick={() => setIsExamMode(true)} className="w-full bg-brand-600 py-3 rounded text-white font-bold hover:bg-brand-500">
-                             Start Examination
-                         </button>
+                 <ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}>
+                     <div className="p-8 flex justify-center items-center h-full">
+                         <div className="bg-dark-800 p-8 rounded-xl max-w-md text-center border border-dark-700">
+                             <ShieldAlert className="w-16 h-16 text-brand-500 mx-auto mb-4" />
+                             <h1 className="text-2xl font-bold mb-2">JLPT Mock Exam</h1>
+                             <p className="text-gray-400 mb-6">Duration: 60 mins • N4 Level</p>
+                             <button onClick={() => setIsExamMode(true)} className="w-full bg-brand-600 py-3 rounded text-white font-bold hover:bg-brand-500">
+                                 Start Examination
+                             </button>
+                         </div>
                      </div>
-                 </div>
+                 </ProtectedRoute>
               } />
               
               {/* Teacher Routes */}
-              <Route path="/teacher/dashboard" element={<TeacherDashboardHome />} />
-              <Route path="/teacher/courses" element={<TeacherCoursesPage />} />
-              <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
-              <Route path="/teacher/reports" element={<TeacherReportsPage />} />
-              <Route path="/teacher/report/:submissionId" element={<TestReport role="TEACHER" />} /> {/* NEW ROUTE */}
-              <Route path="/teacher/live" element={<LiveClassConsole />} />
+              <Route path="/teacher/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherDashboardHome /></ProtectedRoute>} />
+              <Route path="/teacher/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
+              <Route path="/teacher/assignments" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherAssignmentsPage /></ProtectedRoute>} />
+              <Route path="/teacher/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
+              <Route path="/teacher/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TestReport role="TEACHER" /></ProtectedRoute>} />
+              <Route path="/teacher/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><LiveClassConsole /></ProtectedRoute>} />
 
               {/* Admin Routes */}
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/users" element={<AdminUserManagement />} />
-              <Route path="/admin/finance" element={<AdminFinancials />} />
-              <Route path="/admin/courses" element={<TeacherCoursesPage />} />
-              <Route path="/admin/reports" element={<TeacherReportsPage />} />
-              <Route path="/admin/settings" element={<div className="text-center p-12 text-gray-500">Settings Module Loading...</div>} />
+              <Route path="/admin/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/admin/users" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminUserManagement /></ProtectedRoute>} />
+              <Route path="/admin/finance" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminFinancials /></ProtectedRoute>} />
+              <Route path="/admin/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
+              <Route path="/admin/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
+              <Route path="/admin/settings" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><div className="text-center p-12 text-gray-500">Settings Module Loading...</div></ProtectedRoute>} />
 
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
