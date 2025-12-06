@@ -183,10 +183,10 @@ export const AdminUserManagement = () => {
         setAvailableBatches(prev => {
             // Avoid duplicates if we already added it optimistically
             if (prev.some(b => b.name === newBatch.name)) {
-                // Update the ID if it was a temp ID
                 return prev.map(b => b.name === newBatch.name ? newBatch : b);
             }
-            return [...prev, newBatch].sort((a, b) => a.name.localeCompare(b.name));
+            // Add NEW batch to the TOP (Reverse Order)
+            return [newBatch, ...prev];
         });
       })
       .subscribe();
@@ -245,26 +245,25 @@ export const AdminUserManagement = () => {
 
   const fetchBatches = async () => {
       try {
-          // 1. Robust Fetch: Try to get from 'batches' table
-          const { data, error } = await supabase.from('batches').select('*').order('name');
+          // 1. Robust Fetch: Get batches ordered by newest first (created_at DESC)
+          const { data, error } = await supabase.from('batches').select('*').order('created_at', { ascending: false });
           
           let dbBatches: Batch[] = [];
           if (!error && data) {
               dbBatches = data;
           }
 
-          // 2. Legacy Fallback: Scan profiles for batches not in DB yet (migration support)
-          // Only if DB fetch worked but we want to ensure we don't miss legacy string-only batches
+          // 2. Legacy Fallback
           const { data: profileData } = await supabase.from('profiles').select('batch');
           if (profileData) {
               const uniqueNames = Array.from(new Set(profileData.map((p:any) => p.batch).filter(Boolean)));
-              // Merge: Add legacy ones if they aren't in DB list
               const existingNames = new Set(dbBatches.map(b => b.name));
               const missingLegacy = uniqueNames
                   .filter(name => !existingNames.has(name as string))
                   .map(name => ({ id: `legacy-${name}`, name: name as string }));
               
-              setAvailableBatches([...dbBatches, ...missingLegacy].sort((a, b) => a.name.localeCompare(b.name)));
+              // Combine: DB batches (Newest) first, then legacy
+              setAvailableBatches([...dbBatches, ...missingLegacy]);
           } else {
               setAvailableBatches(dbBatches);
           }
@@ -278,10 +277,10 @@ export const AdminUserManagement = () => {
       if (!confirm(`Create new batch "${newBatchName}"?`)) return;
 
       try {
-          // 1. Optimistic UI Update (Immediate)
+          // 1. Optimistic UI Update (Add to TOP of list)
           const tempId = `temp-${Date.now()}`;
           const tempBatch = { id: tempId, name: newBatchName };
-          setAvailableBatches(prev => [...prev, tempBatch].sort((a, b) => a.name.localeCompare(b.name)));
+          setAvailableBatches(prev => [tempBatch, ...prev]);
           
           // Auto-select
           setFormData(prev => ({ ...prev, batch: newBatchName }));
@@ -293,8 +292,7 @@ export const AdminUserManagement = () => {
           
           if (error) {
               console.error("Create Batch Error:", error);
-              // Handle error: maybe revert optimistic update if it was critical, or just warn
-              if (error.code !== '42P01') { // Ignore "table missing" error for legacy compatibility
+              if (error.code !== '42P01') { 
                   setErrorMsg("Could not save batch to database. It may disappear on refresh.");
               }
           } else if (data) {
@@ -345,9 +343,9 @@ export const AdminUserManagement = () => {
   };
 
   const generatePassword = () => {
-    const chars = "0123456789";
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
     let pass = "";
-    for(let i=0; i<6; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+    for(let i=0; i<8; i++) pass += chars[Math.floor(Math.random() * chars.length)];
     setFormData(prev => ({...prev, password: pass}));
   };
 
@@ -356,24 +354,80 @@ export const AdminUserManagement = () => {
     setIsSubmitting(true);
     setErrorMsg('');
     
-    if (formData.role === 'STUDENT' && !formData.student_id) {
-        setErrorMsg("Student ID is mandatory for Students.");
-        setIsSubmitting(false);
-        return;
-    }
-    if (!editingUser && !formData.password) {
-        setErrorMsg("Password is required for new users.");
+    // --- ROBUST CLIENT-SIDE VALIDATION ---
+    
+    // 1. Mandatory Fields
+    if (!formData.full_name.trim() || !formData.email.trim()) {
+        setErrorMsg("Name and Email are mandatory.");
         setIsSubmitting(false);
         return;
     }
 
+    // 2. Email Format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+        setErrorMsg("Invalid email address format.");
+        setIsSubmitting(false);
+        return;
+    }
+
+    // 3. Phone Number Format (Strict 10 digits)
+    if (formData.phone) {
+        const phoneRegex = /^\d{10}$/;
+        if (!phoneRegex.test(formData.phone)) {
+            setErrorMsg("Phone number must be exactly 10 digits.");
+            setIsSubmitting(false);
+            return;
+        }
+    }
+
+    // 4. Role specific checks
+    if (formData.role === 'STUDENT' && !formData.student_id.trim()) {
+        setErrorMsg("Student ID is mandatory for Students.");
+        setIsSubmitting(false);
+        return;
+    }
+
+    // 5. Password Length
+    if (!editingUser && formData.password.length < 8) {
+        setErrorMsg("Password must be at least 8 characters.");
+        setIsSubmitting(false);
+        return;
+    }
+
+    // 6. Duplicate Detection (Client Check before API)
+    const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser?.id);
+    if (emailExists) {
+        setErrorMsg("A user with this email already exists.");
+        setIsSubmitting(false);
+        return;
+    }
+
+    if (formData.phone) {
+        const phoneExists = users.some(u => u.phone === formData.phone && u.id !== editingUser?.id);
+        if (phoneExists) {
+            setErrorMsg("This phone number is already registered.");
+            setIsSubmitting(false);
+            return;
+        }
+    }
+
+    if (formData.role === 'STUDENT') {
+        const idExists = users.some(u => u.rollNumber?.toLowerCase() === formData.student_id.toLowerCase() && u.id !== editingUser?.id);
+        if (idExists) {
+             setErrorMsg("This Student ID is already assigned.");
+             setIsSubmitting(false);
+             return;
+        }
+    }
+
     const payload: any = {
-      full_name: formData.full_name,
-      email: formData.email,
+      full_name: formData.full_name.trim(),
+      email: formData.email.trim().toLowerCase(),
       role: formData.role,
-      student_id: formData.student_id || null, 
-      batch: formData.batch,
-      phone: formData.phone,
+      student_id: formData.student_id.trim() || null, 
+      batch: formData.batch.trim(),
+      phone: formData.phone.trim(),
       id: editingUser ? editingUser.id : generateUUID() 
     };
 
@@ -398,7 +452,7 @@ export const AdminUserManagement = () => {
     } catch (err: any) {
       console.error("DB Write Failed:", err);
       if (err.code === '23505') {
-          setErrorMsg("Error: Email or Student ID already exists.");
+          setErrorMsg("Duplicate entry detected (Email, Phone or ID).");
       } else {
           setErrorMsg(`Database Error: ${err.message || 'Check connection'}`);
       }
@@ -578,11 +632,11 @@ export const AdminUserManagement = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name *</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name <span className="text-red-500">*</span></label>
                             <input required type="text" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="John Doe" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role *</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role <span className="text-red-500">*</span></label>
                             <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none">
                                 <option value="STUDENT">Student</option>
                                 <option value="TEACHER">Teacher</option>
@@ -592,17 +646,26 @@ export const AdminUserManagement = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address *</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address <span className="text-red-500">*</span></label>
                         <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="john@example.com" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label>
-                            <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="+91..." />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone (10 digits) <span className="text-red-500">*</span></label>
+                            <input 
+                                type="text" 
+                                value={formData.phone} 
+                                onChange={e => {
+                                    const val = e.target.value.replace(/\D/g, '');
+                                    if(val.length <= 10) setFormData({...formData, phone: val});
+                                }} 
+                                className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" 
+                                placeholder="9876543210" 
+                            />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Login Password *</label>
+                            <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Login Password <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <Key className="absolute left-2 top-2.5 w-4 h-4 text-gray-500" />
                                 <input 
@@ -610,7 +673,7 @@ export const AdminUserManagement = () => {
                                     value={formData.password} 
                                     onChange={e => setFormData({...formData, password: e.target.value})} 
                                     className="w-full bg-dark-900 border border-dark-700 rounded p-2 pl-8 text-white text-sm font-mono focus:border-brand-500 outline-none" 
-                                    placeholder={editingUser ? "(Unchanged)" : "Required"} 
+                                    placeholder={editingUser ? "(Unchanged)" : "Min 8 chars"} 
                                 />
                                 <button type="button" onClick={generatePassword} className="absolute right-2 top-2 text-gray-400 hover:text-brand-500" title="Generate Random Password">
                                     <RefreshCw className="w-4 h-4" />
@@ -673,7 +736,7 @@ export const AdminUserManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Student ID (Login) *</label>
+                                <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Student ID (Login) <span className="text-red-500">*</span></label>
                                 <input 
                                     type="text" 
                                     value={formData.student_id} 
