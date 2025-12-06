@@ -316,8 +316,8 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
 
         } catch (e: any) {
             console.error("Course Creation Failed:", e);
-            if (e.code === '42P01') {
-                alert("CRITICAL DATABASE ERROR: Tables are missing. Please run the SQL script in db_schema.sql via Supabase Editor.");
+            if (e.code === '42P01' || e.code === '42703') { // 42P01=Table missing, 42703=Column missing
+                alert("DATABASE SCHEMA ERROR: Tables or Columns are missing (e.g. instructor_name). Please run the 'db_schema.sql' script in your Supabase SQL Editor.");
             } else {
                 alert(`Failed to create course: ${e.message || 'Check console'}`);
             }
@@ -644,8 +644,9 @@ export const TeacherCoursesPage = () => {
                 // For this demo, we map directly.
                 const mapped = data.map((c: any) => ({
                     ...c,
-                    modules: [], // Loaded on detail view usually
-                    studentCount: 0 // Placeholder
+                    instructor: c.instructor_name, // Map explicitly
+                    modules: [], 
+                    studentCount: 0 
                 }));
                 setCourses(mapped);
             }
