@@ -1,10 +1,10 @@
 
 -- ----------------------------------------------------------------
--- ZENRO DATABASE SETUP SCRIPT
--- Copy and Run this in Supabase SQL Editor to fix missing columns.
+-- ZENRO DATABASE SETUP SCRIPT (FIXED FOR HYBRID IDs)
+-- This script uses TEXT for IDs to allow 's1', 't1' etc.
 -- ----------------------------------------------------------------
 
--- 1. CLEANUP (Drop existing tables to avoid conflicts)
+-- 1. CLEANUP
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS fees CASCADE;
 DROP TABLE IF EXISTS submissions CASCADE;
@@ -18,11 +18,11 @@ DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS batches CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
 
--- 2. CREATE TABLES
+-- 2. CREATE TABLES (Using TEXT for IDs to support 's1', 't1' etc.)
 
--- Profiles (Users)
+-- Profiles
 CREATE TABLE profiles (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   email text,
   password text,
   full_name text,
@@ -36,61 +36,61 @@ CREATE TABLE profiles (
 
 -- Batches
 CREATE TABLE batches (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name text UNIQUE NOT NULL,
   created_at timestamptz DEFAULT now()
 );
 
--- Courses (Fixed: Added level, status, instructor_name)
+-- Courses
 CREATE TABLE courses (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text NOT NULL,
   description text,
-  level text,                 -- Required for Wizard
+  level text,
   thumbnail text,
-  status text DEFAULT 'DRAFT', -- Required for Wizard
-  instructor_name text,       -- Required for Wizard
+  status text DEFAULT 'DRAFT',
+  instructor_name text,
   created_at timestamptz DEFAULT now()
 );
 
 -- Course Modules
 CREATE TABLE course_modules (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  course_id uuid REFERENCES courses(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  course_id text REFERENCES courses(id) ON DELETE CASCADE,
   title text,
   "order" int,
   created_at timestamptz DEFAULT now()
 );
 
--- Course Materials (Videos, PDFs)
+-- Course Materials
 CREATE TABLE course_materials (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  module_id uuid REFERENCES course_modules(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  module_id text REFERENCES course_modules(id) ON DELETE CASCADE,
   title text,
   type text,
   url text,
   created_at timestamptz DEFAULT now()
 );
 
--- Course Batches (Junction Table)
+-- Course Batches (Junction)
 CREATE TABLE course_batches (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  course_id uuid REFERENCES courses(id) ON DELETE CASCADE,
-  batch_name text, 
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  course_id text REFERENCES courses(id) ON DELETE CASCADE,
+  batch_name text,
   created_at timestamptz DEFAULT now()
 );
 
--- Course Enrollments (Junction Table for individual students)
+-- Course Enrollments (Junction)
 CREATE TABLE course_enrollments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  course_id uuid REFERENCES courses(id) ON DELETE CASCADE,
-  student_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  course_id text REFERENCES courses(id) ON DELETE CASCADE,
+  student_id text REFERENCES profiles(id) ON DELETE CASCADE,
   created_at timestamptz DEFAULT now()
 );
 
--- Tests/Exams
+-- Tests
 CREATE TABLE tests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text,
   duration_minutes int,
   passing_score int DEFAULT 40,
@@ -100,31 +100,31 @@ CREATE TABLE tests (
 
 -- Questions
 CREATE TABLE questions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  test_id uuid REFERENCES tests(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  test_id text REFERENCES tests(id) ON DELETE CASCADE,
   question_text text,
-  options text[], -- Array of strings
+  options text[],
   correct_option_index int,
   marks int DEFAULT 1,
   created_at timestamptz DEFAULT now()
 );
 
--- Submissions (Student Results)
+-- Submissions
 CREATE TABLE submissions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  test_id uuid REFERENCES tests(id) ON DELETE CASCADE,
-  student_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  test_id text REFERENCES tests(id) ON DELETE CASCADE,
+  student_id text REFERENCES profiles(id) ON DELETE CASCADE,
   score int,
   total_score int,
-  answers jsonb, -- Stores key-value of question_id: option_index
+  answers jsonb,
   status text,
   completed_at timestamptz DEFAULT now()
 );
 
 -- Fees
 CREATE TABLE fees (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  student_id text REFERENCES profiles(id) ON DELETE CASCADE,
   title text,
   amount numeric,
   due_date date,
@@ -136,28 +136,27 @@ CREATE TABLE fees (
 
 -- Payments
 CREATE TABLE payments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  fee_id uuid REFERENCES fees(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  fee_id text REFERENCES fees(id) ON DELETE CASCADE,
   razorpay_payment_id text,
   amount numeric,
   payment_date timestamptz DEFAULT now()
 );
 
--- 3. SEED DATA (So the app isn't empty)
+-- 3. SEED DATA (Now valid because IDs are TEXT)
 
--- Insert Batches
+-- Batches
 INSERT INTO batches (name) VALUES ('2024-A'), ('2024-B');
 
--- Insert Users (Ensure IDs match your app's hardcoded credentials for easy login)
+-- Users
 INSERT INTO profiles (id, email, password, full_name, role, batch, student_id, phone) VALUES 
 ('s1', 'student@zenro.jp', '9999999999', 'Alex Student', 'STUDENT', '2024-A', '9999999999', '9999999999'),
 ('t1', 'teacher@zenro.jp', '8888888888', 'Tanaka Sensei', 'TEACHER', NULL, '8888888888', '8888888888'),
 ('a1', 'admin@zenro.jp', '7777777777', 'Admin User', 'ADMIN', NULL, '7777777777', '7777777777');
 
--- Insert a Sample Course
+-- Course
 INSERT INTO courses (id, title, description, level, thumbnail, status, instructor_name) VALUES
 ('c1', 'JLPT N4 Comprehensive', 'Complete guide to passing N4.', 'N4', 'https://images.unsplash.com/photo-1528164344705-47542687000d', 'PUBLISHED', 'Tanaka Sensei');
 
--- Link Sample Course to Batch 2024-A
+-- Enrollments/Assignments
 INSERT INTO course_batches (course_id, batch_name) VALUES ('c1', '2024-A');
-
