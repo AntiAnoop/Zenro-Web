@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, Clock, Calendar, AlertCircle, CheckCircle, 
@@ -18,13 +19,6 @@ import { jsPDF } from "jspdf";
 const RAZORPAY_KEY_ID = "rzp_test_RoNJfVaY3d336e"; 
 
 // --- MOCK DATA FOR OTHER COMPONENTS ---
-const MOCK_COURSES: Course[] = [
-  { id: 'c1', title: 'JLPT N4 Comprehensive: Grammar & Vocab', progress: 75, totalDuration: '40h 30m', thumbnail: 'https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&q=80&w=800', lastWatchedTimestamp: 1205, instructor: 'Tanaka Sensei', isLive: true },
-  { id: 'c2', title: 'Kanji Mastery: The First 500', progress: 30, totalDuration: '15h 00m', thumbnail: 'https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d?auto=format&fit=crop&q=80&w=800', lastWatchedTimestamp: 0, instructor: 'Sato Sensei' },
-  { id: 'c3', title: 'Business Japanese (Keigo)', progress: 0, totalDuration: '12h 00m', thumbnail: 'https://images.unsplash.com/photo-1480796927426-f609979314bd?auto=format&fit=crop&q=80&w=800', isLocked: true, instructor: 'Yamamoto Sensei' },
-  { id: 'c4', title: 'Japanese IT Vocabulary', progress: 10, totalDuration: '8h 00m', thumbnail: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&q=80&w=800', instructor: 'Suzuki Sensei' }
-];
-
 const MOCK_TESTS: TestResult[] = [
   { id: 't1', title: 'JLPT N4 Mock Exam', subject: 'Japanese', date: '2023-10-15', score: 145, totalScore: 180, classAverage: 120, topperScore: 175 },
   { id: 't2', title: 'Kanji Weekly Quiz (Ch 5-10)', subject: 'Kanji', date: '2023-09-20', score: 92, totalScore: 100, classAverage: 65, topperScore: 100 },
@@ -191,14 +185,79 @@ export const StudentDashboardHome = () => {
 export const StudentCoursesPage = () => {
   const navigate = useNavigate();
   const { isLive, topic } = useLiveSession();
-  const liveCourse = MOCK_COURSES.find(c => c.isLive); // Ideally match by ID from context, but mocking for now
   
-  // Fake loading state for demo robustness
+  // Real Data State
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [liveCourse, setLiveCourse] = useState<Course | null>(null);
+
+  // User context from Session Storage (or Auth Context if available)
+  const userData = localStorage.getItem('zenro_session');
+  const user: User = userData ? JSON.parse(userData) : null;
+
   useEffect(() => {
-      const t = setTimeout(() => setLoading(false), 500);
-      return () => clearTimeout(t);
-  }, []);
+    const fetchMyCourses = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            // ROBUST QUERY:
+            // 1. Get Courses assigned to my Batch (course_batches)
+            const { data: batchCourses } = await supabase
+                .from('course_batches')
+                .select('course_id')
+                .eq('batch_name', user.batch); // '2024-A'
+
+            // 2. Get Courses assigned to me directly (course_enrollments)
+            const { data: directCourses } = await supabase
+                .from('course_enrollments')
+                .select('course_id')
+                .eq('student_id', user.id);
+
+            // Combine IDs
+            const courseIds = new Set<string>();
+            if (batchCourses) batchCourses.forEach((c: any) => courseIds.add(c.course_id));
+            if (directCourses) directCourses.forEach((c: any) => courseIds.add(c.course_id));
+
+            if (courseIds.size > 0) {
+                // 3. Fetch full course details
+                const { data: courseDetails } = await supabase
+                    .from('courses')
+                    .select('*')
+                    .in('id', Array.from(courseIds))
+                    .eq('status', 'PUBLISHED'); // Only show published
+                
+                if (courseDetails) {
+                    // Map to UI model
+                    const mapped: Course[] = courseDetails.map((c: any) => ({
+                        id: c.id,
+                        title: c.title,
+                        description: c.description,
+                        instructor: c.instructor_name || 'Tanaka Sensei',
+                        progress: 0, // In real app, join 'course_enrollments' to get progress
+                        thumbnail: c.thumbnail,
+                        totalDuration: '10h 30m', // Mock duration until modules calc
+                        level: c.level,
+                        status: c.status
+                    }));
+                    setCourses(mapped);
+
+                    // Check for live match (mock logic for now as 'isLive' is transient)
+                    const foundLive = mapped.find(c => c.title.includes(topic) || (isLive && c.id === 'c1')); 
+                    if (foundLive && isLive) setLiveCourse(foundLive);
+                }
+            } else {
+                setCourses([]);
+            }
+
+        } catch (e) {
+            console.error("Course fetch error:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchMyCourses();
+  }, [user?.id, user?.batch]);
 
   if (loading) {
       return (
@@ -242,43 +301,52 @@ export const StudentCoursesPage = () => {
 
         {/* Course Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {MOCK_COURSES.map(course => (
-            <div key={course.id} className={`bg-dark-800 rounded-xl overflow-hidden border ${course.isLive ? 'border-brand-500/60 ring-1 ring-brand-500/20' : 'border-dark-700'} hover:border-brand-500/50 transition group shadow-lg`}>
-              <div className="relative aspect-video overflow-hidden">
-                <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-700" />
-                {course.isLocked && (
-                    <div className="absolute inset-0 bg-dark-900/80 flex flex-col items-center justify-center backdrop-blur-[2px]">
-                        <Lock className="w-8 h-8 text-gray-400 mb-2" />
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Locked</span>
-                    </div>
-                )}
-                <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs text-white font-mono backdrop-blur-md border border-white/10">
-                  {course.totalDuration}
-                </div>
-              </div>
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-white truncate flex-1 text-lg" title={course.title}>{course.title}</h4>
-                </div>
-                <p className="text-sm text-gray-400 mb-4">Sensei: {course.instructor}</p>
-                {!course.isLocked ? (
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-xs text-gray-500">
-                            <span>Progression</span>
-                            <span>{course.progress}%</span>
+          {courses.length === 0 ? (
+               <div className="col-span-3 p-12 text-center text-gray-500 border-2 border-dashed border-dark-700 rounded-xl">
+                   No courses assigned to your batch ({user?.batch}) yet. Please contact admin.
+               </div>
+          ) : (
+            courses.map(course => (
+                <div key={course.id} className={`bg-dark-800 rounded-xl overflow-hidden border ${course.isLive ? 'border-brand-500/60 ring-1 ring-brand-500/20' : 'border-dark-700'} hover:border-brand-500/50 transition group shadow-lg`}>
+                <div className="relative aspect-video overflow-hidden">
+                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-700" />
+                    {course.isLocked && (
+                        <div className="absolute inset-0 bg-dark-900/80 flex flex-col items-center justify-center backdrop-blur-[2px]">
+                            <Lock className="w-8 h-8 text-gray-400 mb-2" />
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Locked</span>
                         </div>
-                        <div className="w-full bg-dark-900 rounded-full h-1.5 border border-dark-700">
-                            <div style={{width: `${course.progress}%`}} className="bg-brand-500 h-1.5 rounded-full"></div>
-                        </div>
+                    )}
+                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-xs text-white border border-white/10">
+                        {course.level}
                     </div>
-                ) : (
-                    <button className="w-full py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 text-sm rounded transition border border-dark-600">
-                        Unlock Course
-                    </button>
-                )}
-              </div>
-            </div>
-          ))}
+                    <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs text-white font-mono backdrop-blur-md border border-white/10">
+                        {course.totalDuration}
+                    </div>
+                </div>
+                <div className="p-5">
+                    <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold text-white truncate flex-1 text-lg" title={course.title}>{course.title}</h4>
+                    </div>
+                    <p className="text-sm text-gray-400 mb-4">Sensei: {course.instructor}</p>
+                    {!course.isLocked ? (
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-xs text-gray-500">
+                                <span>Progression</span>
+                                <span>{course.progress}%</span>
+                            </div>
+                            <div className="w-full bg-dark-900 rounded-full h-1.5 border border-dark-700">
+                                <div style={{width: `${course.progress}%`}} className="bg-brand-500 h-1.5 rounded-full"></div>
+                            </div>
+                        </div>
+                    ) : (
+                        <button className="w-full py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 text-sm rounded transition border border-dark-600">
+                            Unlock Course
+                        </button>
+                    )}
+                </div>
+                </div>
+            ))
+          )}
         </div>
     </div>
   );

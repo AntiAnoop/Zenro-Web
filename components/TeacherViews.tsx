@@ -6,23 +6,15 @@ import {
   CheckCircle, AlertTriangle, MoreVertical, X,
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
   ChevronRight, Filter, Search, Download, Trash2, Upload,
-  Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle
+  Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
+  Briefcase, GraduationCap, Loader2
 } from 'lucide-react';
-import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial } from '../types';
+import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User } from '../types';
 import { generateClassSummary } from '../services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLiveSession } from '../context/LiveContext';
 import { supabase } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-
-// --- HELPER MOCK DATA FOR SELECTION ---
-const MOCK_STUDENTS_POOL = [
-    { id: 's1', name: 'Alex Student', email: 'alex@zenro.jp', batch: '2024-A' },
-    { id: 's2', name: 'Riya Patel', email: 'riya@zenro.jp', batch: '2024-A' },
-    { id: 's3', name: 'Kenji Sato', email: 'kenji@zenro.jp', batch: '2024-B' },
-    { id: 's4', name: 'Maria Garcia', email: 'maria@zenro.jp', batch: '2024-A' },
-    { id: 's5', name: 'John Doe', email: 'john@zenro.jp', batch: '2023-C' },
-];
 
 // --- MOCK TEACHER STATS ---
 const TEACHER_STATS = [
@@ -136,22 +128,60 @@ export const TeacherDashboardHome = () => {
   );
 };
 
-// --- COURSE CREATION WIZARD ---
-const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave: (course: any) => void }) => {
+// --- ROBUST COURSE CREATION WIZARD ---
+const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => void, onSave: (course: any) => void, onRefresh: () => void }) => {
     const [step, setStep] = useState(1);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // DB Data States
+    const [availableBatches, setAvailableBatches] = useState<string[]>([]);
+    const [availableStudents, setAvailableStudents] = useState<User[]>([]);
+    const [studentSearch, setStudentSearch] = useState('');
+
+    // Form Data
     const [courseData, setCourseData] = useState<Partial<Course>>({
         title: '',
         description: '',
         level: 'N5',
         thumbnail: 'https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&q=80&w=800',
         modules: [],
+        assignedBatches: [],
         enrolledStudentIds: [],
         status: 'DRAFT',
-        instructor: 'Tanaka Sensei' // Auto-filled from Auth in real app
+        instructor: 'Tanaka Sensei' 
     });
 
-    // Module Helper State
     const [newModuleTitle, setNewModuleTitle] = useState('');
+
+    // Fetch Batches & Students on Mount
+    useEffect(() => {
+        const fetchResources = async () => {
+            // 1. Fetch Batches
+            const { data: batches } = await supabase.from('batches').select('name');
+            if (batches) {
+                setAvailableBatches(batches.map(b => b.name));
+            }
+            // 2. Fetch Students
+            const { data: students } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('role', 'STUDENT')
+                .order('full_name');
+            
+            if (students) {
+                 const mapped = students.map((u: any) => ({
+                    id: u.id,
+                    name: u.full_name,
+                    role: 'STUDENT',
+                    email: u.email,
+                    avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name)}&background=random`,
+                    batch: u.batch
+                }));
+                setAvailableStudents(mapped);
+            }
+        };
+        fetchResources();
+    }, []);
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -159,7 +189,7 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
     const addModule = () => {
         if (!newModuleTitle.trim()) return;
         const newMod: CourseModule = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(), // Temp ID
             title: newModuleTitle,
             materials: [],
             duration: '0m'
@@ -174,29 +204,31 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
     const addMaterialToModule = (moduleId: string, type: 'PDF' | 'LINK' | 'VIDEO') => {
         const title = prompt(`Enter Title for ${type}:`);
         if(!title) return;
-        
-        // Mocking Upload/Link
         const url = type === 'VIDEO' ? 'https://example.com/video.mp4' : 'https://example.com/material.pdf'; 
 
         const newMat: CourseMaterial = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             title: title,
-            type: type === 'VIDEO' ? 'LINK' : type as any, // Simplifying for demo
+            type: type,
             url: url
         };
 
         const updatedModules = courseData.modules?.map(m => {
             if (m.id === moduleId) {
-                if (type === 'VIDEO') {
-                    return { ...m, videoUrl: url, duration: '15m' }; // Set video
-                } else {
-                    return { ...m, materials: [...m.materials, newMat] };
-                }
+                return { ...m, materials: [...m.materials, newMat] };
             }
             return m;
         });
-
         setCourseData({ ...courseData, modules: updatedModules });
+    };
+
+    const toggleBatch = (batchName: string) => {
+        const current = courseData.assignedBatches || [];
+        if (current.includes(batchName)) {
+            setCourseData({ ...courseData, assignedBatches: current.filter(b => b !== batchName) });
+        } else {
+            setCourseData({ ...courseData, assignedBatches: [...current, batchName] });
+        }
     };
 
     const toggleStudent = (id: string) => {
@@ -208,25 +240,106 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
         }
     };
 
-    const handleFinalSave = () => {
-        const finalCourse = {
-            ...courseData,
-            id: Math.random().toString(36).substr(2, 9),
-            totalDuration: '0h', // Calculate based on modules
-            progress: 0,
-            studentCount: courseData.enrolledStudentIds?.length || 0,
-        };
-        onSave(finalCourse);
+    const handleFinalSave = async () => {
+        // Validation
+        if (!courseData.title || !courseData.level) {
+            alert("Please fill in Course Title and Level.");
+            return;
+        }
+        if ((courseData.modules?.length || 0) === 0 && courseData.status === 'PUBLISHED') {
+            alert("You cannot publish a course with 0 chapters.");
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            // 1. Insert Course
+            const { data: courseInsert, error: courseError } = await supabase.from('courses').insert({
+                title: courseData.title,
+                description: courseData.description,
+                level: courseData.level,
+                thumbnail: courseData.thumbnail,
+                status: courseData.status,
+                instructor_name: courseData.instructor
+            }).select().single();
+
+            if (courseError) throw courseError;
+            const newCourseId = courseInsert.id;
+
+            // 2. Insert Modules & Materials (Deep Insert simulation)
+            if (courseData.modules && courseData.modules.length > 0) {
+                for (let i = 0; i < courseData.modules.length; i++) {
+                    const mod = courseData.modules[i];
+                    const { data: modInsert, error: modError } = await supabase.from('course_modules').insert({
+                        course_id: newCourseId,
+                        title: mod.title,
+                        "order": i
+                    }).select().single();
+
+                    if (modError) throw modError;
+                    const newModId = modInsert.id;
+
+                    if (mod.materials && mod.materials.length > 0) {
+                        const matsPayload = mod.materials.map(mat => ({
+                            module_id: newModId,
+                            title: mat.title,
+                            type: mat.type,
+                            url: mat.url
+                        }));
+                        await supabase.from('course_materials').insert(matsPayload);
+                    }
+                }
+            }
+
+            // 3. Insert Batch Assignments
+            if (courseData.assignedBatches && courseData.assignedBatches.length > 0) {
+                const batchPayload = courseData.assignedBatches.map(bName => ({
+                    course_id: newCourseId,
+                    batch_name: bName
+                }));
+                await supabase.from('course_batches').insert(batchPayload);
+            }
+
+            // 4. Insert Individual Enrollments
+            if (courseData.enrolledStudentIds && courseData.enrolledStudentIds.length > 0) {
+                const enrollPayload = courseData.enrolledStudentIds.map(sId => ({
+                    course_id: newCourseId,
+                    student_id: sId
+                }));
+                await supabase.from('course_enrollments').insert(enrollPayload);
+            }
+
+            // Success
+            onRefresh(); 
+            onClose();
+
+        } catch (e: any) {
+            console.error("Course Creation Failed:", e);
+            if (e.code === '42P01') {
+                alert("CRITICAL DATABASE ERROR: Tables are missing. Please run the SQL script in db_schema.sql via Supabase Editor.");
+            } else {
+                alert(`Failed to create course: ${e.message || 'Check console'}`);
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
+
+    // Filter students for Step 3
+    const filteredStudents = availableStudents.filter(s => 
+        s.name.toLowerCase().includes(studentSearch.toLowerCase()) || 
+        s.email.toLowerCase().includes(studentSearch.toLowerCase())
+    );
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-dark-800 w-full max-w-4xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[85vh]">
+            <div className="bg-dark-800 w-full max-w-5xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[90vh]">
                 {/* Header */}
                 <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900 rounded-t-2xl">
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                           <BookOpen className="w-6 h-6 text-brand-500" /> Create New Course
+                           <BookOpen className="w-6 h-6 text-brand-500" /> Course Wizard
                         </h2>
                         <p className="text-gray-400 text-sm mt-1">Step {step} of 4</p>
                     </div>
@@ -243,12 +356,13 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
 
                 {/* Body - Scrollable */}
                 <div className="flex-1 overflow-y-auto p-8">
+                    {/* STEP 1: IDENTITY */}
                     {step === 1 && (
                         <div className="space-y-6 max-w-2xl mx-auto animate-fade-in">
                             <h3 className="text-xl font-bold text-white mb-6">Course Identity</h3>
                             
                             <div>
-                                <label className="block text-sm font-bold text-gray-400 mb-2">Course Title</label>
+                                <label className="block text-sm font-bold text-gray-400 mb-2">Course Title <span className="text-red-500">*</span></label>
                                 <input 
                                     type="text" 
                                     className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
@@ -260,7 +374,7 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
 
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-400 mb-2">JLPT Level</label>
+                                    <label className="block text-sm font-bold text-gray-400 mb-2">JLPT Level <span className="text-red-500">*</span></label>
                                     <select 
                                         className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
                                         value={courseData.level}
@@ -296,11 +410,11 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                         </div>
                     )}
 
+                    {/* STEP 2: CURRICULUM */}
                     {step === 2 && (
                         <div className="space-y-6 animate-fade-in">
                             <h3 className="text-xl font-bold text-white mb-4">Curriculum Builder</h3>
                             
-                            {/* Add Module Input */}
                             <div className="flex gap-4 mb-8">
                                 <input 
                                     type="text" 
@@ -318,7 +432,6 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                                 </button>
                             </div>
 
-                            {/* Modules List */}
                             <div className="space-y-4">
                                 {courseData.modules?.length === 0 && (
                                     <div className="text-center p-12 border-2 border-dashed border-dark-700 rounded-xl text-gray-500">
@@ -335,9 +448,9 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                                             <div className="flex gap-2">
                                                 <button 
                                                     onClick={() => addMaterialToModule(mod.id, 'VIDEO')}
-                                                    className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 border ${mod.videoUrl ? 'bg-green-500/10 text-green-500 border-green-500/30' : 'bg-dark-800 text-gray-400 border-dark-600 hover:text-white'}`}
+                                                    className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white"
                                                 >
-                                                    <Video className="w-3 h-3" /> {mod.videoUrl ? 'Video Added' : 'Add Video'}
+                                                    <Video className="w-3 h-3" /> Add Video
                                                 </button>
                                                 <button 
                                                     onClick={() => addMaterialToModule(mod.id, 'PDF')}
@@ -348,17 +461,12 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                                             </div>
                                         </div>
                                         
-                                        {/* Materials List inside Module */}
-                                        {(mod.materials.length > 0 || mod.videoUrl) && (
+                                        {mod.materials.length > 0 && (
                                             <div className="bg-dark-800 rounded-lg p-3 space-y-2">
-                                                {mod.videoUrl && (
-                                                    <div className="flex items-center gap-3 text-sm text-brand-400 p-2 bg-dark-900 rounded border border-brand-900/30">
-                                                        <PlayCircle className="w-4 h-4" /> Video Lesson ({mod.duration})
-                                                    </div>
-                                                )}
                                                 {mod.materials.map(mat => (
                                                     <div key={mat.id} className="flex items-center gap-3 text-sm text-gray-300 p-2 bg-dark-900 rounded border border-dark-700">
-                                                        <Paperclip className="w-4 h-4" /> {mat.title} <span className="text-xs bg-dark-800 px-1 rounded text-gray-500">{mat.type}</span>
+                                                        {mat.type === 'VIDEO' ? <Film className="w-4 h-4 text-brand-500" /> : <Paperclip className="w-4 h-4" />} 
+                                                        {mat.title} <span className="text-xs bg-dark-800 px-1 rounded text-gray-500">{mat.type}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -369,43 +477,81 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                         </div>
                     )}
 
+                    {/* STEP 3: ENROLLMENT (ROBUST SPLIT VIEW) */}
                     {step === 3 && (
-                        <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
-                            <h3 className="text-xl font-bold text-white mb-2">Enroll Students</h3>
-                            <p className="text-gray-400 text-sm mb-6">Select students to grant immediate access to this course.</p>
-
-                            <div className="bg-dark-900 border border-dark-700 rounded-lg p-2 mb-4 flex gap-2">
-                                <Search className="w-5 h-5 text-gray-500 m-2" />
-                                <input type="text" placeholder="Search students..." className="bg-transparent text-white outline-none flex-1" />
+                        <div className="space-y-6 animate-fade-in h-full flex flex-col">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-xl font-bold text-white">Enrollment & Access</h3>
+                                <p className="text-sm text-gray-400">Total Access: <span className="text-brand-500 font-bold">{courseData.assignedBatches?.length} Batches</span> + <span className="text-white font-bold">{courseData.enrolledStudentIds?.length} Individuals</span></p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
-                                {MOCK_STUDENTS_POOL.map(student => {
-                                    const isSelected = courseData.enrolledStudentIds?.includes(student.id);
-                                    return (
-                                        <div 
-                                            key={student.id} 
-                                            onClick={() => toggleStudent(student.id)}
-                                            className={`p-4 rounded-xl border cursor-pointer transition flex items-center justify-between group ${isSelected ? 'bg-brand-900/20 border-brand-500' : 'bg-dark-900 border-dark-700 hover:border-gray-500'}`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${isSelected ? 'bg-brand-500 text-white' : 'bg-dark-800 text-gray-400'}`}>
-                                                    {student.name.charAt(0)}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                                {/* LEFT: BATCH SELECTION */}
+                                <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-4 border-b border-dark-700 bg-dark-800 font-bold text-gray-300 flex items-center gap-2">
+                                        <Layers className="w-4 h-4 text-brand-500" /> Batch Assignments
+                                    </div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-3">
+                                        {availableBatches.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No batches found.</p>}
+                                        {availableBatches.map(batch => {
+                                            const isSelected = courseData.assignedBatches?.includes(batch);
+                                            return (
+                                                <div 
+                                                    key={batch} 
+                                                    onClick={() => toggleBatch(batch)}
+                                                    className={`p-3 rounded-lg border cursor-pointer flex items-center justify-between transition ${isSelected ? 'bg-brand-900/20 border-brand-500' : 'bg-dark-800 border-dark-600 hover:border-gray-500'}`}
+                                                >
+                                                    <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-400'}`}>{batch}</span>
+                                                    {isSelected && <CheckCircle className="w-4 h-4 text-brand-500" />}
                                                 </div>
-                                                <div>
-                                                    <p className={`font-bold ${isSelected ? 'text-brand-400' : 'text-white'}`}>{student.name}</p>
-                                                    <p className="text-xs text-gray-500">{student.batch}</p>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* RIGHT: INDIVIDUAL SELECTION */}
+                                <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-3 border-b border-dark-700 bg-dark-800 flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-blue-500" /> 
+                                        <span className="font-bold text-gray-300 text-sm flex-1">Individual Students</span>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search name..." 
+                                            value={studentSearch}
+                                            onChange={e => setStudentSearch(e.target.value)}
+                                            className="bg-dark-900 border border-dark-700 rounded px-2 py-1 text-xs text-white outline-none w-32 focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-3">
+                                        {filteredStudents.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No students found.</p>}
+                                        {filteredStudents.map(student => {
+                                            const isSelected = courseData.enrolledStudentIds?.includes(student.id);
+                                            return (
+                                                <div 
+                                                    key={student.id} 
+                                                    onClick={() => toggleStudent(student.id)}
+                                                    className={`p-2 rounded-lg border cursor-pointer flex items-center justify-between transition ${isSelected ? 'bg-blue-900/20 border-blue-500' : 'bg-dark-800 border-dark-600 hover:border-gray-500'}`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-blue-500 text-white' : 'bg-dark-700 text-gray-400'}`}>
+                                                            {student.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-gray-300'}`}>{student.name}</p>
+                                                            <p className="text-[10px] text-gray-500">{student.batch || 'No Batch'}</p>
+                                                        </div>
+                                                    </div>
+                                                    {isSelected && <CheckCircle className="w-4 h-4 text-blue-500" />}
                                                 </div>
-                                            </div>
-                                            {isSelected && <CheckCircle className="w-5 h-5 text-brand-500" />}
-                                        </div>
-                                    );
-                                })}
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
-                            <p className="text-right text-sm text-gray-400 mt-2">Selected: {courseData.enrolledStudentIds?.length} Students</p>
                         </div>
                     )}
 
+                    {/* STEP 4: REVIEW */}
                     {step === 4 && (
                         <div className="space-y-8 animate-fade-in text-center max-w-2xl mx-auto pt-10">
                             <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-500/30">
@@ -413,17 +559,21 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                             </div>
                             <h2 className="text-3xl font-bold text-white">Ready to Launch?</h2>
                             <p className="text-gray-400">
-                                You are about to create <span className="text-white font-bold">"{courseData.title}"</span> with {courseData.modules?.length} chapters for {courseData.enrolledStudentIds?.length} students.
+                                You are about to create <span className="text-white font-bold">"{courseData.title}"</span>.
                             </p>
                             
                             <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 text-left space-y-4">
                                 <div className="flex justify-between border-b border-dark-800 pb-2">
-                                    <span className="text-gray-500">Level</span>
-                                    <span className="text-white font-bold">{courseData.level}</span>
+                                    <span className="text-gray-500">Curriculum</span>
+                                    <span className="text-white font-bold">{courseData.modules?.length} Chapters</span>
                                 </div>
                                 <div className="flex justify-between border-b border-dark-800 pb-2">
-                                    <span className="text-gray-500">Chapters</span>
-                                    <span className="text-white font-bold">{courseData.modules?.length}</span>
+                                    <span className="text-gray-500">Access Groups</span>
+                                    <span className="text-white font-bold">
+                                        {courseData.assignedBatches?.length 
+                                            ? courseData.assignedBatches.join(', ') 
+                                            : <span className="text-gray-600 italic">No batches</span>}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Status</span>
@@ -445,6 +595,7 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                 <div className="p-6 border-t border-dark-700 bg-dark-900 rounded-b-2xl flex justify-between">
                     <button 
                         onClick={step === 1 ? onClose : handleBack}
+                        disabled={isLoading}
                         className="px-6 py-3 rounded-lg text-gray-400 hover:text-white font-bold"
                     >
                         {step === 1 ? 'Cancel' : 'Back'}
@@ -453,7 +604,7 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                     {step < 4 ? (
                         <button 
                             onClick={handleNext}
-                            disabled={!courseData.title}
+                            disabled={!courseData.title || isLoading}
                             className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
                         >
                             Next Step <ChevronRight className="w-5 h-5" />
@@ -461,9 +612,11 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
                     ) : (
                         <button 
                             onClick={handleFinalSave}
-                            className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-green-900/20"
+                            disabled={isLoading}
+                            className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-green-900/20 disabled:opacity-50"
                         >
-                            <Save className="w-5 h-5" /> Create Course
+                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                            {isLoading ? 'Creating...' : 'Create Course'}
                         </button>
                     )}
                 </div>
@@ -473,17 +626,39 @@ const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave
 };
 
 export const TeacherCoursesPage = () => {
-    // Initial State is EMPTY array as requested (Fresh Start)
     const [courses, setCourses] = useState<Course[]>([]);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    const handleSaveCourse = (newCourse: Course) => {
-        setCourses(prev => [...prev, newCourse]);
-        setIsWizardOpen(false);
+    useEffect(() => {
+        fetchCourses();
+    }, []);
+
+    const fetchCourses = async () => {
+        setLoading(true);
+        try {
+            // Fetch courses with module counts (approximate via FK lookup usually, but for now simple select)
+            const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+            if (data) {
+                // To get student counts and module counts, in a real app we'd use .select('*, course_modules(count), course_enrollments(count)')
+                // For this demo, we map directly.
+                const mapped = data.map((c: any) => ({
+                    ...c,
+                    modules: [], // Loaded on detail view usually
+                    studentCount: 0 // Placeholder
+                }));
+                setCourses(mapped);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleDelete = (id: string) => {
-        if(confirm("Are you sure you want to delete this course?")) {
+    const handleDelete = async (id: string) => {
+        if(confirm("Are you sure you want to delete this course? This will remove all modules and enrollments.")) {
+            await supabase.from('courses').delete().eq('id', id);
             setCourses(prev => prev.filter(c => c.id !== id));
         }
     };
@@ -504,7 +679,7 @@ export const TeacherCoursesPage = () => {
             </div>
 
             {/* Empty State */}
-            {courses.length === 0 ? (
+            {!loading && courses.length === 0 ? (
                 <div className="bg-dark-800 border-2 border-dashed border-dark-700 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
                     <div className="bg-dark-900 p-6 rounded-full mb-6">
                         <BookOpen className="w-12 h-12 text-dark-600" />
@@ -537,11 +712,6 @@ export const TeacherCoursesPage = () => {
                                 <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{course.title}</h3>
                                 <p className="text-sm text-gray-400 line-clamp-2 mb-4 flex-1">{course.description || "No description provided."}</p>
                                 
-                                <div className="flex justify-between text-xs text-gray-500 mb-4 bg-dark-900 p-3 rounded-lg">
-                                    <span className="flex items-center gap-1"><Users className="w-3 h-3"/> {course.studentCount} Students</span>
-                                    <span className="flex items-center gap-1"><Layers className="w-3 h-3"/> {course.modules?.length} Chapters</span>
-                                </div>
-                                
                                 <div className="flex gap-2 mt-auto">
                                     <button className="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded text-sm font-bold shadow-lg">Manage</button>
                                     <button onClick={() => handleDelete(course.id)} className="p-2 bg-dark-700 hover:bg-red-900/30 text-red-500 rounded border border-dark-600">
@@ -555,7 +725,7 @@ export const TeacherCoursesPage = () => {
             )}
 
             {isWizardOpen && (
-                <CourseCreationWizard onClose={() => setIsWizardOpen(false)} onSave={handleSaveCourse} />
+                <CourseCreationWizard onClose={() => setIsWizardOpen(false)} onSave={() => {}} onRefresh={fetchCourses} />
             )}
         </div>
     );

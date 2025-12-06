@@ -23,14 +23,14 @@ export interface User {
 export interface CourseMaterial {
   id: string;
   title: string;
-  type: 'PDF' | 'DOC' | 'LINK';
+  type: 'PDF' | 'DOC' | 'LINK' | 'VIDEO';
   url: string;
 }
 
 export interface CourseModule {
   id: string;
   title: string;
-  videoUrl?: string;
+  videoUrl?: string; // Legacy support
   duration?: string;
   materials: CourseMaterial[];
 }
@@ -48,12 +48,15 @@ export interface Course {
   isLocked?: boolean; // Payment pending
   isLive?: boolean; // New: Live class indicator
   studentCount?: number; // For teacher view
-  batchId?: string;
-  // New Fields for Robust Architecture
+  
+  // Robust Architecture Fields
   level?: 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   modules?: CourseModule[];
-  enrolledStudentIds?: string[];
+  
+  // Assignment Logic
+  assignedBatches?: string[]; // Array of Batch Names e.g. ["2024-A", "2024-B"]
+  enrolledStudentIds?: string[]; // Array of Profile IDs
 }
 
 export interface ExamSession {
