@@ -108,8 +108,8 @@ export const StudentDashboardHome = () => {
           <div className="flex justify-between items-start">
              <div>
               <p className="text-gray-400 text-sm font-semibold uppercase tracking-widest">Next Payment</p>
-              <h3 className="text-4xl font-bold text-accent-gold mt-2">¥9,000</h3> 
-              <p className="text-xs text-gray-500 mt-1">Due: Oct 01</p>
+              <h3 className="text-4xl font-bold text-accent-gold mt-2">¥35,000</h3> 
+              <p className="text-xs text-gray-500 mt-1">Due: Month 3</p>
             </div>
             <div className="p-3 bg-accent-gold/20 rounded-lg">
               <CreditCard className="w-6 h-6 text-accent-gold" />
@@ -455,14 +455,14 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
     );
 };
 
-export const StudentFeesPage = () => {
+export const StudentFeesPage = ({ user }: { user: User }) => {
   const [fees, setFees] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingFeeId, setPayingFeeId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFees();
-  }, []);
+  }, [user.id]);
 
   const fetchFees = async () => {
       setLoading(true);
@@ -470,6 +470,7 @@ export const StudentFeesPage = () => {
         const { data, error } = await supabase
             .from('fees')
             .select('*')
+            .eq('student_id', user.id) // Filter strictly by logged-in user
             .order('due_date', { ascending: true });
         
         if (data) setFees(data);
@@ -484,48 +485,77 @@ export const StudentFeesPage = () => {
     try {
         const doc = new jsPDF();
         
-        // Header
-        doc.setFillColor(15, 23, 42); // bg-dark-900
+        // Add Company Logo/Header Background
+        doc.setFillColor(190, 18, 60); // Brand Red
         doc.rect(0, 0, 210, 40, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(22);
-        doc.text("ZENRO INSTITUTE", 20, 20);
-        doc.setFontSize(12);
-        doc.text("Official Payment Receipt", 20, 30);
         
-        // Info
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(24);
+        doc.text("ZENRO INSTITUTE", 20, 20);
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Excellence in Japanese Language Training", 20, 28);
+        doc.text("Tokyo | New Delhi", 20, 33);
+
+        doc.setFontSize(16);
+        doc.text("PAYMENT RECEIPT", 150, 25);
+        
+        // Receipt Details
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
-        doc.text(`Transaction Ref: ${paymentId}`, 20, 60);
-        doc.text(`Date: ${new Date().toLocaleString()}`, 20, 68);
-        doc.text(`Student: Alex Student`, 20, 76); // Ideally fetch student name
+        doc.text(`Receipt No:`, 140, 55);
+        doc.text(`Date:`, 140, 62);
+        doc.text(`Student Name:`, 20, 55);
+        doc.text(`Payment ID:`, 20, 62);
 
-        // Table
-        doc.setLineWidth(0.5);
-        doc.line(20, 90, 190, 90);
-        
-        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text("Description", 20, 100);
-        doc.text("Amount", 160, 100);
+        doc.text(`#${paymentId.slice(-8).toUpperCase()}`, 170, 55);
+        doc.text(`${new Date().toLocaleDateString()}`, 170, 62);
+        doc.text(user.name, 50, 55);
+        doc.text(paymentId, 50, 62);
+
+        // Table Header
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(20, 75, 190, 75);
+        
+        doc.setFillColor(245, 245, 245);
+        doc.rect(20, 75, 170, 10, 'F');
+        
+        doc.setFontSize(11);
+        doc.text("Description", 25, 82);
+        doc.text("Phase", 100, 82);
+        doc.text("Amount (JPY)", 160, 82);
+        
+        // Table Row
+        doc.setFont("helvetica", "normal");
+        doc.text(fee.title, 25, 95);
+        doc.text(`Phase ${fee.phase}`, 100, 95);
+        doc.text(`¥${fee.amount.toLocaleString()}`, 160, 95);
         
         doc.line(20, 105, 190, 105);
-        
-        doc.setFont("helvetica", "normal");
-        doc.text(fee.title, 20, 115);
-        doc.text(`JPY ${fee.amount.toLocaleString()}`, 160, 115);
-        
-        doc.line(20, 125, 190, 125);
+
+        // Totals
         doc.setFont("helvetica", "bold");
-        doc.text("Total Paid", 120, 135);
-        doc.text(`JPY ${fee.amount.toLocaleString()}`, 160, 135);
+        doc.text("Total Paid:", 120, 115);
+        doc.setFontSize(14);
+        doc.setTextColor(190, 18, 60);
+        doc.text(`¥${fee.amount.toLocaleString()}`, 160, 115);
 
         // Footer
-        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "italic");
-        doc.text("This is a computer generated receipt. No signature required.", 20, 180);
+        doc.text("Thank you for your payment. This is a computer-generated receipt.", 105, 140, { align: "center" });
         
-        doc.save(`Receipt_${paymentId}.pdf`);
+        // Watermark
+        doc.setTextColor(240, 240, 240);
+        doc.setFontSize(60);
+        doc.text("PAID", 105, 100, { align: "center", angle: 45 });
+
+        doc.save(`Zenro_Receipt_${paymentId}.pdf`);
     } catch (e) {
         console.error("PDF Gen Error:", e);
         alert("Could not generate PDF. Please contact admin.");
@@ -581,9 +611,9 @@ export const StudentFeesPage = () => {
             }
         },
         prefill: {
-            name: "Alex Student", // Should come from User Context
-            email: "alex@zenro.jp",
-            contact: "9999999999"
+            name: user.name, 
+            email: user.email,
+            contact: user.phone || "9999999999"
         },
         notes: {
             fee_id: fee.id
@@ -614,9 +644,6 @@ export const StudentFeesPage = () => {
       );
   }
 
-  // If no data, show mock fallback UI or empty state
-  const displayPhase1 = fees.length > 0 ? phase1Fees : []; // Would add mocks here if needed
-
   return (
     <div className="space-y-8 animate-fade-in">
       <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -624,18 +651,18 @@ export const StudentFeesPage = () => {
       </h1>
       
       {/* Phase 1 */}
-      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-lg">
         <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-gradient-to-r from-dark-900 to-dark-800">
             <div>
                 <h2 className="text-xl font-bold text-white">Phase 1: Domestic Training</h2>
-                <p className="text-sm text-gray-400">Total: ¥{calculateTotal(phase1Fees).toLocaleString()}</p>
+                <p className="text-sm text-gray-400">Total Due: ¥{calculateTotal(phase1Fees.filter(f => f.status !== 'PAID')).toLocaleString()}</p>
             </div>
              <div className="px-3 py-1 bg-green-500/10 text-green-500 rounded text-xs font-bold border border-green-500/20">Active</div>
         </div>
         <div className="divide-y divide-dark-700">
-            {displayPhase1.length === 0 && <div className="p-6 text-center text-gray-500">No fees assigned.</div>}
-            {displayPhase1.map(fee => (
-                <div key={fee.id} className="p-4 flex items-center justify-between hover:bg-dark-700/30 transition">
+            {phase1Fees.length === 0 && <div className="p-6 text-center text-gray-500">No Phase 1 fees found.</div>}
+            {phase1Fees.map(fee => (
+                <div key={fee.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-dark-700/30 transition">
                     <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-green-500/20 text-green-500' : fee.status === 'OVERDUE' ? 'bg-red-500/20 text-red-500' : 'bg-gray-500/20 text-gray-400'}`}>
                             {fee.status === 'PAID' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
@@ -645,7 +672,7 @@ export const StudentFeesPage = () => {
                             <p className="text-xs text-gray-500">Due: {fee.dueDate}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                         <div className="text-right">
                             <p className="text-white font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
                             <StatusBadge status={fee.status} />
@@ -662,7 +689,7 @@ export const StudentFeesPage = () => {
                             </button>
                         ) : (
                             <button 
-                                onClick={() => generateReceipt(fee, `PREV-TXN-${fee.id.substring(0,8)}`)}
+                                onClick={() => generateReceipt(fee, `PREV-TXN-${fee.id.substring(0,8).toUpperCase()}`)}
                                 className="bg-dark-700 hover:bg-dark-600 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm border border-dark-600 flex items-center gap-2"
                             >
                                 <Download className="w-4 h-4" /> Receipt
@@ -675,30 +702,50 @@ export const StudentFeesPage = () => {
       </div>
 
        {/* Phase 2 */}
-       <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden opacity-75">
+       <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-lg opacity-90">
         <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-gradient-to-r from-dark-900 to-dark-800">
             <div>
-                <h2 className="text-xl font-bold text-white">Phase 2: Placement Success</h2>
+                <h2 className="text-xl font-bold text-white">Phase 2: Placement & Visa</h2>
                 <p className="text-sm text-gray-400">Total: ¥{calculateTotal(phase2Fees).toLocaleString()}</p>
             </div>
-             <div className="px-3 py-1 bg-gray-700 text-gray-400 rounded text-xs font-bold border border-gray-600">Locked</div>
+             <div className="px-3 py-1 bg-blue-500/10 text-blue-500 rounded text-xs font-bold border border-blue-500/20">Installments</div>
         </div>
         <div className="divide-y divide-dark-700">
-             {phase2Fees.length === 0 && <div className="p-6 text-center text-gray-500">No Phase 2 fees yet.</div>}
+             {phase2Fees.length === 0 && <div className="p-6 text-center text-gray-500">No Phase 2 fees assigned yet.</div>}
             {phase2Fees.map(fee => (
-                <div key={fee.id} className="p-4 flex items-center justify-between hover:bg-dark-700/30 transition">
+                <div key={fee.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-dark-700/30 transition">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-gray-500/20 text-gray-400">
-                            <Lock className="w-5 h-5" />
+                        <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                             {fee.status === 'PAID' ? <CheckCircle className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
                         </div>
                         <div>
                             <p className="text-white font-medium">{fee.title}</p>
                             <p className="text-xs text-gray-500">Due: {fee.dueDate}</p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-white font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
-                        <StatusBadge status={fee.status} />
+                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                        <div className="text-right">
+                            <p className="text-white font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
+                            <StatusBadge status={fee.status} />
+                        </div>
+
+                         {fee.status !== 'PAID' ? (
+                            <button 
+                                onClick={() => handlePay(fee)}
+                                disabled={payingFeeId === fee.id}
+                                className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {payingFeeId === fee.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                                Pay Now
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={() => generateReceipt(fee, `PREV-TXN-${fee.id.substring(0,8).toUpperCase()}`)}
+                                className="bg-dark-700 hover:bg-dark-600 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm border border-dark-600 flex items-center gap-2"
+                            >
+                                <Download className="w-4 h-4" /> Receipt
+                            </button>
+                        )}
                     </div>
                 </div>
             ))}
