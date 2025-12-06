@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
-  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff
+  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff, Loader2
 } from 'lucide-react';
-import { User, UserRole, Course, FeeRecord } from '../types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from 'recharts';
+import { User, UserRole } from '../types';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { supabase } from '../services/supabaseClient';
 
-// --- MOCK DATA EXTENDED FOR ADMIN ---
+// --- MOCK DATA FOR CHARTS ---
 const REVENUE_DATA = [
   { month: 'Jan', phase1: 4000, phase2: 2400 },
   { month: 'Feb', phase1: 3000, phase2: 1398 },
@@ -19,11 +19,12 @@ const REVENUE_DATA = [
 ];
 
 // --- HELPER FUNCTIONS ---
-const generateId = () => {
-    return 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+// Generates a proper UUID v4 to satisfy Postgres 'uuid' column type constraints
+const generateUUID = () => {
+    return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+        (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> (+c / 4)).toString(16)
+    );
 };
-
-// --- SHARED COMPONENTS ---
 
 const AdminHeader = ({ title, action }: { title: string, action?: React.ReactNode }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -49,7 +50,6 @@ const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: 
 );
 
 // --- DASHBOARD ---
-
 export const AdminDashboard = () => {
   return (
     <div className="space-y-8 animate-fade-in">
@@ -126,17 +126,6 @@ export const AdminDashboard = () => {
                 </div>
               ))}
            </div>
-           
-           <div className="mt-8 p-4 bg-dark-900 rounded-lg border border-dark-700">
-              <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-orange-500" /> System Alerts
-              </h4>
-              <ul className="text-sm text-gray-400 space-y-2">
-                <li className="flex items-center gap-2">• 12 Payment verifications pending</li>
-                <li className="flex items-center gap-2">• 3 Teachers absent today</li>
-                <li className="flex items-center gap-2">• Server load at 45%</li>
-              </ul>
-           </div>
         </div>
       </div>
     </div>
@@ -144,18 +133,22 @@ export const AdminDashboard = () => {
 };
 
 // --- USER MANAGEMENT ---
-
 export const AdminUserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
-  const [offlineMode, setOfflineMode] = useState(false);
+  
+  // Feedback States
+  const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  
+  // Form State
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -170,58 +163,44 @@ export const AdminUserManagement = () => {
     fetchUsers();
   }, []);
 
+  // Clear toast messages after 3 seconds
   useEffect(() => {
-      if (successMsg) {
-          const timer = setTimeout(() => setSuccessMsg(''), 3000);
-          return () => clearTimeout(timer);
-      }
-  }, [successMsg]);
+    if (successMsg || errorMsg) {
+      const timer = setTimeout(() => {
+        setSuccessMsg('');
+        setErrorMsg('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg, errorMsg]);
 
   const fetchUsers = async () => {
     setLoading(true);
-    let allUsers: any[] = [];
-
-    // 1. Try DB
     try {
-        const { data, error } = await supabase.from('profiles').select('*');
-        if (!error && data) {
-            allUsers = [...data];
-        } else {
-            console.warn("DB Fetch failed or empty, considering local mode.");
+        // Robust fetch: Select all columns
+        const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        if (data) {
+            const mappedUsers = data.map((u: any) => ({
+                id: u.id,
+                name: u.full_name,
+                role: u.role as UserRole,
+                email: u.email,
+                avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name)}&background=random`,
+                batch: u.batch,
+                phone: u.phone,
+                rollNumber: u.student_id
+            }));
+            setUsers(mappedUsers);
         }
-    } catch (e) {
-        console.warn("DB Exception", e);
+    } catch (e: any) {
+        console.error("DB Fetch Error:", e);
+        setErrorMsg("Failed to load users from database. Please check your connection.");
+    } finally {
+        setLoading(false);
     }
-
-    // 2. Merge Local Storage (Demo Mode Persistence)
-    try {
-        const local = localStorage.getItem('zenro_demo_users');
-        if (local) {
-            const parsedLocal = JSON.parse(local);
-            // Merge logic: Local overrides DB if IDs clash (simulating optimistic UI)
-            const dbMap = new Map(allUsers.map(u => [u.id, u]));
-            parsedLocal.forEach((u: any) => dbMap.set(u.id, u));
-            allUsers = Array.from(dbMap.values());
-            
-            // If we found local users, we assume we might be in a hybrid/demo mode
-            if (parsedLocal.length > 0) setOfflineMode(true);
-        }
-    } catch (e) { console.error("Local storage error", e); }
-
-    // Map DB fields to UI type
-    const mappedUsers = allUsers.map((u: any) => ({
-        id: u.id,
-        name: u.full_name,
-        role: u.role as UserRole,
-        email: u.email,
-        avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name)}&background=random`,
-        batch: u.batch,
-        phone: u.phone,
-        rollNumber: u.student_id
-    }));
-    
-    setUsers(mappedUsers);
-    setLoading(false);
   };
 
   const filteredUsers = useMemo(() => {
@@ -232,6 +211,8 @@ export const AdminUserManagement = () => {
   }, [users, filter, roleFilter]);
 
   const handleOpenModal = (user: any = null) => {
+    setErrorMsg('');
+    setSuccessMsg('');
     if (user) {
       setEditingUser(user);
       setFormData({
@@ -240,7 +221,7 @@ export const AdminUserManagement = () => {
         role: user.role,
         student_id: user.rollNumber || '',
         batch: user.batch || '',
-        password: '', 
+        password: '', // Don't pre-fill password for security
         phone: user.phone || ''
       });
     } else {
@@ -265,103 +246,78 @@ export const AdminUserManagement = () => {
     setFormData(prev => ({...prev, password: pass}));
   };
 
-  const saveToLocal = (user: any) => {
-      // Helper to save "Robust" fallback users to local storage
-      const existing = localStorage.getItem('zenro_demo_users');
-      let items = existing ? JSON.parse(existing) : [];
-      
-      // Update or Insert
-      const idx = items.findIndex((i: any) => i.id === user.id);
-      if (idx >= 0) {
-          items[idx] = { ...items[idx], ...user }; // Merge updates
-      } else {
-          items.push(user);
-      }
-      
-      localStorage.setItem('zenro_demo_users', JSON.stringify(items));
-      setOfflineMode(true); // Flag that we used local storage
-  };
-
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMsg('');
     
-    // Validations
+    // 1. Validation
     if (formData.role === 'STUDENT' && !formData.student_id) {
-        alert("Student ID is required for Students.");
+        setErrorMsg("Student ID is mandatory for Students.");
+        setIsSubmitting(false);
         return;
     }
     if (!editingUser && !formData.password) {
-        alert("Password is required for new users.");
+        setErrorMsg("Password is required for new users.");
+        setIsSubmitting(false);
         return;
     }
 
+    // 2. Prepare Payload with UUID
     const payload: any = {
       full_name: formData.full_name,
       email: formData.email,
       role: formData.role,
-      student_id: formData.student_id,
+      student_id: formData.student_id || null, // Handle empty string as null for unique constraint
       batch: formData.batch,
       phone: formData.phone,
-      id: editingUser ? editingUser.id : generateId() // Robust ID generation
+      // If editing, use existing ID. If new, let DB generate or generate explicit UUID v4
+      // We generate explicit UUID here to ensure optimistic UI updates match DB
+      id: editingUser ? editingUser.id : generateUUID() 
     };
 
     if (formData.password) {
       payload.password = formData.password;
     }
 
-    // IMMEDIATE OPTIMISTIC UPDATE
-    // We update the UI state immediately so the user sees the change
-    const newUserUI = {
-        id: payload.id,
-        name: payload.full_name,
-        role: payload.role as UserRole,
-        email: payload.email,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(payload.full_name)}&background=random`,
-        batch: payload.batch,
-        phone: payload.phone,
-        rollNumber: payload.student_id
-    };
-
-    setUsers(prev => {
-        if (editingUser) {
-            return prev.map(u => u.id === payload.id ? newUserUI : u);
-        } else {
-            return [newUserUI, ...prev];
-        }
-    });
-
-    setIsModalOpen(false);
-    setSuccessMsg(editingUser ? 'User updated successfully!' : 'User created successfully!');
-
-    // Persist to DB or Local
     try {
       if (editingUser) {
         const { error } = await supabase.from('profiles').update(payload).eq('id', editingUser.id);
         if (error) throw error;
+        setSuccessMsg("User updated successfully.");
       } else {
         const { error } = await supabase.from('profiles').insert([payload]);
         if (error) throw error;
+        setSuccessMsg("New user created in database.");
       }
+
+      // Close and Refresh
+      setIsModalOpen(false);
+      fetchUsers();
+
     } catch (err: any) {
-      console.warn("DB Write Failed (Using Local Fallback):", err.message);
-      saveToLocal(payload);
+      console.error("DB Write Failed:", err);
+      if (err.code === '23505') {
+          setErrorMsg("Error: Email or Student ID already exists.");
+      } else {
+          setErrorMsg(`Database Error: ${err.message || 'Check connection or permissions'}`);
+      }
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-        // Immediate UI update
-        setUsers(prev => prev.filter(u => u.id !== id));
-        
+    if (confirm('Are you sure you want to delete this user? This cannot be undone.')) {
         try {
-            await supabase.from('profiles').delete().eq('id', id);
-        } catch (e) { console.warn("DB Delete Failed, removing locally"); }
-        
-        // Remove from local storage if exists
-        const existing = localStorage.getItem('zenro_demo_users');
-        if (existing) {
-            const items = JSON.parse(existing).filter((i: any) => i.id !== id);
-            localStorage.setItem('zenro_demo_users', JSON.stringify(items));
+            const { error } = await supabase.from('profiles').delete().eq('id', id);
+            if (error) throw error;
+            
+            setSuccessMsg("User deleted.");
+            setUsers(prev => prev.filter(u => u.id !== id));
+        } catch (e: any) {
+            console.error("Delete Failed:", e);
+            setErrorMsg("Failed to delete user. " + e.message);
         }
     }
   };
@@ -380,17 +336,15 @@ export const AdminUserManagement = () => {
         }
       />
 
-      {/* SUCCESS TOAST */}
+      {/* FEEDBACK TOASTS */}
       {successMsg && (
-          <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-2xl z-50 animate-bounce flex items-center gap-2 font-bold">
+          <div className="bg-green-500/10 border border-green-500/50 text-green-500 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in-up">
               <CheckCircle className="w-5 h-5" /> {successMsg}
           </div>
       )}
-
-      {offlineMode && (
-          <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-200 px-4 py-2 rounded-lg flex items-center gap-2 text-sm mb-4">
-              <WifiOff className="w-4 h-4" />
-              <span>Running in Demonstration Mode. Some data is stored locally due to restricted backend permissions.</span>
+      {errorMsg && (
+          <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in-up">
+              <XCircle className="w-5 h-5" /> {errorMsg}
           </div>
       )}
 
@@ -414,12 +368,12 @@ export const AdminUserManagement = () => {
              </div>
          </div>
          <div className="text-gray-400 text-sm">
-           Showing {filteredUsers.length} users
+           {loading ? 'Syncing...' : `Showing ${filteredUsers.length} users`}
          </div>
       </div>
 
       {/* Data Table */}
-      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-xl">
+      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-xl min-h-[400px]">
          <div className="overflow-x-auto">
            <table className="w-full text-left text-sm text-gray-400">
              <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
@@ -432,7 +386,20 @@ export const AdminUserManagement = () => {
                </tr>
              </thead>
              <tbody className="divide-y divide-dark-700">
-               {loading ? <tr><td colSpan={5} className="p-8 text-center">Loading...</td></tr> : 
+               {loading ? (
+                   <tr>
+                       <td colSpan={5} className="p-12 text-center">
+                           <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto mb-2" />
+                           <p>Connecting to Database...</p>
+                       </td>
+                   </tr>
+               ) : filteredUsers.length === 0 ? (
+                   <tr>
+                       <td colSpan={5} className="p-12 text-center text-gray-500">
+                           No users found. Click "Add New User" to get started.
+                       </td>
+                   </tr>
+               ) : (
                 filteredUsers.map(user => (
                  <tr key={user.id} className="hover:bg-dark-700/50 transition group">
                    <td className="px-6 py-4">
@@ -479,7 +446,7 @@ export const AdminUserManagement = () => {
                       </div>
                    </td>
                  </tr>
-               ))}
+               )))}
              </tbody>
            </table>
          </div>
@@ -498,6 +465,13 @@ export const AdminUserManagement = () => {
                 </div>
                 
                 <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+                    {/* Error Banner inside Modal */}
+                    {errorMsg && (
+                        <div className="bg-red-500/20 border border-red-500/30 p-3 rounded text-red-400 text-xs mb-4">
+                            {errorMsg}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name *</label>
@@ -562,8 +536,13 @@ export const AdminUserManagement = () => {
 
                     <div className="pt-6 flex justify-end gap-3">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
-                        <button type="submit" className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition">
-                            <Save className="w-4 h-4" /> {editingUser ? 'Update Profile' : 'Create Profile'}
+                        <button 
+                            type="submit" 
+                            disabled={isSubmitting}
+                            className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition disabled:opacity-50"
+                        >
+                            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 
+                            {editingUser ? 'Update Profile' : 'Create Profile'}
                         </button>
                     </div>
                 </form>
@@ -575,7 +554,6 @@ export const AdminUserManagement = () => {
 };
 
 // --- FINANCIALS ---
-
 export const AdminFinancials = () => {
   return (
     <div className="space-y-6 animate-fade-in">
