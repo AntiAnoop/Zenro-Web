@@ -3,7 +3,7 @@ import {
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
   CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff, Loader2,
-  Layers, Check
+  Layers, Check, Eye, CreditCard, FileText, Calendar, Clock, ArrowLeft, Briefcase, GraduationCap, MapPin, Phone, Mail
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -54,6 +54,314 @@ const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: 
     />
   </div>
 );
+
+// --- COMPONENT: USER PROFILE DETAIL MODAL ---
+const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void }) => {
+    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'FEES' | 'TESTS' | 'COURSES'>('OVERVIEW');
+    const [loading, setLoading] = useState(true);
+    
+    // Data States
+    const [fees, setFees] = useState<any[]>([]);
+    const [submissions, setSubmissions] = useState<any[]>([]);
+    const [stats, setStats] = useState({
+        totalFees: 0,
+        paidFees: 0,
+        pendingFees: 0,
+        avgScore: 0,
+        testsTaken: 0,
+        attendance: 88 // Mock default
+    });
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // 1. Fetch Fees
+                const { data: feeData } = await supabase.from('fees').select('*').eq('student_id', user.id);
+                const fData = feeData || [];
+                setFees(fData);
+
+                // 2. Fetch Tests
+                const { data: subData } = await supabase
+                    .from('submissions')
+                    .select('*, tests(title)')
+                    .eq('student_id', user.id)
+                    .order('completed_at', { ascending: false });
+                const sData = subData || [];
+                setSubmissions(sData);
+
+                // 3. Calculate Stats
+                const totalF = fData.reduce((acc:number, curr:any) => acc + curr.amount, 0);
+                const paidF = fData.filter((f:any) => f.status === 'PAID').reduce((acc:number, curr:any) => acc + curr.amount, 0);
+                const avgS = sData.length > 0 ? Math.round(sData.reduce((acc:number, curr:any) => acc + (curr.score/curr.total_score), 0) / sData.length * 100) : 0;
+
+                setStats({
+                    totalFees: totalF,
+                    paidFees: paidF,
+                    pendingFees: totalF - paidF,
+                    avgScore: avgS,
+                    testsTaken: sData.length,
+                    attendance: Math.floor(Math.random() * (100 - 70) + 70) // Mock attendance
+                });
+
+            } catch (e) {
+                console.error("Profile Detail Fetch Error:", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [user.id]);
+
+    const InfoRow = ({ label, value, icon: Icon }: any) => (
+        <div className="flex items-center justify-between p-3 bg-dark-900/50 rounded-lg border border-dark-700">
+            <div className="flex items-center gap-3">
+                {Icon && <Icon className="w-4 h-4 text-gray-500" />}
+                <span className="text-sm text-gray-400">{label}</span>
+            </div>
+            <span className="text-white font-medium text-sm">{value}</span>
+        </div>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex justify-end animate-fade-in">
+            <div className="w-full max-w-4xl bg-dark-800 h-full border-l border-dark-700 shadow-2xl overflow-y-auto flex flex-col">
+                {/* Header */}
+                <div className="p-6 bg-gradient-to-r from-dark-900 to-dark-800 border-b border-dark-700 flex justify-between items-start sticky top-0 z-10">
+                    <div className="flex items-center gap-4">
+                         <button onClick={onClose} className="p-2 hover:bg-dark-700 rounded-full transition text-gray-400 hover:text-white">
+                             <ArrowLeft className="w-6 h-6" />
+                         </button>
+                         <div className="flex items-center gap-4">
+                             <img src={user.avatar} alt="" className="w-16 h-16 rounded-full border-2 border-brand-500" />
+                             <div>
+                                 <h2 className="text-2xl font-bold text-white">{user.name}</h2>
+                                 <p className="text-gray-400 text-sm flex items-center gap-2">
+                                     <span className="bg-brand-500/20 text-brand-500 px-2 py-0.5 rounded text-xs font-bold border border-brand-500/30 uppercase">{user.role}</span>
+                                     <span>•</span>
+                                     <span>{user.email}</span>
+                                 </p>
+                             </div>
+                         </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button className="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg text-sm font-bold border border-dark-600">
+                             Reset Password
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="px-6 border-b border-dark-700 bg-dark-800 flex gap-6">
+                    {['OVERVIEW', 'FEES', 'TESTS', 'COURSES'].map((tab) => (
+                        <button 
+                            key={tab}
+                            onClick={() => setActiveTab(tab as any)}
+                            className={`py-4 text-sm font-bold border-b-2 transition ${activeTab === tab ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-400 hover:text-white'}`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Content Area */}
+                <div className="p-8 flex-1">
+                    {loading ? (
+                        <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-500" /></div>
+                    ) : (
+                        <div className="space-y-8 animate-fade-in">
+                            {/* OVERVIEW TAB */}
+                            {activeTab === 'OVERVIEW' && (
+                                <div className="space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Financial Summary Card */}
+                                        <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 hover:border-brand-500/30 transition group">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="p-3 bg-accent-gold/10 rounded-lg text-accent-gold group-hover:bg-accent-gold group-hover:text-black transition">
+                                                    <DollarSign className="w-6 h-6" />
+                                                </div>
+                                                <span className={`text-xs font-bold px-2 py-1 rounded ${stats.pendingFees > 0 ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
+                                                    {stats.pendingFees > 0 ? 'Payment Due' : 'All Clear'}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-gray-400 text-sm font-bold uppercase mb-1">Fee Status</h3>
+                                            <div className="flex justify-between items-end mb-4">
+                                                <div>
+                                                    <p className="text-3xl font-bold text-white">¥{stats.totalFees.toLocaleString()}</p>
+                                                    <p className="text-xs text-gray-500">Total Invoiced</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xl font-bold text-red-400">¥{stats.pendingFees.toLocaleString()}</p>
+                                                    <p className="text-xs text-gray-500">Pending</p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => setActiveTab('FEES')}
+                                                className="w-full py-2 bg-dark-800 hover:bg-dark-700 text-white text-sm font-bold rounded border border-dark-600 flex items-center justify-center gap-2"
+                                            >
+                                                View Fee Structure <ChevronDown className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Academic Summary Card */}
+                                        <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 hover:border-brand-500/30 transition group">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="p-3 bg-brand-500/10 rounded-lg text-brand-500 group-hover:bg-brand-500 group-hover:text-white transition">
+                                                    <GraduationCap className="w-6 h-6" />
+                                                </div>
+                                                <span className="text-xs font-bold px-2 py-1 rounded bg-blue-500/20 text-blue-500">
+                                                    Active Student
+                                                </span>
+                                            </div>
+                                            <h3 className="text-gray-400 text-sm font-bold uppercase mb-1">Academic Performance</h3>
+                                            <div className="flex justify-between items-end mb-4">
+                                                <div>
+                                                    <p className="text-3xl font-bold text-white">{stats.avgScore}%</p>
+                                                    <p className="text-xs text-gray-500">Average Score</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xl font-bold text-white">{stats.testsTaken}</p>
+                                                    <p className="text-xs text-gray-500">Tests Taken</p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => setActiveTab('TESTS')}
+                                                className="w-full py-2 bg-dark-800 hover:bg-dark-700 text-white text-sm font-bold rounded border border-dark-600 flex items-center justify-center gap-2"
+                                            >
+                                                View Test History <ChevronDown className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Detailed Personal Info */}
+                                    <div className="bg-dark-900 rounded-xl border border-dark-700 p-6">
+                                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                            <Users className="w-5 h-5 text-brand-500" /> Student Details
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <InfoRow label="Full Name" value={user.name} icon={Users} />
+                                            <InfoRow label="Student ID" value={user.rollNumber || user.id.slice(0,8)} icon={Key} />
+                                            <InfoRow label="Batch" value={user.batch || 'Unassigned'} icon={Layers} />
+                                            <InfoRow label="Phone" value={user.phone || 'N/A'} icon={Phone} />
+                                            <InfoRow label="Email" value={user.email} icon={Mail} />
+                                            <InfoRow label="Address" value="Tokyo, Japan (Mock)" icon={MapPin} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* FEES TAB */}
+                            {activeTab === 'FEES' && (
+                                <div className="space-y-6">
+                                     <div className="flex justify-between items-center">
+                                        <h3 className="text-xl font-bold text-white">Fee Ledger</h3>
+                                        <button className="bg-brand-600 text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2">
+                                            <Plus className="w-4 h-4" /> Add Manual Transaction
+                                        </button>
+                                     </div>
+                                     <div className="bg-dark-900 rounded-xl border border-dark-700 overflow-hidden">
+                                         <table className="w-full text-left text-sm text-gray-400">
+                                             <thead className="bg-dark-800 text-gray-200 uppercase font-bold text-xs">
+                                                 <tr>
+                                                     <th className="p-4">Description</th>
+                                                     <th className="p-4">Due Date</th>
+                                                     <th className="p-4">Amount</th>
+                                                     <th className="p-4">Status</th>
+                                                 </tr>
+                                             </thead>
+                                             <tbody className="divide-y divide-dark-700">
+                                                 {fees.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-gray-500">No fee records found.</td></tr>}
+                                                 {fees.map(fee => (
+                                                     <tr key={fee.id}>
+                                                         <td className="p-4 font-bold text-white">{fee.title} <br/><span className="text-xs text-gray-500 font-normal">{fee.category} • Phase {fee.phase}</span></td>
+                                                         <td className="p-4">{fee.dueDate || fee.due_date}</td>
+                                                         <td className="p-4 font-mono">¥{fee.amount.toLocaleString()}</td>
+                                                         <td className="p-4">
+                                                             <span className={`px-2 py-1 rounded text-xs font-bold ${fee.status === 'PAID' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                                                 {fee.status}
+                                                             </span>
+                                                         </td>
+                                                     </tr>
+                                                 ))}
+                                             </tbody>
+                                         </table>
+                                     </div>
+                                </div>
+                            )}
+
+                            {/* TESTS TAB */}
+                            {activeTab === 'TESTS' && (
+                                <div className="space-y-6">
+                                     <div className="flex justify-between items-center">
+                                        <h3 className="text-xl font-bold text-white">Test History</h3>
+                                        <p className="text-gray-400 text-sm">Avg Score: <span className="text-white font-bold">{stats.avgScore}%</span></p>
+                                     </div>
+                                     <div className="bg-dark-900 rounded-xl border border-dark-700 overflow-hidden">
+                                         <table className="w-full text-left text-sm text-gray-400">
+                                             <thead className="bg-dark-800 text-gray-200 uppercase font-bold text-xs">
+                                                 <tr>
+                                                     <th className="p-4">Test Name</th>
+                                                     <th className="p-4">Date Taken</th>
+                                                     <th className="p-4">Score</th>
+                                                     <th className="p-4 text-right">Action</th>
+                                                 </tr>
+                                             </thead>
+                                             <tbody className="divide-y divide-dark-700">
+                                                 {submissions.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-gray-500">No tests taken yet.</td></tr>}
+                                                 {submissions.map(sub => (
+                                                     <tr key={sub.id}>
+                                                         <td className="p-4 font-bold text-white">{sub.tests?.title || 'Unknown Test'}</td>
+                                                         <td className="p-4">{new Date(sub.completed_at).toLocaleDateString()}</td>
+                                                         <td className="p-4">
+                                                             <span className={`font-bold ${sub.score/sub.total_score > 0.4 ? 'text-green-500' : 'text-red-500'}`}>
+                                                                 {sub.score} / {sub.total_score}
+                                                             </span>
+                                                         </td>
+                                                         <td className="p-4 text-right">
+                                                             <button className="text-brand-500 hover:text-white underline text-xs">View Report</button>
+                                                         </td>
+                                                     </tr>
+                                                 ))}
+                                             </tbody>
+                                         </table>
+                                     </div>
+                                </div>
+                            )}
+
+                            {/* COURSES TAB (Mocked for now) */}
+                            {activeTab === 'COURSES' && (
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-bold text-white">Enrolled Courses</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {[
+                                            { title: 'JLPT N4 Comprehensive', progress: 75, instructor: 'Tanaka Sensei' },
+                                            { title: 'Kanji Mastery', progress: 30, instructor: 'Sato Sensei' },
+                                            { title: 'Business Japanese', progress: 0, instructor: 'Yamamoto Sensei' },
+                                        ].map((c, i) => (
+                                            <div key={i} className="bg-dark-900 border border-dark-700 p-4 rounded-xl flex items-center gap-4">
+                                                <div className="h-12 w-12 bg-dark-800 rounded-lg flex items-center justify-center">
+                                                    <BookOpen className="w-6 h-6 text-gray-500" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h4 className="text-white font-bold text-sm">{c.title}</h4>
+                                                    <p className="text-xs text-gray-500">{c.instructor}</p>
+                                                    <div className="mt-2 w-full bg-dark-800 rounded-full h-1.5">
+                                                        <div style={{width: `${c.progress}%`}} className="bg-brand-500 h-1.5 rounded-full"></div>
+                                                    </div>
+                                                </div>
+                                                <span className="text-white font-bold text-sm">{c.progress}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- DASHBOARD ---
 export const AdminDashboard = () => {
@@ -153,6 +461,9 @@ export const AdminUserManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+
+  // Profile View Modal State
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
 
   // Delete Modal State
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -589,6 +900,14 @@ export const AdminUserManagement = () => {
                    </td>
                    <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {/* VIEW PROFILE BUTTON */}
+                        <button 
+                            onClick={() => setViewingUser(user)}
+                            className="p-2 bg-dark-900 hover:bg-brand-900/30 text-brand-500 rounded border border-dark-600 hover:border-brand-500/30 transition" 
+                            title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <button onClick={() => handleOpenModal(user)} className="p-2 bg-dark-900 hover:bg-blue-900/30 text-blue-500 rounded border border-dark-600 hover:border-blue-500/30 transition" title="Edit">
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -820,6 +1139,12 @@ export const AdminUserManagement = () => {
               </div>
           </div>
       )}
+
+      {/* NEW: USER PROFILE DETAIL OVERVIEW MODAL */}
+      {viewingUser && (
+        <UserProfileDetail user={viewingUser} onClose={() => setViewingUser(null)} />
+      )}
+
     </div>
   );
 };
