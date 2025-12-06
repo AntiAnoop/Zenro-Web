@@ -12,23 +12,12 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend
 import { useNavigate } from 'react-router-dom';
 import { useLiveSession } from '../context/LiveContext';
 import { supabase } from '../services/supabaseClient';
+import { jsPDF } from "jspdf";
 
-// --- MOCK DATA (JAPANESE CONTEXT) ---
+// --- RAZORPAY CONFIG ---
+const RAZORPAY_KEY_ID = "rzp_test_RoNJfVaY3d336e"; 
 
-const MOCK_FEES: FeeRecord[] = [
-  // Phase 1: Total 50,000 (Before Placement) - Training in India
-  { id: 'p1_m1', title: 'Month 1: N5 Basics', amount: 5000, dueDate: '2023-08-01', status: 'PAID', category: 'TUITION', phase: 1 },
-  { id: 'p1_m2', title: 'Month 2: N5/N4 Grammar', amount: 9000, dueDate: '2023-09-01', status: 'PAID', category: 'TUITION', phase: 1 },
-  { id: 'p1_m3', title: 'Month 3: N4 Conversation', amount: 9000, dueDate: '2023-10-01', status: 'OVERDUE', category: 'TUITION', phase: 1 },
-  { id: 'p1_m4', title: 'Month 4: N3 Advanced', amount: 9000, dueDate: '2023-11-01', status: 'PENDING', category: 'TUITION', phase: 1 },
-  { id: 'p1_m5', title: 'Month 5: Interview Prep', amount: 9000, dueDate: '2023-12-01', status: 'PENDING', category: 'TUITION', phase: 1 },
-  { id: 'p1_m6', title: 'Month 6: Cultural Training', amount: 9000, dueDate: '2024-01-01', status: 'PENDING', category: 'TUITION', phase: 1 },
-  
-  // Phase 2: Total 1,50,000 (After Placement) - Success Fee
-  { id: 'p2_i1', title: 'Employment Confirmation Fee', amount: 75000, dueDate: 'TBD', status: 'PENDING', category: 'PLACEMENT', phase: 2 },
-  { id: 'p2_i2', title: 'COE & Visa Issuance Fee', amount: 75000, dueDate: 'TBD', status: 'PENDING', category: 'PLACEMENT', phase: 2 },
-];
-
+// --- MOCK DATA FOR OTHER COMPONENTS ---
 const MOCK_COURSES: Course[] = [
   { id: 'c1', title: 'JLPT N4 Comprehensive: Grammar & Vocab', progress: 75, totalDuration: '40h 30m', thumbnail: 'https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&q=80&w=800', lastWatchedTimestamp: 1205, instructor: 'Tanaka Sensei', isLive: true },
   { id: 'c2', title: 'Kanji Mastery: The First 500', progress: 30, totalDuration: '15h 00m', thumbnail: 'https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d?auto=format&fit=crop&q=80&w=800', lastWatchedTimestamp: 0, instructor: 'Sato Sensei' },
@@ -60,8 +49,8 @@ const ATTENDANCE_DATA = [
 
 const StatusBadge = ({ status }: { status: string }) => {
   const styles: Record<string, string> = {
-    PAID: 'bg-brand-500/20 text-brand-500 border-brand-500/30',
-    SUCCESS: 'bg-brand-500/20 text-brand-500 border-brand-500/30',
+    PAID: 'bg-green-500/20 text-green-500 border-green-500/30',
+    SUCCESS: 'bg-green-500/20 text-green-500 border-green-500/30',
     PENDING: 'bg-accent-gold/20 text-accent-gold border-accent-gold/30',
     OVERDUE: 'bg-red-500/20 text-red-500 border-red-500/30',
     FAILED: 'bg-red-500/20 text-red-500 border-red-500/30',
@@ -467,10 +456,166 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
 };
 
 export const StudentFeesPage = () => {
-  const phase1Fees = MOCK_FEES.filter(f => f.phase === 1);
-  const phase2Fees = MOCK_FEES.filter(f => f.phase === 2);
+  const [fees, setFees] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [payingFeeId, setPayingFeeId] = useState<string | null>(null);
 
-  const calculateTotal = (fees: FeeRecord[]) => fees.reduce((acc, curr) => acc + curr.amount, 0);
+  useEffect(() => {
+    fetchFees();
+  }, []);
+
+  const fetchFees = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+            .from('fees')
+            .select('*')
+            .order('due_date', { ascending: true });
+        
+        if (data) setFees(data);
+      } catch (e) {
+        console.error("Error fetching fees:", e);
+      } finally {
+        setLoading(false);
+      }
+  };
+
+  const generateReceipt = (fee: FeeRecord, paymentId: string) => {
+    try {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFillColor(15, 23, 42); // bg-dark-900
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text("ZENRO INSTITUTE", 20, 20);
+        doc.setFontSize(12);
+        doc.text("Official Payment Receipt", 20, 30);
+        
+        // Info
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.text(`Transaction Ref: ${paymentId}`, 20, 60);
+        doc.text(`Date: ${new Date().toLocaleString()}`, 20, 68);
+        doc.text(`Student: Alex Student`, 20, 76); // Ideally fetch student name
+
+        // Table
+        doc.setLineWidth(0.5);
+        doc.line(20, 90, 190, 90);
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Description", 20, 100);
+        doc.text("Amount", 160, 100);
+        
+        doc.line(20, 105, 190, 105);
+        
+        doc.setFont("helvetica", "normal");
+        doc.text(fee.title, 20, 115);
+        doc.text(`JPY ${fee.amount.toLocaleString()}`, 160, 115);
+        
+        doc.line(20, 125, 190, 125);
+        doc.setFont("helvetica", "bold");
+        doc.text("Total Paid", 120, 135);
+        doc.text(`JPY ${fee.amount.toLocaleString()}`, 160, 135);
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "italic");
+        doc.text("This is a computer generated receipt. No signature required.", 20, 180);
+        
+        doc.save(`Receipt_${paymentId}.pdf`);
+    } catch (e) {
+        console.error("PDF Gen Error:", e);
+        alert("Could not generate PDF. Please contact admin.");
+    }
+  };
+
+  const handlePay = (fee: FeeRecord) => {
+    setPayingFeeId(fee.id);
+
+    const options = {
+        key: RAZORPAY_KEY_ID, 
+        amount: fee.amount * 100, // Amount in paise/yen cents (check currency)
+        currency: "INR", // Using INR for test mode as RZP Japan might need special activation
+        name: "Zenro Institute",
+        description: `Payment for ${fee.title}`,
+        image: "https://ui-avatars.com/api/?name=Zenro", // Logo
+        handler: async function (response: any) {
+            try {
+                // 1. Verify and Record Payment in DB
+                const { error: payError } = await supabase.from('payments').insert({
+                    fee_id: fee.id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    amount: fee.amount,
+                    payment_date: new Date().toISOString()
+                });
+
+                if (payError) throw payError;
+
+                // 2. Update Fee Status
+                const { error: feeError } = await supabase
+                    .from('fees')
+                    .update({ status: 'PAID' })
+                    .eq('id', fee.id);
+                
+                if (feeError) throw feeError;
+
+                // 3. Success UI
+                alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}`);
+                
+                // 4. Download Receipt
+                if(confirm("Download Receipt now?")) {
+                    generateReceipt(fee, response.razorpay_payment_id);
+                }
+
+                // 5. Refresh List
+                fetchFees();
+
+            } catch (err: any) {
+                console.error("Payment Record Failed:", err);
+                alert("Payment processed but failed to record. Contact support with ID: " + response.razorpay_payment_id);
+            } finally {
+                setPayingFeeId(null);
+            }
+        },
+        prefill: {
+            name: "Alex Student", // Should come from User Context
+            email: "alex@zenro.jp",
+            contact: "9999999999"
+        },
+        notes: {
+            fee_id: fee.id
+        },
+        theme: {
+            color: "#be123c"
+        }
+    };
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
+    
+    rzp.on('payment.failed', function (response: any){
+        alert("Payment Failed: " + response.error.description);
+        setPayingFeeId(null);
+    });
+  };
+
+  const phase1Fees = fees.filter(f => f.phase === 1);
+  const phase2Fees = fees.filter(f => f.phase === 2);
+  const calculateTotal = (fList: FeeRecord[]) => fList.reduce((acc, curr) => acc + curr.amount, 0);
+
+  if (loading) {
+      return (
+        <div className="h-full flex items-center justify-center">
+            <Loader2 className="w-12 h-12 text-brand-500 animate-spin" />
+        </div>
+      );
+  }
+
+  // If no data, show mock fallback UI or empty state
+  const displayPhase1 = fees.length > 0 ? phase1Fees : []; // Would add mocks here if needed
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -488,7 +633,8 @@ export const StudentFeesPage = () => {
              <div className="px-3 py-1 bg-green-500/10 text-green-500 rounded text-xs font-bold border border-green-500/20">Active</div>
         </div>
         <div className="divide-y divide-dark-700">
-            {phase1Fees.map(fee => (
+            {displayPhase1.length === 0 && <div className="p-6 text-center text-gray-500">No fees assigned.</div>}
+            {displayPhase1.map(fee => (
                 <div key={fee.id} className="p-4 flex items-center justify-between hover:bg-dark-700/30 transition">
                     <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-green-500/20 text-green-500' : fee.status === 'OVERDUE' ? 'bg-red-500/20 text-red-500' : 'bg-gray-500/20 text-gray-400'}`}>
@@ -499,9 +645,29 @@ export const StudentFeesPage = () => {
                             <p className="text-xs text-gray-500">Due: {fee.dueDate}</p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-white font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
-                        <StatusBadge status={fee.status} />
+                    <div className="flex items-center gap-4">
+                        <div className="text-right">
+                            <p className="text-white font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
+                            <StatusBadge status={fee.status} />
+                        </div>
+                        
+                        {fee.status !== 'PAID' ? (
+                            <button 
+                                onClick={() => handlePay(fee)}
+                                disabled={payingFeeId === fee.id}
+                                className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {payingFeeId === fee.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                                Pay Now
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={() => generateReceipt(fee, `PREV-TXN-${fee.id.substring(0,8)}`)}
+                                className="bg-dark-700 hover:bg-dark-600 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm border border-dark-600 flex items-center gap-2"
+                            >
+                                <Download className="w-4 h-4" /> Receipt
+                            </button>
+                        )}
                     </div>
                 </div>
             ))}
@@ -518,6 +684,7 @@ export const StudentFeesPage = () => {
              <div className="px-3 py-1 bg-gray-700 text-gray-400 rounded text-xs font-bold border border-gray-600">Locked</div>
         </div>
         <div className="divide-y divide-dark-700">
+             {phase2Fees.length === 0 && <div className="p-6 text-center text-gray-500">No Phase 2 fees yet.</div>}
             {phase2Fees.map(fee => (
                 <div key={fee.id} className="p-4 flex items-center justify-between hover:bg-dark-700/30 transition">
                     <div className="flex items-center gap-4">
