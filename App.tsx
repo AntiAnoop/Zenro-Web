@@ -339,7 +339,7 @@ const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
 };
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   allowedRoles: UserRole[];
   user: User;
 }

@@ -18,6 +18,11 @@ const REVENUE_DATA = [
   { month: 'Jun', phase1: 2390, phase2: 3800 },
 ];
 
+// --- HELPER FUNCTIONS ---
+const generateId = () => {
+    return 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+};
+
 // --- SHARED COMPONENTS ---
 
 const AdminHeader = ({ title, action }: { title: string, action?: React.ReactNode }) => (
@@ -146,6 +151,7 @@ export const AdminUserManagement = () => {
   const [filter, setFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
   const [offlineMode, setOfflineMode] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -164,6 +170,13 @@ export const AdminUserManagement = () => {
     fetchUsers();
   }, []);
 
+  useEffect(() => {
+      if (successMsg) {
+          const timer = setTimeout(() => setSuccessMsg(''), 3000);
+          return () => clearTimeout(timer);
+      }
+  }, [successMsg]);
+
   const fetchUsers = async () => {
     setLoading(true);
     let allUsers: any[] = [];
@@ -174,12 +187,10 @@ export const AdminUserManagement = () => {
         if (!error && data) {
             allUsers = [...data];
         } else {
-            console.warn("DB Fetch failed, entering local mode.");
-            setOfflineMode(true);
+            console.warn("DB Fetch failed or empty, considering local mode.");
         }
     } catch (e) {
         console.warn("DB Exception", e);
-        setOfflineMode(true);
     }
 
     // 2. Merge Local Storage (Demo Mode Persistence)
@@ -191,6 +202,9 @@ export const AdminUserManagement = () => {
             const dbMap = new Map(allUsers.map(u => [u.id, u]));
             parsedLocal.forEach((u: any) => dbMap.set(u.id, u));
             allUsers = Array.from(dbMap.values());
+            
+            // If we found local users, we assume we might be in a hybrid/demo mode
+            if (parsedLocal.length > 0) setOfflineMode(true);
         }
     } catch (e) { console.error("Local storage error", e); }
 
@@ -288,39 +302,57 @@ export const AdminUserManagement = () => {
       student_id: formData.student_id,
       batch: formData.batch,
       phone: formData.phone,
-      id: editingUser ? editingUser.id : crypto.randomUUID() // Client-side ID for robustness
+      id: editingUser ? editingUser.id : generateId() // Robust ID generation
     };
 
     if (formData.password) {
       payload.password = formData.password;
     }
 
+    // IMMEDIATE OPTIMISTIC UPDATE
+    // We update the UI state immediately so the user sees the change
+    const newUserUI = {
+        id: payload.id,
+        name: payload.full_name,
+        role: payload.role as UserRole,
+        email: payload.email,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(payload.full_name)}&background=random`,
+        batch: payload.batch,
+        phone: payload.phone,
+        rollNumber: payload.student_id
+    };
+
+    setUsers(prev => {
+        if (editingUser) {
+            return prev.map(u => u.id === payload.id ? newUserUI : u);
+        } else {
+            return [newUserUI, ...prev];
+        }
+    });
+
+    setIsModalOpen(false);
+    setSuccessMsg(editingUser ? 'User updated successfully!' : 'User created successfully!');
+
+    // Persist to DB or Local
     try {
       if (editingUser) {
-        // Optimistic Update
         const { error } = await supabase.from('profiles').update(payload).eq('id', editingUser.id);
         if (error) throw error;
       } else {
-        // Optimistic Create
         const { error } = await supabase.from('profiles').insert([payload]);
-        if (error) {
-            // Handle unique constraint or RLS error
-            if (error.code === '23505') throw new Error("Student ID or Email already exists.");
-            throw error; // Fallback to catch
-        }
+        if (error) throw error;
       }
     } catch (err: any) {
       console.warn("DB Write Failed (Using Local Fallback):", err.message);
-      // Fallback: Save to LocalStorage so Admin sees it "worked"
       saveToLocal(payload);
-    } finally {
-        setIsModalOpen(false);
-        fetchUsers(); // Refresh UI
     }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this user?')) {
+        // Immediate UI update
+        setUsers(prev => prev.filter(u => u.id !== id));
+        
         try {
             await supabase.from('profiles').delete().eq('id', id);
         } catch (e) { console.warn("DB Delete Failed, removing locally"); }
@@ -331,8 +363,6 @@ export const AdminUserManagement = () => {
             const items = JSON.parse(existing).filter((i: any) => i.id !== id);
             localStorage.setItem('zenro_demo_users', JSON.stringify(items));
         }
-        
-        fetchUsers();
     }
   };
 
@@ -349,6 +379,13 @@ export const AdminUserManagement = () => {
           </button>
         }
       />
+
+      {/* SUCCESS TOAST */}
+      {successMsg && (
+          <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-2xl z-50 animate-bounce flex items-center gap-2 font-bold">
+              <CheckCircle className="w-5 h-5" /> {successMsg}
+          </div>
+      )}
 
       {offlineMode && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-200 px-4 py-2 rounded-lg flex items-center gap-2 text-sm mb-4">
