@@ -1,0 +1,163 @@
+
+-- ----------------------------------------------------------------
+-- ZENRO DATABASE SETUP SCRIPT
+-- Copy and Run this in Supabase SQL Editor to fix missing columns.
+-- ----------------------------------------------------------------
+
+-- 1. CLEANUP (Drop existing tables to avoid conflicts)
+DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS fees CASCADE;
+DROP TABLE IF EXISTS submissions CASCADE;
+DROP TABLE IF EXISTS questions CASCADE;
+DROP TABLE IF EXISTS tests CASCADE;
+DROP TABLE IF EXISTS course_enrollments CASCADE;
+DROP TABLE IF EXISTS course_batches CASCADE;
+DROP TABLE IF EXISTS course_materials CASCADE;
+DROP TABLE IF EXISTS course_modules CASCADE;
+DROP TABLE IF EXISTS courses CASCADE;
+DROP TABLE IF EXISTS batches CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
+
+-- 2. CREATE TABLES
+
+-- Profiles (Users)
+CREATE TABLE profiles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text,
+  password text,
+  full_name text,
+  role text CHECK (role IN ('STUDENT', 'TEACHER', 'ADMIN')),
+  batch text,
+  phone text,
+  student_id text,
+  avatar_url text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Batches
+CREATE TABLE batches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text UNIQUE NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Courses (Fixed: Added level, status, instructor_name)
+CREATE TABLE courses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  level text,                 -- Required for Wizard
+  thumbnail text,
+  status text DEFAULT 'DRAFT', -- Required for Wizard
+  instructor_name text,       -- Required for Wizard
+  created_at timestamptz DEFAULT now()
+);
+
+-- Course Modules
+CREATE TABLE course_modules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id uuid REFERENCES courses(id) ON DELETE CASCADE,
+  title text,
+  "order" int,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Course Materials (Videos, PDFs)
+CREATE TABLE course_materials (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  module_id uuid REFERENCES course_modules(id) ON DELETE CASCADE,
+  title text,
+  type text,
+  url text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Course Batches (Junction Table)
+CREATE TABLE course_batches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id uuid REFERENCES courses(id) ON DELETE CASCADE,
+  batch_name text, 
+  created_at timestamptz DEFAULT now()
+);
+
+-- Course Enrollments (Junction Table for individual students)
+CREATE TABLE course_enrollments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id uuid REFERENCES courses(id) ON DELETE CASCADE,
+  student_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Tests/Exams
+CREATE TABLE tests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text,
+  duration_minutes int,
+  passing_score int DEFAULT 40,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Questions
+CREATE TABLE questions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  test_id uuid REFERENCES tests(id) ON DELETE CASCADE,
+  question_text text,
+  options text[], -- Array of strings
+  correct_option_index int,
+  marks int DEFAULT 1,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Submissions (Student Results)
+CREATE TABLE submissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  test_id uuid REFERENCES tests(id) ON DELETE CASCADE,
+  student_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  score int,
+  total_score int,
+  answers jsonb, -- Stores key-value of question_id: option_index
+  status text,
+  completed_at timestamptz DEFAULT now()
+);
+
+-- Fees
+CREATE TABLE fees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  title text,
+  amount numeric,
+  due_date date,
+  status text DEFAULT 'PENDING',
+  category text,
+  phase int,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Payments
+CREATE TABLE payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  fee_id uuid REFERENCES fees(id) ON DELETE CASCADE,
+  razorpay_payment_id text,
+  amount numeric,
+  payment_date timestamptz DEFAULT now()
+);
+
+-- 3. SEED DATA (So the app isn't empty)
+
+-- Insert Batches
+INSERT INTO batches (name) VALUES ('2024-A'), ('2024-B');
+
+-- Insert Users (Ensure IDs match your app's hardcoded credentials for easy login)
+INSERT INTO profiles (id, email, password, full_name, role, batch, student_id, phone) VALUES 
+('s1', 'student@zenro.jp', '9999999999', 'Alex Student', 'STUDENT', '2024-A', '9999999999', '9999999999'),
+('t1', 'teacher@zenro.jp', '8888888888', 'Tanaka Sensei', 'TEACHER', NULL, '8888888888', '8888888888'),
+('a1', 'admin@zenro.jp', '7777777777', 'Admin User', 'ADMIN', NULL, '7777777777', '7777777777');
+
+-- Insert a Sample Course
+INSERT INTO courses (id, title, description, level, thumbnail, status, instructor_name) VALUES
+('c1', 'JLPT N4 Comprehensive', 'Complete guide to passing N4.', 'N4', 'https://images.unsplash.com/photo-1528164344705-47542687000d', 'PUBLISHED', 'Tanaka Sensei');
+
+-- Link Sample Course to Batch 2024-A
+INSERT INTO course_batches (course_id, batch_name) VALUES ('c1', '2024-A');
+
