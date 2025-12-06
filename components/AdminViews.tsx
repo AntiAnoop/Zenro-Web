@@ -174,6 +174,23 @@ export const AdminUserManagement = () => {
     fetchUsers();
     fetchBatches();
     
+    // SUBSCRIBE TO BATCH UPDATES (REAL-TIME)
+    const batchSubscription = supabase
+      .channel('public:batches')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'batches' }, (payload) => {
+        console.log("Realtime Batch Insert:", payload.new);
+        const newBatch = payload.new as Batch;
+        setAvailableBatches(prev => {
+            // Avoid duplicates if we already added it optimistically
+            if (prev.some(b => b.name === newBatch.name)) {
+                // Update the ID if it was a temp ID
+                return prev.map(b => b.name === newBatch.name ? newBatch : b);
+            }
+            return [...prev, newBatch].sort((a, b) => a.name.localeCompare(b.name));
+        });
+      })
+      .subscribe();
+
     // Click outside listener for batch dropdown
     const handleClickOutside = (event: MouseEvent) => {
         if (batchDropdownRef.current && !batchDropdownRef.current.contains(event.target as Node)) {
@@ -181,7 +198,11 @@ export const AdminUserManagement = () => {
         }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    
+    return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        supabase.removeChannel(batchSubscription);
+    };
   }, []);
 
   // Clear toast messages after 3 seconds
@@ -224,18 +245,28 @@ export const AdminUserManagement = () => {
 
   const fetchBatches = async () => {
       try {
-          // Robust Fetch: Try to get from 'batches' table
+          // 1. Robust Fetch: Try to get from 'batches' table
           const { data, error } = await supabase.from('batches').select('*').order('name');
+          
+          let dbBatches: Batch[] = [];
           if (!error && data) {
-              setAvailableBatches(data);
+              dbBatches = data;
+          }
+
+          // 2. Legacy Fallback: Scan profiles for batches not in DB yet (migration support)
+          // Only if DB fetch worked but we want to ensure we don't miss legacy string-only batches
+          const { data: profileData } = await supabase.from('profiles').select('batch');
+          if (profileData) {
+              const uniqueNames = Array.from(new Set(profileData.map((p:any) => p.batch).filter(Boolean)));
+              // Merge: Add legacy ones if they aren't in DB list
+              const existingNames = new Set(dbBatches.map(b => b.name));
+              const missingLegacy = uniqueNames
+                  .filter(name => !existingNames.has(name as string))
+                  .map(name => ({ id: `legacy-${name}`, name: name as string }));
+              
+              setAvailableBatches([...dbBatches, ...missingLegacy].sort((a, b) => a.name.localeCompare(b.name)));
           } else {
-              // Fallback: If table doesn't exist yet, get unique from profiles (Legacy Support)
-              console.warn("Batches table missing, falling back to profiles scan.");
-              const { data: profileData } = await supabase.from('profiles').select('batch');
-              if (profileData) {
-                  const unique = Array.from(new Set(profileData.map((p:any) => p.batch).filter(Boolean)));
-                  setAvailableBatches(unique.map(name => ({ id: name, name: name } as Batch)));
-              }
+              setAvailableBatches(dbBatches);
           }
       } catch (e) {
           console.error("Batch fetch error", e);
@@ -243,34 +274,37 @@ export const AdminUserManagement = () => {
   };
 
   const handleCreateBatch = async (newBatchName: string) => {
-      if (!confirm(`Are you sure you want to create a new batch named "${newBatchName}"?`)) return;
+      if (!newBatchName.trim()) return;
+      if (!confirm(`Create new batch "${newBatchName}"?`)) return;
 
       try {
-          // 1. Optimistic UI Update
-          const tempId = generateUUID();
-          setAvailableBatches(prev => [...prev, { id: tempId, name: newBatchName }]);
+          // 1. Optimistic UI Update (Immediate)
+          const tempId = `temp-${Date.now()}`;
+          const tempBatch = { id: tempId, name: newBatchName };
+          setAvailableBatches(prev => [...prev, tempBatch].sort((a, b) => a.name.localeCompare(b.name)));
+          
+          // Auto-select
           setFormData(prev => ({ ...prev, batch: newBatchName }));
           setShowBatchDropdown(false);
-          setSuccessMsg(`Batch "${newBatchName}" Created!`);
+          setSuccessMsg(`Batch "${newBatchName}" created! Syncing...`);
 
           // 2. DB Insert
           const { data, error } = await supabase.from('batches').insert({ name: newBatchName }).select();
           
           if (error) {
-              // If table doesn't exist, we just rely on the Profile string value (Legacy Mode)
-              if (error.code === '42P01') { 
-                  console.warn("Batches table doesn't exist, proceeding with string-only batch.");
-              } else {
-                  throw error;
+              console.error("Create Batch Error:", error);
+              // Handle error: maybe revert optimistic update if it was critical, or just warn
+              if (error.code !== '42P01') { // Ignore "table missing" error for legacy compatibility
+                  setErrorMsg("Could not save batch to database. It may disappear on refresh.");
               }
           } else if (data) {
-              // Update with real ID if needed, though name is what we display
+              // 3. Confirm Update with real ID
               setAvailableBatches(prev => prev.map(b => b.id === tempId ? data[0] : b));
+              setSuccessMsg(`Batch "${newBatchName}" synced successfully.`);
           }
 
       } catch (e: any) {
-          console.error("Create Batch Error:", e);
-          setErrorMsg("Could not save batch to master list (using local value).");
+          console.error("Create Batch Critical Error:", e);
       }
   };
 
