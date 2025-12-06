@@ -149,10 +149,15 @@ export const AdminUserManagement = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
-  // Modal State
+  // Create/Edit Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+
+  // Delete Modal State
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Batch Management State
   const [availableBatches, setAvailableBatches] = useState<Batch[]>([]);
@@ -181,17 +186,14 @@ export const AdminUserManagement = () => {
         console.log("Realtime Batch Insert:", payload.new);
         const newBatch = payload.new as Batch;
         setAvailableBatches(prev => {
-            // Avoid duplicates if we already added it optimistically
             if (prev.some(b => b.name === newBatch.name)) {
                 return prev.map(b => b.name === newBatch.name ? newBatch : b);
             }
-            // Add NEW batch to the TOP (Reverse Order)
             return [newBatch, ...prev];
         });
       })
       .subscribe();
 
-    // Click outside listener for batch dropdown
     const handleClickOutside = (event: MouseEvent) => {
         if (batchDropdownRef.current && !batchDropdownRef.current.contains(event.target as Node)) {
             setShowBatchDropdown(false);
@@ -205,7 +207,6 @@ export const AdminUserManagement = () => {
     };
   }, []);
 
-  // Clear toast messages after 3 seconds
   useEffect(() => {
     if (successMsg || errorMsg) {
       const timer = setTimeout(() => {
@@ -245,7 +246,6 @@ export const AdminUserManagement = () => {
 
   const fetchBatches = async () => {
       try {
-          // 1. Robust Fetch: Get batches ordered by newest first (created_at DESC)
           const { data, error } = await supabase.from('batches').select('*').order('created_at', { ascending: false });
           
           let dbBatches: Batch[] = [];
@@ -253,7 +253,6 @@ export const AdminUserManagement = () => {
               dbBatches = data;
           }
 
-          // 2. Legacy Fallback
           const { data: profileData } = await supabase.from('profiles').select('batch');
           if (profileData) {
               const uniqueNames = Array.from(new Set(profileData.map((p:any) => p.batch).filter(Boolean)));
@@ -262,7 +261,6 @@ export const AdminUserManagement = () => {
                   .filter(name => !existingNames.has(name as string))
                   .map(name => ({ id: `legacy-${name}`, name: name as string }));
               
-              // Combine: DB batches (Newest) first, then legacy
               setAvailableBatches([...dbBatches, ...missingLegacy]);
           } else {
               setAvailableBatches(dbBatches);
@@ -277,17 +275,14 @@ export const AdminUserManagement = () => {
       if (!confirm(`Create new batch "${newBatchName}"?`)) return;
 
       try {
-          // 1. Optimistic UI Update (Add to TOP of list)
           const tempId = `temp-${Date.now()}`;
           const tempBatch = { id: tempId, name: newBatchName };
           setAvailableBatches(prev => [tempBatch, ...prev]);
           
-          // Auto-select
           setFormData(prev => ({ ...prev, batch: newBatchName }));
           setShowBatchDropdown(false);
           setSuccessMsg(`Batch "${newBatchName}" created! Syncing...`);
 
-          // 2. DB Insert
           const { data, error } = await supabase.from('batches').insert({ name: newBatchName }).select();
           
           if (error) {
@@ -296,7 +291,6 @@ export const AdminUserManagement = () => {
                   setErrorMsg("Could not save batch to database. It may disappear on refresh.");
               }
           } else if (data) {
-              // 3. Confirm Update with real ID
               setAvailableBatches(prev => prev.map(b => b.id === tempId ? data[0] : b));
               setSuccessMsg(`Batch "${newBatchName}" synced successfully.`);
           }
@@ -355,23 +349,17 @@ export const AdminUserManagement = () => {
     setErrorMsg('');
     
     // --- ROBUST CLIENT-SIDE VALIDATION ---
-    
-    // 1. Mandatory Fields
     if (!formData.full_name.trim() || !formData.email.trim()) {
         setErrorMsg("Name and Email are mandatory.");
         setIsSubmitting(false);
         return;
     }
-
-    // 2. Email Format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
         setErrorMsg("Invalid email address format.");
         setIsSubmitting(false);
         return;
     }
-
-    // 3. Phone Number Format (Strict 10 digits)
     if (formData.phone) {
         const phoneRegex = /^\d{10}$/;
         if (!phoneRegex.test(formData.phone)) {
@@ -380,29 +368,22 @@ export const AdminUserManagement = () => {
             return;
         }
     }
-
-    // 4. Role specific checks
     if (formData.role === 'STUDENT' && !formData.student_id.trim()) {
         setErrorMsg("Student ID is mandatory for Students.");
         setIsSubmitting(false);
         return;
     }
-
-    // 5. Password Length
     if (!editingUser && formData.password.length < 8) {
         setErrorMsg("Password must be at least 8 characters.");
         setIsSubmitting(false);
         return;
     }
-
-    // 6. Duplicate Detection (Client Check before API)
     const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.id !== editingUser?.id);
     if (emailExists) {
         setErrorMsg("A user with this email already exists.");
         setIsSubmitting(false);
         return;
     }
-
     if (formData.phone) {
         const phoneExists = users.some(u => u.phone === formData.phone && u.id !== editingUser?.id);
         if (phoneExists) {
@@ -411,7 +392,6 @@ export const AdminUserManagement = () => {
             return;
         }
     }
-
     if (formData.role === 'STUDENT') {
         const idExists = users.some(u => u.rollNumber?.toLowerCase() === formData.student_id.toLowerCase() && u.id !== editingUser?.id);
         if (idExists) {
@@ -461,16 +441,34 @@ export const AdminUserManagement = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this user? This cannot be undone.')) {
-        try {
-            const { error } = await supabase.from('profiles').delete().eq('id', id);
-            if (error) throw error;
-            setSuccessMsg("User deleted.");
-            setUsers(prev => prev.filter(u => u.id !== id));
-        } catch (e: any) {
-            setErrorMsg("Failed to delete user. " + e.message);
-        }
+  // --- DELETE FLOW HANDLERS ---
+  const initiateDelete = (user: User) => {
+      setUserToDelete(user);
+      setIsDeleteConfirmed(false);
+      setErrorMsg('');
+  };
+
+  const handleExecuteDelete = async () => {
+    if (!userToDelete || !isDeleteConfirmed) return;
+    
+    setIsDeleting(true);
+    try {
+        // HARD DELETE from Database
+        const { error } = await supabase.from('profiles').delete().eq('id', userToDelete.id);
+        
+        if (error) throw error;
+
+        // Success logic
+        setSuccessMsg(`User ${userToDelete.name} has been permanently deleted.`);
+        setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+        setUserToDelete(null); // Close modal
+    } catch (e: any) {
+        console.error("Delete Failed:", e);
+        setErrorMsg("Delete failed. " + (e.message || "Constraint error (check payments/results)."));
+        // Don't close modal on error so user can see it, but optional
+        setUserToDelete(null); // Actually, let's close it and show the toast to keep flow clean
+    } finally {
+        setIsDeleting(false);
     }
   };
 
@@ -595,9 +593,9 @@ export const AdminUserManagement = () => {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(user.id)}
-                          className="p-2 bg-dark-900 hover:bg-red-900/30 text-red-500 rounded border border-dark-600 hover:border-red-500/30 transition" 
-                          title="Delete"
+                          onClick={() => initiateDelete(user)}
+                          className="p-2 bg-dark-900 hover:bg-red-900/30 text-red-500 rounded border border-dark-600 hover:border-red-500/30 transition shadow-lg group-hover:bg-red-900/40" 
+                          title="Delete User"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -762,6 +760,65 @@ export const AdminUserManagement = () => {
                 </form>
             </div>
         </div>
+      )}
+
+      {/* DANGER: DELETE CONFIRMATION MODAL */}
+      {userToDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-dark-800 w-full max-w-md rounded-2xl border border-red-500 shadow-2xl overflow-hidden relative">
+                  {/* Danger Header */}
+                  <div className="bg-red-900/20 p-6 flex flex-col items-center justify-center border-b border-red-500/30">
+                      <div className="bg-red-500/10 p-4 rounded-full border border-red-500/50 mb-4 animate-pulse">
+                          <AlertTriangle className="w-10 h-10 text-red-500" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-red-500">Delete User Permanently?</h2>
+                      <p className="text-red-300 text-sm mt-2 text-center">
+                          This action is <strong className="uppercase">irreversible</strong>.
+                      </p>
+                  </div>
+                  
+                  <div className="p-6">
+                      <p className="text-gray-300 mb-6 text-center text-sm">
+                          You are about to delete the user <strong className="text-white">{userToDelete.name}</strong> ({userToDelete.email}). 
+                          All associated data including exam results, fee records, and attendance will be wiped from the database.
+                      </p>
+
+                      <div className="bg-dark-900 border border-red-900/50 p-4 rounded-lg mb-6">
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                              <div className="relative flex items-center">
+                                  <input 
+                                      type="checkbox" 
+                                      className="peer h-5 w-5 cursor-pointer appearance-none rounded border border-gray-500 bg-dark-800 checked:border-red-500 checked:bg-red-500 transition-all"
+                                      checked={isDeleteConfirmed}
+                                      onChange={(e) => setIsDeleteConfirmed(e.target.checked)}
+                                  />
+                                  <Check className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100" />
+                              </div>
+                              <span className="text-xs text-gray-400 group-hover:text-gray-300 select-none leading-relaxed">
+                                  I verify that I want to delete this user permanently and understand this step cannot be undone.
+                              </span>
+                          </label>
+                      </div>
+
+                      <div className="flex gap-3">
+                          <button 
+                              onClick={() => setUserToDelete(null)}
+                              className="flex-1 py-3 bg-dark-700 hover:bg-dark-600 text-white rounded-lg font-bold text-sm transition"
+                          >
+                              Cancel
+                          </button>
+                          <button 
+                              onClick={handleExecuteDelete}
+                              disabled={!isDeleteConfirmed || isDeleting}
+                              className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold text-sm shadow-lg shadow-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                              Delete Permanently
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );
