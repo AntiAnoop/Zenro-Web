@@ -1,3 +1,4 @@
+
 export enum UserRole {
   STUDENT = 'STUDENT',
   TEACHER = 'TEACHER',
@@ -19,10 +20,27 @@ export interface User {
   address?: string;
 }
 
+export interface CourseMaterial {
+  id: string;
+  title: string;
+  type: 'PDF' | 'DOC' | 'LINK';
+  url: string;
+}
+
+export interface CourseModule {
+  id: string;
+  title: string;
+  videoUrl?: string;
+  duration?: string;
+  materials: CourseMaterial[];
+}
+
 export interface Course {
   id: string;
   title: string;
+  description?: string;
   instructor: string;
+  instructorId?: string;
   progress: number;
   thumbnail: string;
   totalDuration: string;
@@ -31,6 +49,11 @@ export interface Course {
   isLive?: boolean; // New: Live class indicator
   studentCount?: number; // For teacher view
   batchId?: string;
+  // New Fields for Robust Architecture
+  level?: 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  modules?: CourseModule[];
+  enrolledStudentIds?: string[];
 }
 
 export interface ExamSession {

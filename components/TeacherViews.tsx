@@ -1,29 +1,34 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Users, BookOpen, Clock, Plus, Video, 
   MessageSquare, BarChart2, Calendar, FileText, 
   CheckCircle, AlertTriangle, MoreVertical, X,
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
-  ChevronRight, Filter, Search, Download
+  ChevronRight, Filter, Search, Download, Trash2, Upload,
+  Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle
 } from 'lucide-react';
-import { Course, Assignment, StudentPerformance } from '../types';
+import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial } from '../types';
 import { generateClassSummary } from '../services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLiveSession } from '../context/LiveContext';
 import { supabase } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
-// --- MOCK DATA (TEACHER) ---
+// --- HELPER MOCK DATA FOR SELECTION ---
+const MOCK_STUDENTS_POOL = [
+    { id: 's1', name: 'Alex Student', email: 'alex@zenro.jp', batch: '2024-A' },
+    { id: 's2', name: 'Riya Patel', email: 'riya@zenro.jp', batch: '2024-A' },
+    { id: 's3', name: 'Kenji Sato', email: 'kenji@zenro.jp', batch: '2024-B' },
+    { id: 's4', name: 'Maria Garcia', email: 'maria@zenro.jp', batch: '2024-A' },
+    { id: 's5', name: 'John Doe', email: 'john@zenro.jp', batch: '2023-C' },
+];
 
+// --- MOCK TEACHER STATS ---
 const TEACHER_STATS = [
   { label: 'Total Students', value: '142', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/20' },
   { label: 'Active Batches', value: '4', icon: BookOpen, color: 'text-brand-500', bg: 'bg-brand-500/20' },
   { label: 'JLPT Pass Rate', value: '94%', icon: BarChart2, color: 'text-accent-gold', bg: 'bg-accent-gold/20' },
-];
-
-const MOCK_TEACHER_COURSES: Course[] = [
-  { id: 'c1', title: 'JLPT N4 Comprehensive', instructor: 'Tanaka Sensei', progress: 0, totalDuration: '40h', thumbnail: 'https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&q=80&w=800', studentCount: 45, batchId: 'B-2024' },
-  { id: 'c2', title: 'Kanji Mastery N5-N3', instructor: 'Tanaka Sensei', progress: 0, totalDuration: '28h', thumbnail: 'https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d?auto=format&fit=crop&q=80&w=800', studentCount: 38, batchId: 'B-2024' },
 ];
 
 const MOCK_ASSIGNMENTS: Assignment[] = [
@@ -47,11 +52,6 @@ export const TeacherDashboardHome = () => {
         <div>
           <h1 className="text-3xl font-bold text-white">Sensei Dashboard</h1>
           <p className="text-gray-400">Manage your Japanese language classes and student progress.</p>
-        </div>
-        <div className="flex gap-3">
-            <button className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
-                <Plus className="w-5 h-5" /> New Course
-            </button>
         </div>
       </div>
 
@@ -136,40 +136,427 @@ export const TeacherDashboardHome = () => {
   );
 };
 
+// --- COURSE CREATION WIZARD ---
+const CourseCreationWizard = ({ onClose, onSave }: { onClose: () => void, onSave: (course: any) => void }) => {
+    const [step, setStep] = useState(1);
+    const [courseData, setCourseData] = useState<Partial<Course>>({
+        title: '',
+        description: '',
+        level: 'N5',
+        thumbnail: 'https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&q=80&w=800',
+        modules: [],
+        enrolledStudentIds: [],
+        status: 'DRAFT',
+        instructor: 'Tanaka Sensei' // Auto-filled from Auth in real app
+    });
+
+    // Module Helper State
+    const [newModuleTitle, setNewModuleTitle] = useState('');
+
+    const handleNext = () => setStep(prev => prev + 1);
+    const handleBack = () => setStep(prev => prev - 1);
+    
+    const addModule = () => {
+        if (!newModuleTitle.trim()) return;
+        const newMod: CourseModule = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: newModuleTitle,
+            materials: [],
+            duration: '0m'
+        };
+        setCourseData({
+            ...courseData,
+            modules: [...(courseData.modules || []), newMod]
+        });
+        setNewModuleTitle('');
+    };
+
+    const addMaterialToModule = (moduleId: string, type: 'PDF' | 'LINK' | 'VIDEO') => {
+        const title = prompt(`Enter Title for ${type}:`);
+        if(!title) return;
+        
+        // Mocking Upload/Link
+        const url = type === 'VIDEO' ? 'https://example.com/video.mp4' : 'https://example.com/material.pdf'; 
+
+        const newMat: CourseMaterial = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: title,
+            type: type === 'VIDEO' ? 'LINK' : type as any, // Simplifying for demo
+            url: url
+        };
+
+        const updatedModules = courseData.modules?.map(m => {
+            if (m.id === moduleId) {
+                if (type === 'VIDEO') {
+                    return { ...m, videoUrl: url, duration: '15m' }; // Set video
+                } else {
+                    return { ...m, materials: [...m.materials, newMat] };
+                }
+            }
+            return m;
+        });
+
+        setCourseData({ ...courseData, modules: updatedModules });
+    };
+
+    const toggleStudent = (id: string) => {
+        const current = courseData.enrolledStudentIds || [];
+        if (current.includes(id)) {
+            setCourseData({ ...courseData, enrolledStudentIds: current.filter(s => s !== id) });
+        } else {
+            setCourseData({ ...courseData, enrolledStudentIds: [...current, id] });
+        }
+    };
+
+    const handleFinalSave = () => {
+        const finalCourse = {
+            ...courseData,
+            id: Math.random().toString(36).substr(2, 9),
+            totalDuration: '0h', // Calculate based on modules
+            progress: 0,
+            studentCount: courseData.enrolledStudentIds?.length || 0,
+        };
+        onSave(finalCourse);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-dark-800 w-full max-w-4xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[85vh]">
+                {/* Header */}
+                <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900 rounded-t-2xl">
+                    <div>
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                           <BookOpen className="w-6 h-6 text-brand-500" /> Create New Course
+                        </h2>
+                        <p className="text-gray-400 text-sm mt-1">Step {step} of 4</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-dark-800 rounded-full text-gray-500 hover:text-white"><X className="w-6 h-6"/></button>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full h-1 bg-dark-900">
+                    <div 
+                        className="h-full bg-brand-500 transition-all duration-300"
+                        style={{ width: `${(step / 4) * 100}%` }}
+                    ></div>
+                </div>
+
+                {/* Body - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-8">
+                    {step === 1 && (
+                        <div className="space-y-6 max-w-2xl mx-auto animate-fade-in">
+                            <h3 className="text-xl font-bold text-white mb-6">Course Identity</h3>
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-gray-400 mb-2">Course Title</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                    placeholder="e.g. JLPT N4 Comprehensive Grammar"
+                                    value={courseData.title}
+                                    onChange={e => setCourseData({...courseData, title: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-400 mb-2">JLPT Level</label>
+                                    <select 
+                                        className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                        value={courseData.level}
+                                        onChange={e => setCourseData({...courseData, level: e.target.value as any})}
+                                    >
+                                        <option value="N5">N5 (Beginner)</option>
+                                        <option value="N4">N4 (Basic)</option>
+                                        <option value="N3">N3 (Intermediate)</option>
+                                        <option value="N2">N2 (Advanced)</option>
+                                        <option value="N1">N1 (Expert)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-400 mb-2">Thumbnail URL</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                        value={courseData.thumbnail}
+                                        onChange={e => setCourseData({...courseData, thumbnail: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-400 mb-2">Description</label>
+                                <textarea 
+                                    className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-32 resize-none"
+                                    placeholder="Describe what students will learn..."
+                                    value={courseData.description}
+                                    onChange={e => setCourseData({...courseData, description: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 2 && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h3 className="text-xl font-bold text-white mb-4">Curriculum Builder</h3>
+                            
+                            {/* Add Module Input */}
+                            <div className="flex gap-4 mb-8">
+                                <input 
+                                    type="text" 
+                                    className="flex-1 bg-dark-900 border border-dark-700 rounded-lg p-3 text-white outline-none"
+                                    placeholder="Enter Chapter/Module Title..."
+                                    value={newModuleTitle}
+                                    onChange={e => setNewModuleTitle(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && addModule()}
+                                />
+                                <button 
+                                    onClick={addModule}
+                                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2"
+                                >
+                                    <Plus className="w-5 h-5" /> Add Chapter
+                                </button>
+                            </div>
+
+                            {/* Modules List */}
+                            <div className="space-y-4">
+                                {courseData.modules?.length === 0 && (
+                                    <div className="text-center p-12 border-2 border-dashed border-dark-700 rounded-xl text-gray-500">
+                                        No chapters added yet. Start building your curriculum!
+                                    </div>
+                                )}
+                                {courseData.modules?.map((mod, idx) => (
+                                    <div key={mod.id} className="bg-dark-900 rounded-xl border border-dark-700 p-4">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="font-bold text-white text-lg flex items-center gap-2">
+                                                <span className="bg-dark-800 text-gray-400 w-8 h-8 rounded-full flex items-center justify-center text-xs border border-dark-700">{idx + 1}</span>
+                                                {mod.title}
+                                            </h4>
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    onClick={() => addMaterialToModule(mod.id, 'VIDEO')}
+                                                    className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 border ${mod.videoUrl ? 'bg-green-500/10 text-green-500 border-green-500/30' : 'bg-dark-800 text-gray-400 border-dark-600 hover:text-white'}`}
+                                                >
+                                                    <Video className="w-3 h-3" /> {mod.videoUrl ? 'Video Added' : 'Add Video'}
+                                                </button>
+                                                <button 
+                                                    onClick={() => addMaterialToModule(mod.id, 'PDF')}
+                                                    className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white"
+                                                >
+                                                    <Upload className="w-3 h-3" /> Materials
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Materials List inside Module */}
+                                        {(mod.materials.length > 0 || mod.videoUrl) && (
+                                            <div className="bg-dark-800 rounded-lg p-3 space-y-2">
+                                                {mod.videoUrl && (
+                                                    <div className="flex items-center gap-3 text-sm text-brand-400 p-2 bg-dark-900 rounded border border-brand-900/30">
+                                                        <PlayCircle className="w-4 h-4" /> Video Lesson ({mod.duration})
+                                                    </div>
+                                                )}
+                                                {mod.materials.map(mat => (
+                                                    <div key={mat.id} className="flex items-center gap-3 text-sm text-gray-300 p-2 bg-dark-900 rounded border border-dark-700">
+                                                        <Paperclip className="w-4 h-4" /> {mat.title} <span className="text-xs bg-dark-800 px-1 rounded text-gray-500">{mat.type}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 3 && (
+                        <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
+                            <h3 className="text-xl font-bold text-white mb-2">Enroll Students</h3>
+                            <p className="text-gray-400 text-sm mb-6">Select students to grant immediate access to this course.</p>
+
+                            <div className="bg-dark-900 border border-dark-700 rounded-lg p-2 mb-4 flex gap-2">
+                                <Search className="w-5 h-5 text-gray-500 m-2" />
+                                <input type="text" placeholder="Search students..." className="bg-transparent text-white outline-none flex-1" />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
+                                {MOCK_STUDENTS_POOL.map(student => {
+                                    const isSelected = courseData.enrolledStudentIds?.includes(student.id);
+                                    return (
+                                        <div 
+                                            key={student.id} 
+                                            onClick={() => toggleStudent(student.id)}
+                                            className={`p-4 rounded-xl border cursor-pointer transition flex items-center justify-between group ${isSelected ? 'bg-brand-900/20 border-brand-500' : 'bg-dark-900 border-dark-700 hover:border-gray-500'}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${isSelected ? 'bg-brand-500 text-white' : 'bg-dark-800 text-gray-400'}`}>
+                                                    {student.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <p className={`font-bold ${isSelected ? 'text-brand-400' : 'text-white'}`}>{student.name}</p>
+                                                    <p className="text-xs text-gray-500">{student.batch}</p>
+                                                </div>
+                                            </div>
+                                            {isSelected && <CheckCircle className="w-5 h-5 text-brand-500" />}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-right text-sm text-gray-400 mt-2">Selected: {courseData.enrolledStudentIds?.length} Students</p>
+                        </div>
+                    )}
+
+                    {step === 4 && (
+                        <div className="space-y-8 animate-fade-in text-center max-w-2xl mx-auto pt-10">
+                            <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-500/30">
+                                <CheckCircle className="w-12 h-12 text-green-500" />
+                            </div>
+                            <h2 className="text-3xl font-bold text-white">Ready to Launch?</h2>
+                            <p className="text-gray-400">
+                                You are about to create <span className="text-white font-bold">"{courseData.title}"</span> with {courseData.modules?.length} chapters for {courseData.enrolledStudentIds?.length} students.
+                            </p>
+                            
+                            <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 text-left space-y-4">
+                                <div className="flex justify-between border-b border-dark-800 pb-2">
+                                    <span className="text-gray-500">Level</span>
+                                    <span className="text-white font-bold">{courseData.level}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-dark-800 pb-2">
+                                    <span className="text-gray-500">Chapters</span>
+                                    <span className="text-white font-bold">{courseData.modules?.length}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Status</span>
+                                    <select 
+                                        className="bg-dark-800 border border-dark-600 rounded text-xs text-white p-1 outline-none"
+                                        value={courseData.status}
+                                        onChange={e => setCourseData({...courseData, status: e.target.value as any})}
+                                    >
+                                        <option value="DRAFT">Draft (Hidden)</option>
+                                        <option value="PUBLISHED">Published (Visible)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Controls */}
+                <div className="p-6 border-t border-dark-700 bg-dark-900 rounded-b-2xl flex justify-between">
+                    <button 
+                        onClick={step === 1 ? onClose : handleBack}
+                        className="px-6 py-3 rounded-lg text-gray-400 hover:text-white font-bold"
+                    >
+                        {step === 1 ? 'Cancel' : 'Back'}
+                    </button>
+                    
+                    {step < 4 ? (
+                        <button 
+                            onClick={handleNext}
+                            disabled={!courseData.title}
+                            className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
+                        >
+                            Next Step <ChevronRight className="w-5 h-5" />
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={handleFinalSave}
+                            className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-green-900/20"
+                        >
+                            <Save className="w-5 h-5" /> Create Course
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const TeacherCoursesPage = () => {
+    // Initial State is EMPTY array as requested (Fresh Start)
+    const [courses, setCourses] = useState<Course[]>([]);
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
+
+    const handleSaveCourse = (newCourse: Course) => {
+        setCourses(prev => [...prev, newCourse]);
+        setIsWizardOpen(false);
+    };
+
+    const handleDelete = (id: string) => {
+        if(confirm("Are you sure you want to delete this course?")) {
+            setCourses(prev => prev.filter(c => c.id !== id));
+        }
+    };
+
     return (
         <div className="space-y-8 animate-fade-in">
              <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-white">Course Management</h1>
-                <button className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Course Management</h1>
+                    <p className="text-gray-400 text-sm mt-1">Design curriculum and assign batches</p>
+                </div>
+                <button 
+                    onClick={() => setIsWizardOpen(true)}
+                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"
+                >
                     <Plus className="w-5 h-5" /> Create Course
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {MOCK_TEACHER_COURSES.map(course => (
-                    <div key={course.id} className="bg-dark-800 rounded-xl overflow-hidden border border-dark-700 hover:border-brand-500/50 transition group shadow-lg">
-                        <div className="relative aspect-video">
-                            <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-4">
-                                <button className="bg-white text-black px-4 py-2 rounded-lg font-bold text-sm">Edit</button>
-                                <button className="bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Manage</button>
-                            </div>
-                        </div>
-                        <div className="p-5">
-                            <h3 className="text-xl font-bold text-white mb-2">{course.title}</h3>
-                            <div className="flex justify-between text-sm text-gray-400 mb-4">
-                                <span>{course.studentCount} Students</span>
-                                <span>{course.totalDuration} Content</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <button className="flex-1 bg-dark-700 hover:bg-dark-600 text-white py-2 rounded text-sm font-medium">Add Lecture</button>
-                                <button className="flex-1 bg-dark-700 hover:bg-dark-600 text-white py-2 rounded text-sm font-medium">View Stats</button>
-                            </div>
-                        </div>
+            {/* Empty State */}
+            {courses.length === 0 ? (
+                <div className="bg-dark-800 border-2 border-dashed border-dark-700 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
+                    <div className="bg-dark-900 p-6 rounded-full mb-6">
+                        <BookOpen className="w-12 h-12 text-dark-600" />
                     </div>
-                ))}
-            </div>
+                    <h3 className="text-xl font-bold text-white mb-2">No Courses Created Yet</h3>
+                    <p className="text-gray-500 max-w-md mb-8">Start by clicking the "Create Course" button to build your first curriculum, add videos, and assign students.</p>
+                    <button 
+                        onClick={() => setIsWizardOpen(true)}
+                        className="bg-dark-700 hover:bg-dark-600 text-white px-6 py-3 rounded-lg font-bold border border-dark-500"
+                    >
+                        Launch Course Wizard
+                    </button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {courses.map(course => (
+                        <div key={course.id} className="bg-dark-800 rounded-xl overflow-hidden border border-dark-700 hover:border-brand-500/50 transition group shadow-lg flex flex-col">
+                            <div className="relative aspect-video bg-black">
+                                <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover opacity-80" />
+                                <div className="absolute top-2 right-2 flex gap-2">
+                                     <span className="bg-black/60 backdrop-blur text-white px-2 py-1 rounded text-xs font-bold border border-white/10">
+                                         {course.level}
+                                     </span>
+                                     <span className={`px-2 py-1 rounded text-xs font-bold border ${course.status === 'PUBLISHED' ? 'bg-green-500/80 text-white border-green-500' : 'bg-gray-600/80 text-gray-200 border-gray-500'}`}>
+                                         {course.status}
+                                     </span>
+                                </div>
+                            </div>
+                            <div className="p-5 flex-1 flex flex-col">
+                                <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{course.title}</h3>
+                                <p className="text-sm text-gray-400 line-clamp-2 mb-4 flex-1">{course.description || "No description provided."}</p>
+                                
+                                <div className="flex justify-between text-xs text-gray-500 mb-4 bg-dark-900 p-3 rounded-lg">
+                                    <span className="flex items-center gap-1"><Users className="w-3 h-3"/> {course.studentCount} Students</span>
+                                    <span className="flex items-center gap-1"><Layers className="w-3 h-3"/> {course.modules?.length} Chapters</span>
+                                </div>
+                                
+                                <div className="flex gap-2 mt-auto">
+                                    <button className="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded text-sm font-bold shadow-lg">Manage</button>
+                                    <button onClick={() => handleDelete(course.id)} className="p-2 bg-dark-700 hover:bg-red-900/30 text-red-500 rounded border border-dark-600">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {isWizardOpen && (
+                <CourseCreationWizard onClose={() => setIsWizardOpen(false)} onSave={handleSaveCourse} />
+            )}
         </div>
     );
 };
