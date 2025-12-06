@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2 } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom } from './components/StudentViews';
@@ -361,10 +361,55 @@ const ProtectedRoute = ({ children, allowedRoles, user }: ProtectedRouteProps) =
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isExamMode, setIsExamMode] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+
+  // SESSION PERSISTENCE LOGIC
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const storedSession = localStorage.getItem('zenro_session');
+        if (storedSession) {
+          const parsedUser = JSON.parse(storedSession);
+          setUser(parsedUser);
+        }
+      } catch (error) {
+        console.error("Failed to restore session:", error);
+        localStorage.removeItem('zenro_session');
+      } finally {
+        setIsSessionLoading(false);
+      }
+    };
+    restoreSession();
+  }, []);
+
+  const handleLogin = (newUser: User) => {
+    // Save to local storage for persistence
+    localStorage.setItem('zenro_session', JSON.stringify(newUser));
+    setUser(newUser);
+  };
+
+  const handleLogout = () => {
+    // Explicitly clear session on logout
+    localStorage.removeItem('zenro_session');
+    setUser(null);
+  };
+
+  // Prevent flash of login screen while checking session
+  if (isSessionLoading) {
+     return (
+        <div className="h-screen w-full bg-dark-900 flex flex-col items-center justify-center text-white space-y-4">
+            <ZenroLogo className="w-24 h-24 animate-pulse" />
+            <div className="flex items-center gap-2 text-brand-500">
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <span className="font-bold">Loading Session...</span>
+            </div>
+        </div>
+     );
+  }
 
   // If not logged in, show Login Screen
   if (!user) {
-    return <LoginScreen onLogin={setUser} />;
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   // If in Exam Mode, hijack screen
@@ -376,7 +421,7 @@ export default function App() {
     <LiveProvider user={user}>
       <Router>
         <div className="flex h-screen bg-dark-900 text-white font-sans selection:bg-brand-500 selection:text-white">
-          <Sidebar user={user} onLogout={() => setUser(null)} />
+          <Sidebar user={user} onLogout={handleLogout} />
           <main className="ml-64 flex-1 overflow-auto p-8 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
             <Routes>
               <Route path="/" element={
