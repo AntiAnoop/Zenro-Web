@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
-  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff, Loader2
+  CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff, Loader2,
+  Layers, Check
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -18,8 +19,13 @@ const REVENUE_DATA = [
   { month: 'Jun', phase1: 2390, phase2: 3800 },
 ];
 
+// --- TYPES ---
+interface Batch {
+  id: string;
+  name: string;
+}
+
 // --- HELPER FUNCTIONS ---
-// Generates a proper UUID v4 to satisfy Postgres 'uuid' column type constraints
 const generateUUID = () => {
     return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
         (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> (+c / 4)).toString(16)
@@ -147,6 +153,11 @@ export const AdminUserManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+
+  // Batch Management State
+  const [availableBatches, setAvailableBatches] = useState<Batch[]>([]);
+  const [showBatchDropdown, setShowBatchDropdown] = useState(false);
+  const batchDropdownRef = useRef<HTMLDivElement>(null);
   
   // Form State
   const [formData, setFormData] = useState({
@@ -161,6 +172,16 @@ export const AdminUserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchBatches();
+    
+    // Click outside listener for batch dropdown
+    const handleClickOutside = (event: MouseEvent) => {
+        if (batchDropdownRef.current && !batchDropdownRef.current.contains(event.target as Node)) {
+            setShowBatchDropdown(false);
+        }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Clear toast messages after 3 seconds
@@ -177,9 +198,7 @@ export const AdminUserManagement = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-        // Robust fetch: Select all columns
         const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-        
         if (error) throw error;
         
         if (data) {
@@ -203,6 +222,58 @@ export const AdminUserManagement = () => {
     }
   };
 
+  const fetchBatches = async () => {
+      try {
+          // Robust Fetch: Try to get from 'batches' table
+          const { data, error } = await supabase.from('batches').select('*').order('name');
+          if (!error && data) {
+              setAvailableBatches(data);
+          } else {
+              // Fallback: If table doesn't exist yet, get unique from profiles (Legacy Support)
+              console.warn("Batches table missing, falling back to profiles scan.");
+              const { data: profileData } = await supabase.from('profiles').select('batch');
+              if (profileData) {
+                  const unique = Array.from(new Set(profileData.map((p:any) => p.batch).filter(Boolean)));
+                  setAvailableBatches(unique.map(name => ({ id: name, name: name } as Batch)));
+              }
+          }
+      } catch (e) {
+          console.error("Batch fetch error", e);
+      }
+  };
+
+  const handleCreateBatch = async (newBatchName: string) => {
+      if (!confirm(`Are you sure you want to create a new batch named "${newBatchName}"?`)) return;
+
+      try {
+          // 1. Optimistic UI Update
+          const tempId = generateUUID();
+          setAvailableBatches(prev => [...prev, { id: tempId, name: newBatchName }]);
+          setFormData(prev => ({ ...prev, batch: newBatchName }));
+          setShowBatchDropdown(false);
+          setSuccessMsg(`Batch "${newBatchName}" Created!`);
+
+          // 2. DB Insert
+          const { data, error } = await supabase.from('batches').insert({ name: newBatchName }).select();
+          
+          if (error) {
+              // If table doesn't exist, we just rely on the Profile string value (Legacy Mode)
+              if (error.code === '42P01') { 
+                  console.warn("Batches table doesn't exist, proceeding with string-only batch.");
+              } else {
+                  throw error;
+              }
+          } else if (data) {
+              // Update with real ID if needed, though name is what we display
+              setAvailableBatches(prev => prev.map(b => b.id === tempId ? data[0] : b));
+          }
+
+      } catch (e: any) {
+          console.error("Create Batch Error:", e);
+          setErrorMsg("Could not save batch to master list (using local value).");
+      }
+  };
+
   const filteredUsers = useMemo(() => {
     return users.filter(u => 
       (u.name.toLowerCase().includes(filter.toLowerCase()) || u.email.toLowerCase().includes(filter.toLowerCase())) &&
@@ -221,7 +292,7 @@ export const AdminUserManagement = () => {
         role: user.role,
         student_id: user.rollNumber || '',
         batch: user.batch || '',
-        password: '', // Don't pre-fill password for security
+        password: '',
         phone: user.phone || ''
       });
     } else {
@@ -251,7 +322,6 @@ export const AdminUserManagement = () => {
     setIsSubmitting(true);
     setErrorMsg('');
     
-    // 1. Validation
     if (formData.role === 'STUDENT' && !formData.student_id) {
         setErrorMsg("Student ID is mandatory for Students.");
         setIsSubmitting(false);
@@ -263,16 +333,13 @@ export const AdminUserManagement = () => {
         return;
     }
 
-    // 2. Prepare Payload with UUID
     const payload: any = {
       full_name: formData.full_name,
       email: formData.email,
       role: formData.role,
-      student_id: formData.student_id || null, // Handle empty string as null for unique constraint
+      student_id: formData.student_id || null, 
       batch: formData.batch,
       phone: formData.phone,
-      // If editing, use existing ID. If new, let DB generate or generate explicit UUID v4
-      // We generate explicit UUID here to ensure optimistic UI updates match DB
       id: editingUser ? editingUser.id : generateUUID() 
     };
 
@@ -291,7 +358,6 @@ export const AdminUserManagement = () => {
         setSuccessMsg("New user created in database.");
       }
 
-      // Close and Refresh
       setIsModalOpen(false);
       fetchUsers();
 
@@ -300,7 +366,7 @@ export const AdminUserManagement = () => {
       if (err.code === '23505') {
           setErrorMsg("Error: Email or Student ID already exists.");
       } else {
-          setErrorMsg(`Database Error: ${err.message || 'Check connection or permissions'}`);
+          setErrorMsg(`Database Error: ${err.message || 'Check connection'}`);
       }
     } finally {
         setIsSubmitting(false);
@@ -312,15 +378,19 @@ export const AdminUserManagement = () => {
         try {
             const { error } = await supabase.from('profiles').delete().eq('id', id);
             if (error) throw error;
-            
             setSuccessMsg("User deleted.");
             setUsers(prev => prev.filter(u => u.id !== id));
         } catch (e: any) {
-            console.error("Delete Failed:", e);
             setErrorMsg("Failed to delete user. " + e.message);
         }
     }
   };
+
+  // Filter batches for dropdown
+  const filteredBatches = availableBatches.filter(b => 
+      b.name.toLowerCase().includes(formData.batch.toLowerCase())
+  );
+  const exactMatch = availableBatches.find(b => b.name.toLowerCase() === formData.batch.toLowerCase());
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -455,8 +525,8 @@ export const AdminUserManagement = () => {
       {/* CREATE/EDIT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-dark-800 w-full max-w-lg rounded-2xl border border-dark-700 shadow-2xl overflow-hidden">
-                <div className="flex justify-between items-center p-6 border-b border-dark-700 bg-dark-900">
+            <div className="bg-dark-800 w-full max-w-lg rounded-2xl border border-dark-700 shadow-2xl overflow-visible">
+                <div className="flex justify-between items-center p-6 border-b border-dark-700 bg-dark-900 rounded-t-2xl">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         {editingUser ? <Edit2 className="w-5 h-5 text-brand-500" /> : <Plus className="w-5 h-5 text-green-500" />}
                         {editingUser ? 'Edit User Profile' : 'Create New Profile'}
@@ -517,10 +587,57 @@ export const AdminUserManagement = () => {
 
                     {formData.role === 'STUDENT' && (
                         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dark-700 mt-4">
-                            <div>
+                            {/* SMART BATCH SELECTOR */}
+                            <div className="relative" ref={batchDropdownRef}>
                                 <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Batch Assignment</label>
-                                <input type="text" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white text-sm focus:border-brand-500 outline-none" placeholder="e.g. 2024-A" />
+                                <div className="relative">
+                                    <Layers className="absolute left-2 top-2.5 w-4 h-4 text-gray-500" />
+                                    <input 
+                                        type="text" 
+                                        value={formData.batch} 
+                                        onChange={e => {
+                                            setFormData({...formData, batch: e.target.value});
+                                            setShowBatchDropdown(true);
+                                        }}
+                                        onFocus={() => setShowBatchDropdown(true)}
+                                        className="w-full bg-dark-900 border border-dark-700 rounded p-2 pl-8 text-white text-sm focus:border-brand-500 outline-none" 
+                                        placeholder="Select or Create Batch..." 
+                                    />
+                                    <div className="absolute right-2 top-2.5 cursor-pointer" onClick={() => setShowBatchDropdown(!showBatchDropdown)}>
+                                        <ChevronDown className="w-4 h-4 text-gray-500" />
+                                    </div>
+                                </div>
+                                
+                                {showBatchDropdown && (
+                                    <div className="absolute z-50 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                        {filteredBatches.map(b => (
+                                            <div 
+                                                key={b.id} 
+                                                onClick={() => {
+                                                    setFormData({...formData, batch: b.name});
+                                                    setShowBatchDropdown(false);
+                                                }}
+                                                className="px-4 py-2 hover:bg-dark-700 cursor-pointer text-sm text-gray-300 flex justify-between items-center"
+                                            >
+                                                {b.name}
+                                                {formData.batch === b.name && <Check className="w-3 h-3 text-brand-500" />}
+                                            </div>
+                                        ))}
+                                        {formData.batch && !exactMatch && (
+                                            <div 
+                                                onClick={() => handleCreateBatch(formData.batch)}
+                                                className="px-4 py-2 bg-brand-900/20 hover:bg-brand-900/40 text-brand-500 cursor-pointer text-sm font-bold border-t border-dark-700 flex items-center gap-2"
+                                            >
+                                                <Plus className="w-3 h-3" /> Create "{formData.batch}"
+                                            </div>
+                                        )}
+                                        {filteredBatches.length === 0 && !formData.batch && (
+                                            <div className="px-4 py-2 text-xs text-gray-500 italic">Start typing to see batches...</div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
+
                             <div>
                                 <label className="block text-xs font-bold text-brand-500 uppercase mb-1">Student ID (Login) *</label>
                                 <input 
