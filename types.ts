@@ -59,6 +59,27 @@ export interface Course {
   enrolledStudentIds?: string[]; // Array of Profile IDs
 }
 
+// --- TEST & EXAM TYPES ---
+
+export interface Question {
+  id: string;
+  test_id?: string;
+  question_text: string;
+  options: string[]; // Array of 4 strings
+  correct_option_index: number; // 0-3
+  marks: number;
+}
+
+export interface Test {
+  id: string;
+  title: string;
+  duration_minutes: number;
+  passing_score: number;
+  is_active: boolean;
+  questions?: Question[];
+  created_at?: string;
+}
+
 export interface ExamSession {
   id: string;
   courseId: string;

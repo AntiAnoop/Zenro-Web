@@ -7,9 +7,10 @@ import {
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
-  Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff
+  Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff,
+  FileCheck, HelpCircle
 } from 'lucide-react';
-import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User } from '../types';
+import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User, Test, Question } from '../types';
 import { generateClassSummary } from '../services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLiveSession } from '../context/LiveContext';
@@ -135,6 +136,321 @@ export const TeacherDashboardHome = () => {
       </div>
     </div>
   );
+};
+
+// --- TEST MANAGEMENT ---
+
+interface TestModalProps {
+    onClose: () => void;
+    onRefresh: () => void;
+}
+
+const TestCreationModal = ({ onClose, onRefresh }: TestModalProps) => {
+    const [step, setStep] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [testData, setTestData] = useState<Partial<Test>>({
+        title: '',
+        duration_minutes: 30,
+        passing_score: 40,
+        is_active: true
+    });
+    const [questions, setQuestions] = useState<Partial<Question>[]>([]);
+
+    const addQuestion = () => {
+        setQuestions([
+            ...questions,
+            { id: crypto.randomUUID(), question_text: '', options: ['', '', '', ''], correct_option_index: 0, marks: 1 }
+        ]);
+    };
+
+    const updateQuestion = (idx: number, field: keyof Question, value: any) => {
+        const updated = [...questions];
+        updated[idx] = { ...updated[idx], [field]: value };
+        setQuestions(updated);
+    };
+
+    const updateOption = (qIdx: number, oIdx: number, val: string) => {
+        const updated = [...questions];
+        if (updated[qIdx].options) {
+            const newOpts = [...updated[qIdx].options!];
+            newOpts[oIdx] = val;
+            updated[qIdx].options = newOpts;
+            setQuestions(updated);
+        }
+    };
+
+    const removeQuestion = (idx: number) => {
+        const updated = [...questions];
+        updated.splice(idx, 1);
+        setQuestions(updated);
+    };
+
+    const handleSave = async () => {
+        if (!testData.title) return alert("Title is required");
+        if (questions.length === 0) return alert("Add at least one question");
+        
+        // Validation check for empty fields
+        for (const q of questions) {
+            if (!q.question_text) return alert("All questions must have text");
+            if (q.options?.some(o => !o.trim())) return alert("All options must be filled");
+        }
+
+        setLoading(true);
+        try {
+            // 1. Create Test
+            const { data: test, error: testError } = await supabase
+                .from('tests')
+                .insert(testData)
+                .select()
+                .single();
+            
+            if (testError) throw testError;
+
+            // 2. Add Questions
+            const questionsPayload = questions.map(q => ({
+                test_id: test.id,
+                question_text: q.question_text,
+                options: q.options,
+                correct_option_index: q.correct_option_index,
+                marks: q.marks
+            }));
+
+            const { error: qError } = await supabase.from('questions').insert(questionsPayload);
+            if (qError) throw qError;
+
+            alert("Test Created Successfully!");
+            onRefresh();
+            onClose();
+
+        } catch (e: any) {
+            console.error("Save Test Error:", e);
+            alert("Failed to save test: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-dark-800 w-full max-w-4xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+                <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <FileCheck className="w-6 h-6 text-brand-500" /> Create New Assessment
+                    </h2>
+                    <button onClick={onClose} className="p-2 hover:bg-dark-800 rounded-full text-gray-500 hover:text-white"><X className="w-6 h-6"/></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-8 bg-dark-800/50">
+                    {/* Test Meta */}
+                    <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 mb-8">
+                        <h3 className="text-lg font-bold text-white mb-4">Test Details</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Test Title</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                    placeholder="e.g. JLPT N4 Mock Exam #1"
+                                    value={testData.title}
+                                    onChange={e => setTestData({...testData, title: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Duration (Minutes)</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                    value={testData.duration_minutes}
+                                    onChange={e => setTestData({...testData, duration_minutes: parseInt(e.target.value)})}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Questions Builder */}
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-white">Questions ({questions.length})</h3>
+                            <button onClick={addQuestion} className="text-sm bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                                <Plus className="w-4 h-4" /> Add Question
+                            </button>
+                        </div>
+
+                        {questions.map((q, idx) => (
+                            <div key={idx} className="bg-dark-900 p-6 rounded-xl border border-dark-700 relative group">
+                                <button 
+                                    onClick={() => removeQuestion(idx)}
+                                    className="absolute top-4 right-4 p-2 bg-dark-800 text-gray-500 hover:text-red-500 rounded border border-dark-600 hover:border-red-500 transition"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                
+                                <div className="mb-4 pr-12">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Question {idx + 1}</label>
+                                    <textarea 
+                                        className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-24 resize-none"
+                                        placeholder="Enter question text..."
+                                        value={q.question_text}
+                                        onChange={e => updateQuestion(idx, 'question_text', e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    {q.options?.map((opt, oIdx) => (
+                                        <div key={oIdx} className="flex items-center gap-3">
+                                            <input 
+                                                type="radio" 
+                                                name={`correct-${idx}`}
+                                                checked={q.correct_option_index === oIdx}
+                                                onChange={() => updateQuestion(idx, 'correct_option_index', oIdx)}
+                                                className="w-4 h-4 text-brand-500 focus:ring-brand-500 cursor-pointer"
+                                            />
+                                            <input 
+                                                type="text" 
+                                                className={`flex-1 bg-dark-800 border rounded-lg p-2 text-sm text-white outline-none transition ${q.correct_option_index === oIdx ? 'border-brand-500 bg-brand-900/10' : 'border-dark-600 focus:border-brand-500'}`}
+                                                placeholder={`Option ${oIdx + 1}`}
+                                                value={opt}
+                                                onChange={e => updateOption(idx, oIdx, e.target.value)}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-end">
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Marks:</label>
+                                        <input 
+                                            type="number" 
+                                            className="w-16 bg-dark-800 border border-dark-600 rounded p-1 text-white text-sm text-center outline-none focus:border-brand-500"
+                                            value={q.marks}
+                                            onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value))}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="p-6 border-t border-dark-700 bg-dark-900 flex justify-end gap-3">
+                    <button onClick={onClose} className="px-6 py-3 rounded-lg text-gray-400 hover:text-white font-bold transition">Cancel</button>
+                    <button 
+                        onClick={handleSave}
+                        disabled={loading}
+                        className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50 transition shadow-lg"
+                    >
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        Save & Publish Test
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const TeacherTestsPage = () => {
+    const [tests, setTests] = useState<Test[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+
+    useEffect(() => {
+        fetchTests();
+    }, []);
+
+    const fetchTests = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('tests')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            setTests(data || []);
+        } catch (e) {
+            console.error("Fetch Tests Error:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deleteTest = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this test? All student submissions will be lost.")) return;
+        try {
+            const { error } = await supabase.from('tests').delete().eq('id', id);
+            if (error) throw error;
+            fetchTests(); // Refresh
+        } catch (e) {
+            console.error("Delete Error:", e);
+            alert("Failed to delete test.");
+        }
+    };
+
+    const toggleActive = async (test: Test) => {
+        try {
+            const { error } = await supabase
+                .from('tests')
+                .update({ is_active: !test.is_active })
+                .eq('id', test.id);
+            if (error) throw error;
+            // Optimistic update
+            setTests(prev => prev.map(t => t.id === test.id ? { ...t, is_active: !t.is_active } : t));
+        } catch (e) {
+            console.error("Update Error:", e);
+        }
+    };
+
+    return (
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Test Management</h1>
+                    <p className="text-gray-400">Create, edit and manage exams.</p>
+                </div>
+                <button 
+                    onClick={() => setIsCreatorOpen(true)}
+                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"
+                >
+                    <Plus className="w-5 h-5" /> Create Assessment
+                </button>
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 text-brand-500 animate-spin" /></div>
+            ) : tests.length === 0 ? (
+                <div className="text-center p-12 bg-dark-800 rounded-xl border border-dark-700">
+                    <p className="text-gray-500">No tests found. Create one to get started.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-4">
+                    {tests.map(test => (
+                        <div key={test.id} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex justify-between items-center hover:border-brand-500/30 transition shadow-lg group">
+                            <div>
+                                <h3 className="text-xl font-bold text-white mb-1 group-hover:text-brand-500 transition">{test.title}</h3>
+                                <div className="flex gap-4 text-sm text-gray-400">
+                                    <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {test.duration_minutes} Mins</span>
+                                    <span className="flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Pass: {test.passing_score}%</span>
+                                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {new Date(test.created_at!).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button 
+                                    onClick={() => toggleActive(test)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold border transition ${test.is_active ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20' : 'bg-gray-700 text-gray-400 border-gray-600 hover:text-white'}`}
+                                >
+                                    {test.is_active ? 'Active' : 'Draft'}
+                                </button>
+                                <div className="h-8 w-[1px] bg-dark-600"></div>
+                                <button className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded transition"><Edit3 className="w-5 h-5" /></button>
+                                <button onClick={() => deleteTest(test.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-900/20 rounded transition"><Trash2 className="w-5 h-5" /></button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {isCreatorOpen && <TestCreationModal onClose={() => setIsCreatorOpen(false)} onRefresh={fetchTests} />}
+        </div>
+    );
 };
 
 // --- ROBUST COURSE CREATION WIZARD ---

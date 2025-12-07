@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2, Menu, X } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2, Menu, X, FileCheck } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer } from './components/StudentViews';
 import { StudentTestPlayer } from './components/StudentTestPlayer';
 import { TestReport } from './components/TestReport';
-import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole } from './components/TeacherViews';
+import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage } from './components/TeacherViews';
 import { AdminDashboard, AdminUserManagement, AdminFinancials } from './components/AdminViews';
 import { LiveProvider } from './context/LiveContext';
 import { supabase } from './services/supabaseClient';
@@ -340,6 +340,10 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
                  <Book className="w-4 h-4" />
                  Classes
                </Link>
+               <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/tests')}`}>
+                 <FileCheck className="w-4 h-4" />
+                 Tests
+               </Link>
                <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/assignments')}`}>
                  <FileText className="w-4 h-4" />
                  Assignments
@@ -509,6 +513,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
                 {/* Teacher Routes */}
                 <Route path="/teacher/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherDashboardHome /></ProtectedRoute>} />
                 <Route path="/teacher/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
+                <Route path="/teacher/tests" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherTestsPage /></ProtectedRoute>} />
                 <Route path="/teacher/assignments" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherAssignmentsPage /></ProtectedRoute>} />
                 <Route path="/teacher/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
                 <Route path="/teacher/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TestReport role="TEACHER" /></ProtectedRoute>} />

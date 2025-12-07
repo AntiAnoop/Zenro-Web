@@ -19,12 +19,6 @@ import { jsPDF } from "jspdf";
 const RAZORPAY_KEY_ID = "rzp_test_RoNJfVaY3d336e"; 
 
 // --- MOCK DATA FOR OTHER COMPONENTS ---
-const MOCK_TESTS: TestResult[] = [
-  { id: 't1', title: 'JLPT N4 Mock Exam', subject: 'Japanese', date: '2023-10-15', score: 145, totalScore: 180, classAverage: 120, topperScore: 175 },
-  { id: 't2', title: 'Kanji Weekly Quiz (Ch 5-10)', subject: 'Kanji', date: '2023-09-20', score: 92, totalScore: 100, classAverage: 65, topperScore: 100 },
-  { id: 't3', title: 'Listening Practice Vol. 2', subject: 'Listening', date: '2023-11-05', score: 45, totalScore: 60, classAverage: 40, topperScore: 58 },
-];
-
 const MOCK_ACTIVITIES: ActivityItem[] = [
   { id: 'a1', title: 'Write Essay: "My Dream in Japan"', type: 'ASSIGNMENT', dueDate: 'Today, 11:59 PM', status: 'PENDING', courseName: 'Writing N4' },
   { id: 'a2', title: 'Watch "Life in Tokyo" Documentary', type: 'QUIZ', dueDate: 'Tomorrow', status: 'PENDING', courseName: 'Culture' },
@@ -1015,7 +1009,7 @@ export const StudentTestsPage = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Fetch Active Tests
+                // Fetch Active Tests - REAL DB DATA ONLY
                 const { data: tests } = await supabase.from('tests').select('*').eq('is_active', true);
                 if(tests) setActiveTests(tests);
 
@@ -1039,11 +1033,8 @@ export const StudentTestsPage = () => {
         fetchData();
     }, []);
 
-    // Merge Mock data if DB is empty for demo, but ONLY after loading
-    const displayTests = activeTests.length > 0 ? activeTests : [
-        { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', title: 'JLPT N4 Mock Exam (Demo)', duration_minutes: 30, subject: 'Grammar', date: 'Available Now' },
-        ...MOCK_TESTS
-    ];
+    // No MOCK Data Fallback - We want a clean slate as requested
+    const displayTests = activeTests;
 
     if (loading) {
         return (
@@ -1076,33 +1067,43 @@ export const StudentTestsPage = () => {
              </div>
 
             {tab === 'ACTIVE' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {displayTests.map((test, idx) => (
-                        <div key={test.id || idx} className="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-zenro-red/50 transition shadow-lg">
-                            <div className="absolute top-0 right-0 p-3">
-                                <span className="bg-zenro-red/20 text-zenro-red px-2 py-1 rounded text-[10px] font-bold border border-zenro-red/30 animate-pulse">
-                                    ACTIVE
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 bg-zenro-red/10 text-zenro-red rounded-lg">
-                                    <Activity className="w-6 h-6" />
+                displayTests.length === 0 ? (
+                    <div className="p-12 text-center border-2 border-dashed border-dark-700 rounded-xl bg-dark-800/50">
+                        <div className="flex justify-center mb-4">
+                            <FileCheck className="w-12 h-12 text-gray-600" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">No Active Assessments</h3>
+                        <p className="text-gray-500">There are currently no active tests available for you. Please check back later.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {displayTests.map((test, idx) => (
+                            <div key={test.id || idx} className="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-zenro-red/50 transition shadow-lg">
+                                <div className="absolute top-0 right-0 p-3">
+                                    <span className="bg-zenro-red/20 text-zenro-red px-2 py-1 rounded text-[10px] font-bold border border-zenro-red/30 animate-pulse">
+                                        ACTIVE
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="p-3 bg-zenro-red/10 text-zenro-red rounded-lg">
+                                        <Activity className="w-6 h-6" />
+                                    </div>
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-1">{test.title}</h3>
+                                <p className="text-sm text-gray-400 mb-6">{test.duration_minutes} Minutes • Passing: {test.passing_score || 40}%</p>
+                                
+                                <div className="mt-auto">
+                                <button 
+                                    onClick={() => navigate(`/student/test/${test.id}`)}
+                                    className="w-full py-3 bg-zenro-red hover:bg-brand-600 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-zenro-red/20"
+                                >
+                                    Start Test <ChevronRight className="w-4 h-4" />
+                                </button>
                                 </div>
                             </div>
-                            <h3 className="text-lg font-bold text-white mb-1">{test.title}</h3>
-                            <p className="text-sm text-gray-400 mb-6">{test.duration_minutes} Minutes • Passing: {test.passing_score || 40}%</p>
-                            
-                            <div className="mt-auto">
-                            <button 
-                                onClick={() => navigate(`/student/test/${test.id}`)}
-                                className="w-full py-3 bg-zenro-red hover:bg-brand-600 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-zenro-red/20"
-                            >
-                                Start Test <ChevronRight className="w-4 h-4" />
-                            </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )
             ) : (
                 <div className="glass-card rounded-xl overflow-hidden">
                     <table className="w-full text-left text-sm text-gray-400">
