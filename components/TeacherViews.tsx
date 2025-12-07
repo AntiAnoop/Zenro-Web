@@ -7,7 +7,7 @@ import {
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
-  Briefcase, GraduationCap, Loader2, Edit3, Globe
+  Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -50,7 +50,7 @@ export const TeacherDashboardHome = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {TEACHER_STATS.map((stat, i) => (
-          <div key={i} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex items-center gap-4">
+          <div key={i} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex items-center gap-4 hover:border-brand-500/30 transition shadow-lg">
             <div className={`p-4 rounded-lg ${stat.bg}`}>
               <stat.icon className={`w-8 h-8 ${stat.color}`} />
             </div>
@@ -64,7 +64,7 @@ export const TeacherDashboardHome = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Upcoming Classes */}
-        <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
+        <div className="bg-dark-800 rounded-xl border border-dark-700 p-6 shadow-lg">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-brand-500" /> Today's Schedule
             </h3>
@@ -98,7 +98,7 @@ export const TeacherDashboardHome = () => {
         </div>
 
         {/* Needs Attention */}
-        <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
+        <div className="bg-dark-800 rounded-xl border border-dark-700 p-6 shadow-lg">
              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-orange-500" /> Needs Attention
             </h3>
@@ -262,6 +262,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
     const addMaterialToModule = (moduleIdx: number, type: 'PDF' | 'LINK' | 'VIDEO') => {
         const title = prompt(`Enter Title for ${type}:`);
         if(!title) return;
+        // Mock default URL for demo - in prod, this would be a file upload to Supabase Storage
         const url = type === 'VIDEO' ? 'https://example.com/video.mp4' : 'https://example.com/material.pdf'; 
 
         const newMat: CourseMaterial = {
@@ -339,9 +340,9 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
             // 2. Handle Modules & Materials 
             // Strategy: For robustness in this demo, we will wipe existing modules (cascade deletes materials) 
             // and re-insert the current state. This ensures strict sync with the UI.
-            // *NOTE*: In a production app with progress tracking on specific material IDs, we would upsert.
+            // *NOTE*: In a production app with progress tracking on specific material IDs, we would upsert with ID matching.
             
-            // Delete old modules
+            // Delete old modules (Cascade takes care of materials)
             await supabase.from('course_modules').delete().eq('course_id', activeCourseId);
 
             // Insert new modules
@@ -424,9 +425,9 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-dark-800 w-full max-w-5xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[90vh]">
+            <div className="bg-dark-800 w-full max-w-5xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[90vh] overflow-hidden">
                 {/* Header */}
-                <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900 rounded-t-2xl">
+                <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900">
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                            {courseId ? <Edit3 className="w-6 h-6 text-brand-500" /> : <Plus className="w-6 h-6 text-brand-500" />} 
@@ -440,13 +441,13 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                 {/* Progress Bar */}
                 <div className="w-full h-1 bg-dark-900">
                     <div 
-                        className="h-full bg-brand-500 transition-all duration-300"
+                        className="h-full bg-brand-500 transition-all duration-500 ease-out"
                         style={{ width: `${(step / 4) * 100}%` }}
                     ></div>
                 </div>
 
                 {/* Body - Scrollable */}
-                <div className="flex-1 overflow-y-auto p-8">
+                <div className="flex-1 overflow-y-auto p-8 bg-dark-800/50">
                     {/* STEP 1: IDENTITY */}
                     {step === 1 && (
                         <div className="space-y-6 max-w-2xl mx-auto animate-fade-in">
@@ -456,7 +457,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                 <label className="block text-sm font-bold text-gray-400 mb-2">Course Title <span className="text-red-500">*</span></label>
                                 <input 
                                     type="text" 
-                                    className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                    className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition"
                                     placeholder="e.g. JLPT N4 Comprehensive Grammar"
                                     value={courseData.title}
                                     onChange={e => setCourseData({...courseData, title: e.target.value})}
@@ -467,7 +468,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                 <div>
                                     <label className="block text-sm font-bold text-gray-400 mb-2">JLPT Level <span className="text-red-500">*</span></label>
                                     <select 
-                                        className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                        className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none transition"
                                         value={courseData.level}
                                         onChange={e => setCourseData({...courseData, level: e.target.value as any})}
                                     >
@@ -482,7 +483,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                     <label className="block text-sm font-bold text-gray-400 mb-2">Thumbnail URL</label>
                                     <input 
                                         type="text" 
-                                        className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                        className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none transition"
                                         value={courseData.thumbnail}
                                         onChange={e => setCourseData({...courseData, thumbnail: e.target.value})}
                                     />
@@ -492,7 +493,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                             <div>
                                 <label className="block text-sm font-bold text-gray-400 mb-2">Description</label>
                                 <textarea 
-                                    className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-32 resize-none"
+                                    className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-32 resize-none transition"
                                     placeholder="Describe what students will learn..."
                                     value={courseData.description}
                                     onChange={e => setCourseData({...courseData, description: e.target.value})}
@@ -509,7 +510,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                             <div className="flex gap-4 mb-8">
                                 <input 
                                     type="text" 
-                                    className="flex-1 bg-dark-900 border border-dark-700 rounded-lg p-3 text-white outline-none"
+                                    className="flex-1 bg-dark-900 border border-dark-700 rounded-lg p-3 text-white outline-none focus:border-brand-500 transition"
                                     placeholder="Enter Chapter/Module Title..."
                                     value={newModuleTitle}
                                     onChange={e => setNewModuleTitle(e.target.value)}
@@ -517,7 +518,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                 />
                                 <button 
                                     onClick={addModule}
-                                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2"
+                                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition"
                                 >
                                     <Plus className="w-5 h-5" /> Add Chapter
                                 </button>
@@ -530,7 +531,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                     </div>
                                 )}
                                 {courseData.modules?.map((mod, idx) => (
-                                    <div key={mod.id || idx} className="bg-dark-900 rounded-xl border border-dark-700 p-4">
+                                    <div key={mod.id || idx} className="bg-dark-900 rounded-xl border border-dark-700 p-4 transition hover:border-dark-600">
                                         <div className="flex justify-between items-center mb-4">
                                             <h4 className="font-bold text-white text-lg flex items-center gap-2">
                                                 <span className="bg-dark-800 text-gray-400 w-8 h-8 rounded-full flex items-center justify-center text-xs border border-dark-700">{idx + 1}</span>
@@ -539,19 +540,19 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                             <div className="flex gap-2">
                                                 <button 
                                                     onClick={() => addMaterialToModule(idx, 'VIDEO')}
-                                                    className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white"
+                                                    className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white hover:border-brand-500 transition"
                                                 >
                                                     <Video className="w-3 h-3" /> Add Video
                                                 </button>
                                                 <button 
                                                     onClick={() => addMaterialToModule(idx, 'PDF')}
-                                                    className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white"
+                                                    className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white hover:border-brand-500 transition"
                                                 >
                                                     <Upload className="w-3 h-3" /> Materials
                                                 </button>
                                                 <button 
                                                     onClick={() => removeModule(idx)}
-                                                    className="px-2 py-1.5 rounded text-xs font-bold bg-dark-800 text-red-500 border border-dark-600 hover:bg-red-900/20"
+                                                    className="px-2 py-1.5 rounded text-xs font-bold bg-dark-800 text-red-500 border border-dark-600 hover:bg-red-900/20 transition"
                                                 >
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>
@@ -563,7 +564,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                                 {mod.materials.map((mat, matIdx) => (
                                                     <div key={mat.id || matIdx} className="flex items-center gap-3 text-sm text-gray-300 p-2 bg-dark-900 rounded border border-dark-700">
                                                         {mat.type === 'VIDEO' ? <Film className="w-4 h-4 text-brand-500" /> : <Paperclip className="w-4 h-4" />} 
-                                                        {mat.title} <span className="text-xs bg-dark-800 px-1 rounded text-gray-500">{mat.type}</span>
+                                                        {mat.title} <span className="text-xs bg-dark-800 px-1 rounded text-gray-500 border border-dark-700">{mat.type}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -616,7 +617,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                             placeholder="Search name..." 
                                             value={studentSearch}
                                             onChange={e => setStudentSearch(e.target.value)}
-                                            className="bg-dark-900 border border-dark-700 rounded px-2 py-1 text-xs text-white outline-none w-32 focus:border-blue-500"
+                                            className="bg-dark-900 border border-dark-700 rounded px-2 py-1 text-xs text-white outline-none w-32 focus:border-blue-500 transition"
                                         />
                                     </div>
                                     <div className="p-4 overflow-y-auto flex-1 space-y-3">
@@ -660,8 +661,8 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 hover:border-gray-500 transition cursor-pointer group" onClick={() => handleSave('DRAFT')}>
-                                    <div className="p-3 bg-dark-800 rounded-lg w-fit mb-4 group-hover:bg-dark-700">
+                                <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 hover:border-gray-500 transition cursor-pointer group shadow-lg" onClick={() => handleSave('DRAFT')}>
+                                    <div className="p-3 bg-dark-800 rounded-lg w-fit mb-4 group-hover:bg-dark-700 transition">
                                         <Save className="w-6 h-6 text-gray-400" />
                                     </div>
                                     <h3 className="text-lg font-bold text-white mb-2">Save as Draft</h3>
@@ -670,8 +671,8 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                                     </p>
                                 </div>
 
-                                <div className="bg-brand-900/20 p-6 rounded-xl border border-brand-500/30 hover:border-brand-500 transition cursor-pointer group" onClick={() => handleSave('PUBLISHED')}>
-                                    <div className="p-3 bg-brand-500/20 rounded-lg w-fit mb-4 group-hover:bg-brand-500/30">
+                                <div className="bg-brand-900/20 p-6 rounded-xl border border-brand-500/30 hover:border-brand-500 transition cursor-pointer group shadow-lg" onClick={() => handleSave('PUBLISHED')}>
+                                    <div className="p-3 bg-brand-500/20 rounded-lg w-fit mb-4 group-hover:bg-brand-500/30 transition">
                                         <Globe className="w-6 h-6 text-brand-500" />
                                     </div>
                                     <h3 className="text-lg font-bold text-white mb-2">Publish Now</h3>
@@ -685,11 +686,11 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                 </div>
 
                 {/* Footer Controls */}
-                <div className="p-6 border-t border-dark-700 bg-dark-900 rounded-b-2xl flex justify-between">
+                <div className="p-6 border-t border-dark-700 bg-dark-900 flex justify-between">
                     <button 
                         onClick={step === 1 ? onClose : handleBack}
                         disabled={isLoading}
-                        className="px-6 py-3 rounded-lg text-gray-400 hover:text-white font-bold"
+                        className="px-6 py-3 rounded-lg text-gray-400 hover:text-white font-bold transition"
                     >
                         {step === 1 ? 'Cancel' : 'Back'}
                     </button>
@@ -698,7 +699,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
                         <button 
                             onClick={handleNext}
                             disabled={!courseData.title || isLoading}
-                            className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
+                            className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50 transition shadow-lg shadow-brand-900/50"
                         >
                             Next Step <ChevronRight className="w-5 h-5" />
                         </button>
@@ -740,9 +741,14 @@ export const TeacherCoursesPage = () => {
     };
 
     const handleDelete = async (id: string, title: string) => {
-        if(confirm(`DANGER: Are you sure you want to delete "${title}"?\n\nThis action CANNOT be undone. It will permanently delete:\n- The course and all chapters\n- All student progress and stats\n- All assignments linked to this course`)) {
-            await supabase.from('courses').delete().eq('id', id);
-            setCourses(prev => prev.filter(c => c.id !== id));
+        if(confirm(`⚠️ DANGER ZONE: Are you sure you want to delete "${title}"?\n\nThis action CANNOT be undone. It will permanently delete:\n- The course and all chapters\n- All student progress and stats\n- All assignments linked to this course\n\nClick OK to permanently destroy this data.`)) {
+            try {
+                const { error } = await supabase.from('courses').delete().eq('id', id);
+                if (error) throw error;
+                setCourses(prev => prev.filter(c => c.id !== id));
+            } catch (err: any) {
+                alert("Failed to delete course: " + err.message);
+            }
         }
     };
 
@@ -761,27 +767,27 @@ export const TeacherCoursesPage = () => {
              <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Course Management</h1>
-                    <p className="text-gray-400 text-sm mt-1">Design curriculum and assign batches</p>
+                    <p className="text-gray-400 text-sm mt-1">Design curriculum, upload materials, and assign batches</p>
                 </div>
                 <button 
                     onClick={openCreate}
-                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"
+                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg hover:shadow-brand-900/50 transition transform hover:-translate-y-0.5"
                 >
-                    <Plus className="w-5 h-5" /> Create Course
+                    <Plus className="w-5 h-5" /> Create New Course
                 </button>
             </div>
 
             {/* Empty State */}
             {!loading && courses.length === 0 ? (
                 <div className="bg-dark-800 border-2 border-dashed border-dark-700 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
-                    <div className="bg-dark-900 p-6 rounded-full mb-6">
-                        <BookOpen className="w-12 h-12 text-dark-600" />
+                    <div className="bg-dark-900 p-6 rounded-full mb-6 shadow-xl border border-dark-700">
+                        <BookOpen className="w-12 h-12 text-dark-500" />
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">No Courses Created Yet</h3>
                     <p className="text-gray-500 max-w-md mb-8">Start by clicking the "Create Course" button to build your first curriculum, add videos, and assign students.</p>
                     <button 
                         onClick={openCreate}
-                        className="bg-dark-700 hover:bg-dark-600 text-white px-6 py-3 rounded-lg font-bold border border-dark-500"
+                        className="bg-dark-700 hover:bg-dark-600 text-white px-6 py-3 rounded-lg font-bold border border-dark-500 transition"
                     >
                         Launch Course Wizard
                     </button>
@@ -790,27 +796,27 @@ export const TeacherCoursesPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {courses.map(course => (
                         <div key={course.id} className="bg-dark-800 rounded-xl overflow-hidden border border-dark-700 hover:border-brand-500/50 transition group shadow-lg flex flex-col">
-                            <div className="relative aspect-video bg-black">
-                                <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover opacity-80" />
+                            <div className="relative aspect-video bg-black group-hover:opacity-90 transition">
+                                <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover opacity-80 transition transform group-hover:scale-105 duration-700" />
                                 <div className="absolute top-2 right-2 flex gap-2">
-                                     <span className="bg-black/60 backdrop-blur text-white px-2 py-1 rounded text-xs font-bold border border-white/10">
+                                     <span className="bg-black/60 backdrop-blur text-white px-2 py-1 rounded text-xs font-bold border border-white/10 shadow-lg">
                                          {course.level}
                                      </span>
-                                     <span className={`px-2 py-1 rounded text-xs font-bold border ${course.status === 'PUBLISHED' ? 'bg-green-500/80 text-white border-green-500' : 'bg-gray-600/80 text-gray-200 border-gray-500'}`}>
+                                     <span className={`px-2 py-1 rounded text-xs font-bold border shadow-lg ${course.status === 'PUBLISHED' ? 'bg-green-500/80 text-white border-green-500' : 'bg-gray-600/80 text-gray-200 border-gray-500'}`}>
                                          {course.status}
                                      </span>
                                 </div>
                             </div>
                             <div className="p-5 flex-1 flex flex-col">
-                                <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{course.title}</h3>
+                                <h3 className="text-xl font-bold text-white mb-2 line-clamp-1 group-hover:text-brand-500 transition">{course.title}</h3>
                                 <p className="text-sm text-gray-400 line-clamp-2 mb-4 flex-1">{course.description || "No description provided."}</p>
                                 
                                 <div className="flex gap-2 mt-auto">
                                     <button 
                                         onClick={() => openEdit(course.id)}
-                                        className="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded text-sm font-bold shadow-lg flex items-center justify-center gap-2"
+                                        className="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded text-sm font-bold shadow-lg flex items-center justify-center gap-2 transition"
                                     >
-                                        <Edit3 className="w-4 h-4" /> Edit
+                                        <Edit3 className="w-4 h-4" /> Edit Content
                                     </button>
                                     <button 
                                         onClick={() => handleDelete(course.id, course.title)} 
@@ -848,7 +854,7 @@ export const TeacherAssignmentsPage = () => {
                 </button>
             </div>
 
-            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-lg">
                 <table className="w-full text-left text-sm text-gray-400">
                     <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
                         <tr>
@@ -966,7 +972,7 @@ export const TeacherReportsPage = () => {
              </div>
 
              {/* Chart Section */}
-             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
+             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 shadow-lg">
                  <h3 className="text-lg font-bold text-white mb-6">Class Performance Overview</h3>
                  <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -981,7 +987,7 @@ export const TeacherReportsPage = () => {
              </div>
 
              {/* Filters & Table */}
-             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col space-y-6">
+             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col space-y-6 shadow-lg">
                  <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
                      <h3 className="text-lg font-bold text-white flex-shrink-0">Detailed Submissions</h3>
                      
@@ -994,7 +1000,7 @@ export const TeacherReportsPage = () => {
                                 placeholder="Search Student..." 
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-dark-900 border border-dark-700 text-white pl-9 pr-4 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none w-48"
+                                className="bg-dark-900 border border-dark-700 text-white pl-9 pr-4 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none w-48 transition"
                              />
                          </div>
 
@@ -1167,7 +1173,7 @@ export const LiveClassConsole = () => {
 
     return (
         <div className="h-[calc(100vh-2rem)] flex flex-col space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between bg-dark-800 p-4 rounded-xl border border-dark-700">
+            <div className="flex items-center justify-between bg-dark-800 p-4 rounded-xl border border-dark-700 shadow-lg">
                 <div className="flex items-center gap-4">
                      <div className={`w-3 h-3 rounded-full ${isLive ? 'bg-brand-500 animate-pulse' : 'bg-gray-500'}`}></div>
                      <div>
@@ -1203,7 +1209,7 @@ export const LiveClassConsole = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
                 {/* Video Feed Area */}
-                <div className="lg:col-span-2 bg-black rounded-xl border border-dark-700 relative overflow-hidden flex items-center justify-center group">
+                <div className="lg:col-span-2 bg-black rounded-xl border border-dark-700 relative overflow-hidden flex items-center justify-center group shadow-xl">
                     {localStream ? (
                         <div className="relative w-full h-full">
                             {/* Real Local Video Feed */}
@@ -1215,11 +1221,11 @@ export const LiveClassConsole = () => {
                                 className="w-full h-full object-cover" 
                             />
                             
-                            <div className="absolute top-4 right-4 bg-brand-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-2">
+                            <div className="absolute top-4 right-4 bg-brand-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-2 shadow-lg">
                                 <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-white animate-pulse' : 'bg-gray-400'}`}></span> {isLive ? 'LIVE' : 'PREVIEW'}
                             </div>
                             {isLive && (
-                                <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded text-white text-sm">
+                                <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded text-white text-sm backdrop-blur">
                                     {viewerCount} Students
                                 </div>
                             )}
@@ -1233,7 +1239,7 @@ export const LiveClassConsole = () => {
                 </div>
 
                 {/* Chat & Tools */}
-                <div className="bg-dark-800 rounded-xl border border-dark-700 flex flex-col overflow-hidden">
+                <div className="bg-dark-800 rounded-xl border border-dark-700 flex flex-col overflow-hidden shadow-lg">
                     <div className="p-4 border-b border-dark-700 font-bold bg-dark-900/50">Class Chat</div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {chatMessages.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No messages yet.</p>}
@@ -1253,7 +1259,7 @@ export const LiveClassConsole = () => {
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             placeholder="Type a message..." 
-                            className="w-full bg-dark-900 border border-dark-700 rounded px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 outline-none" 
+                            className="w-full bg-dark-900 border border-dark-700 rounded px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 outline-none transition" 
                         />
                     </form>
                 </div>
