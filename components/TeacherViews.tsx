@@ -148,14 +148,14 @@ interface WizardProps {
 const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: WizardProps) => {
     const [step, setStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
-    const [isFetching, setIsFetching] = useState(true); // Always fetching on init
+    const [isFetching, setIsFetching] = useState(true); // Default to true to load resources
     
     // DB Data States
     const [availableBatches, setAvailableBatches] = useState<string[]>([]);
     const [availableStudents, setAvailableStudents] = useState<User[]>([]);
     const [studentSearch, setStudentSearch] = useState('');
 
-    // Form Data
+    // Form Data - Robust defaults
     const [courseData, setCourseData] = useState<Partial<Course>>({
         title: '',
         description: '',
@@ -172,31 +172,34 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
 
     // Fetch Batches & Students on Mount + Course Details if editing
     useEffect(() => {
+        let isMounted = true;
+
         const fetchResources = async () => {
             try {
+                setIsFetching(true);
+                
                 // 1. Fetch Batches
                 const { data: batches } = await supabase.from('batches').select('name');
-                if (batches) {
+                if (isMounted && batches) {
                     setAvailableBatches(batches.map(b => b.name));
                 }
                 
-                // 2. Fetch ALL Students (Robust)
-                // Note: removed 'eq role STUDENT' to ensure we see everyone who might need access
-                // or ensure roles are correct. Assuming 'STUDENT' is strict string.
+                // 2. Fetch ALL Students (Robust - fetch everything to ensure we don't miss anyone)
+                // We'll filter visually if needed, but for "Add Student", the teacher expects to see everyone.
                 const { data: students } = await supabase
                     .from('profiles')
                     .select('*')
-                    .eq('role', 'STUDENT')
                     .order('full_name');
                 
-                if (students) {
+                if (isMounted && students) {
                      const mapped = students.map((u: any) => ({
                         id: u.id,
-                        name: u.full_name,
-                        role: 'STUDENT',
+                        name: u.full_name || u.email, // Fallback if name missing
+                        role: u.role || 'STUDENT',
                         email: u.email,
-                        avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name)}&background=random`,
-                        batch: u.batch
+                        avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || 'User')}&background=random`,
+                        batch: u.batch,
+                        rollNumber: u.student_id
                     }));
                     setAvailableStudents(mapped);
                 }
@@ -205,7 +208,8 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                 if (courseId) {
                     const { data: course, error } = await supabase.from('courses').select('*').eq('id', courseId).single();
                     if (error) throw error;
-                    if (course) {
+                    
+                    if (isMounted && course) {
                          // Fetch children
                          const { data: modules } = await supabase
                             .from('course_modules')
@@ -226,12 +230,12 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                         setCourseData({
                             id: course.id,
                             title: course.title,
-                            description: course.description,
+                            description: course.description || '',
                             level: course.level,
                             thumbnail: course.thumbnail,
                             status: course.status,
                             instructor: course.instructor_name,
-                            modules: modules || [],
+                            modules: modules || [], // SAFE DEFAULT
                             assignedBatches: batchLinks?.map(b => b.batch_name) || [],
                             enrolledStudentIds: enrollLinks?.map(e => e.student_id) || []
                         });
@@ -240,12 +244,15 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
 
             } catch (e) {
                 console.error("Error loading wizard resources:", e);
-                showToast("Failed to load course details", 'error');
+                showToast("Failed to load course details. Please try again.", 'error');
+                if (courseId) onClose(); // Close if editing fails
             } finally {
-                setIsFetching(false);
+                if (isMounted) setIsFetching(false);
             }
         };
+
         fetchResources();
+        return () => { isMounted = false; };
     }, [courseId]);
 
     const handleNext = () => setStep(prev => prev + 1);
@@ -254,14 +261,16 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
     const addModule = () => {
         if (!newModuleTitle.trim()) return;
         const newMod: CourseModule = {
-            id: crypto.randomUUID(), // Temp ID (or text based on setup)
+            id: crypto.randomUUID(), 
             title: newModuleTitle,
             materials: [],
             duration: '0m'
         };
+        // Safe access
+        const currentModules = courseData.modules || [];
         setCourseData({
             ...courseData,
-            modules: [...(courseData.modules || []), newMod]
+            modules: [...currentModules, newMod]
         });
         setNewModuleTitle('');
     };
@@ -275,7 +284,6 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
     const addMaterialToModule = (moduleIdx: number, type: 'PDF' | 'LINK' | 'VIDEO') => {
         const title = prompt(`Enter Title for ${type}:`);
         if(!title) return;
-        // Mock default URL for demo - in prod, this would be a file upload to Supabase Storage
         const url = type === 'VIDEO' ? 'https://example.com/video.mp4' : 'https://example.com/material.pdf'; 
 
         const newMat: CourseMaterial = {
@@ -286,6 +294,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
         };
 
         const updatedModules = [...(courseData.modules || [])];
+        if (!updatedModules[moduleIdx].materials) updatedModules[moduleIdx].materials = [];
         updatedModules[moduleIdx].materials.push(newMat);
         setCourseData({ ...courseData, modules: updatedModules });
     };
@@ -309,7 +318,6 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
     };
 
     const handleSave = async (status: 'DRAFT' | 'PUBLISHED') => {
-        // Validation
         if (!courseData.title || !courseData.level) {
             showToast("Please fill in Course Title and Level.", 'error');
             return;
@@ -320,48 +328,35 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
         try {
             let activeCourseId = courseId;
 
-            // 1. Upsert Course
             const coursePayload = {
                 title: courseData.title,
                 description: courseData.description,
                 level: courseData.level,
                 thumbnail: courseData.thumbnail,
-                status: status, // Set Draft or Published
+                status: status,
                 instructor_name: courseData.instructor
             };
 
             if (activeCourseId) {
-                // UPDATE
-                const { error } = await supabase
-                    .from('courses')
-                    .update(coursePayload)
-                    .eq('id', activeCourseId);
+                const { error } = await supabase.from('courses').update(coursePayload).eq('id', activeCourseId);
                 if (error) throw error;
             } else {
-                // INSERT
-                const { data, error } = await supabase
-                    .from('courses')
-                    .insert(coursePayload)
-                    .select()
-                    .single();
+                const { data, error } = await supabase.from('courses').insert(coursePayload).select().single();
                 if (error) throw error;
                 activeCourseId = data.id;
             }
 
             if (!activeCourseId) throw new Error("Failed to resolve Course ID");
 
-            // 2. Handle Modules & Materials (MANUAL CLEANUP to ensure it works even without strict CASCADE)
-            // First, find all existing modules
+            // --- CASCADE HANDLING ---
+            // 1. Modules & Materials
             const { data: oldModules } = await supabase.from('course_modules').select('id').eq('course_id', activeCourseId);
             if (oldModules && oldModules.length > 0) {
                 const oldModuleIds = oldModules.map(m => m.id);
-                // Delete materials for these modules
                 await supabase.from('course_materials').delete().in('module_id', oldModuleIds);
-                // Delete modules
                 await supabase.from('course_modules').delete().in('id', oldModuleIds);
             }
 
-            // Insert new modules and materials
             if (courseData.modules && courseData.modules.length > 0) {
                 for (let i = 0; i < courseData.modules.length; i++) {
                     const mod = courseData.modules[i];
@@ -372,11 +367,10 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                     }).select().single();
 
                     if (modError) throw modError;
-                    const newModId = modInsert.id;
-
+                    
                     if (mod.materials && mod.materials.length > 0) {
                         const matsPayload = mod.materials.map(mat => ({
-                            module_id: newModId,
+                            module_id: modInsert.id,
                             title: mat.title,
                             type: mat.type,
                             url: mat.url
@@ -386,7 +380,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                 }
             }
 
-            // 3. Update Batch Assignments (Wipe & Re-insert)
+            // 2. Batches
             await supabase.from('course_batches').delete().eq('course_id', activeCourseId);
             if (courseData.assignedBatches && courseData.assignedBatches.length > 0) {
                 const batchPayload = courseData.assignedBatches.map(bName => ({
@@ -396,7 +390,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                 await supabase.from('course_batches').insert(batchPayload);
             }
 
-            // 4. Update Enrollments (Wipe & Re-insert)
+            // 3. Enrollments
             await supabase.from('course_enrollments').delete().eq('course_id', activeCourseId);
             if (courseData.enrolledStudentIds && courseData.enrolledStudentIds.length > 0) {
                 const enrollPayload = courseData.enrolledStudentIds.map(sId => ({
@@ -406,24 +400,18 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                 await supabase.from('course_enrollments').insert(enrollPayload);
             }
 
-            // Success
             showToast(`Course ${status === 'DRAFT' ? 'saved as draft' : 'published'} successfully!`, 'success');
             onRefresh(); 
             onClose();
 
         } catch (e: any) {
             console.error("Course Save Failed:", e);
-             if (e.code === '42P01' || e.code === '42703' || e.code === 'PGRST204') { 
-                showToast("DB SCHEMA ERROR: Run setup SQL.", 'error');
-            } else {
-                showToast(`Failed to save: ${e.message}`, 'error');
-            }
+            showToast(`Failed to save: ${e.message}`, 'error');
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Filter students for Step 3
     const filteredStudents = availableStudents.filter(s => 
         s.name.toLowerCase().includes(studentSearch.toLowerCase()) || 
         s.email.toLowerCase().includes(studentSearch.toLowerCase())
@@ -434,7 +422,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
             <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
                  <div className="text-center">
                      <Loader2 className="w-12 h-12 text-brand-500 animate-spin mx-auto mb-4" />
-                     <p className="text-white">Loading Course Data...</p>
+                     <p className="text-white">Loading...</p>
                  </div>
             </div>
          );
@@ -448,7 +436,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                            {courseId ? <Edit3 className="w-6 h-6 text-brand-500" /> : <Plus className="w-6 h-6 text-brand-500" />} 
-                           {courseId ? `Editing: ${courseData.title}` : 'Create New Course'}
+                           {courseId ? `Edit: ${courseData.title}` : 'Create New Course'}
                         </h2>
                         <p className="text-gray-400 text-sm mt-1">Step {step} of 4</p>
                     </div>
@@ -476,7 +464,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                     type="text" 
                                     className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition"
                                     placeholder="e.g. JLPT N4 Comprehensive Grammar"
-                                    value={courseData.title}
+                                    value={courseData.title || ''}
                                     onChange={e => setCourseData({...courseData, title: e.target.value})}
                                 />
                             </div>
@@ -486,7 +474,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                     <label className="block text-sm font-bold text-gray-400 mb-2">JLPT Level <span className="text-red-500">*</span></label>
                                     <select 
                                         className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none transition"
-                                        value={courseData.level}
+                                        value={courseData.level || 'N5'}
                                         onChange={e => setCourseData({...courseData, level: e.target.value as any})}
                                     >
                                         <option value="N5">N5 (Beginner)</option>
@@ -501,7 +489,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                     <input 
                                         type="text" 
                                         className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none transition"
-                                        value={courseData.thumbnail}
+                                        value={courseData.thumbnail || ''}
                                         onChange={e => setCourseData({...courseData, thumbnail: e.target.value})}
                                     />
                                 </div>
@@ -512,7 +500,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                 <textarea 
                                     className="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-32 resize-none transition"
                                     placeholder="Describe what students will learn..."
-                                    value={courseData.description}
+                                    value={courseData.description || ''}
                                     onChange={e => setCourseData({...courseData, description: e.target.value})}
                                 />
                             </div>
@@ -542,12 +530,12 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                             </div>
 
                             <div className="space-y-4">
-                                {courseData.modules?.length === 0 && (
+                                {(courseData.modules || []).length === 0 && (
                                     <div className="text-center p-12 border-2 border-dashed border-dark-700 rounded-xl text-gray-500">
                                         No chapters added yet. Start building your curriculum!
                                     </div>
                                 )}
-                                {courseData.modules?.map((mod, idx) => (
+                                {(courseData.modules || []).map((mod, idx) => (
                                     <div key={mod.id || idx} className="bg-dark-900 rounded-xl border border-dark-700 p-4 transition hover:border-dark-600">
                                         <div className="flex justify-between items-center mb-4">
                                             <h4 className="font-bold text-white text-lg flex items-center gap-2">
@@ -576,7 +564,7 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                             </div>
                                         </div>
                                         
-                                        {mod.materials.length > 0 && (
+                                        {mod.materials && mod.materials.length > 0 && (
                                             <div className="bg-dark-800 rounded-lg p-3 space-y-2">
                                                 {mod.materials.map((mat, matIdx) => (
                                                     <div key={mat.id || matIdx} className="flex items-center gap-3 text-sm text-gray-300 p-2 bg-dark-900 rounded border border-dark-700">
@@ -597,7 +585,11 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                         <div className="space-y-6 animate-fade-in h-full flex flex-col">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xl font-bold text-white">Enrollment & Access</h3>
-                                <p className="text-sm text-gray-400">Total Access: <span className="text-brand-500 font-bold">{courseData.assignedBatches?.length} Batches</span> + <span className="text-white font-bold">{courseData.enrolledStudentIds?.length} Individuals</span></p>
+                                <div className="text-xs text-gray-400 bg-dark-900 px-3 py-1 rounded border border-dark-700">
+                                    <span className="text-brand-500 font-bold">{courseData.assignedBatches?.length || 0} Batches</span> 
+                                    <span className="mx-2">•</span> 
+                                    <span className="text-white font-bold">{courseData.enrolledStudentIds?.length || 0} Individual Overrides</span>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
@@ -641,11 +633,11 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                         {filteredStudents.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No students found.</p>}
                                         {filteredStudents.map(student => {
                                             const isDirectlyEnrolled = courseData.enrolledStudentIds?.includes(student.id);
-                                            // Check if student is in a batch that is already assigned
+                                            // SMART LOGIC: If their batch is selected, they are implicitly enrolled
                                             const batchName = student.batch;
                                             const isBatchEnrolled = batchName && courseData.assignedBatches?.includes(batchName);
                                             
-                                            // If batch enrolled, we disable direct toggle to avoid redundancy
+                                            // We disable toggle if they are already in via batch to prevent confusion
                                             const isDisabled = !!isBatchEnrolled;
 
                                             return (
@@ -653,8 +645,8 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                                     key={student.id} 
                                                     onClick={() => !isDisabled && toggleStudent(student.id)}
                                                     className={`p-2 rounded-lg border flex items-center justify-between transition 
-                                                        ${isDisabled 
-                                                            ? 'bg-dark-900/50 border-dark-700 cursor-not-allowed opacity-70' 
+                                                        ${isBatchEnrolled 
+                                                            ? 'bg-brand-900/10 border-brand-500/30 cursor-default opacity-80' 
                                                             : isDirectlyEnrolled 
                                                                 ? 'bg-blue-900/20 border-blue-500 cursor-pointer' 
                                                                 : 'bg-dark-800 border-dark-600 hover:border-gray-500 cursor-pointer'
@@ -662,20 +654,22 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold 
-                                                            ${isDisabled ? 'bg-dark-700 text-gray-500' : isDirectlyEnrolled ? 'bg-blue-500 text-white' : 'bg-dark-700 text-gray-400'}`}>
+                                                            ${isBatchEnrolled ? 'bg-brand-900 text-brand-200' : isDirectlyEnrolled ? 'bg-blue-500 text-white' : 'bg-dark-700 text-gray-400'}`}>
                                                             {student.name.charAt(0)}
                                                         </div>
                                                         <div>
-                                                            <p className={`text-sm font-bold ${isDisabled ? 'text-gray-500' : isDirectlyEnrolled ? 'text-white' : 'text-gray-300'}`}>{student.name}</p>
+                                                            <p className={`text-sm font-bold ${isBatchEnrolled ? 'text-brand-200' : isDirectlyEnrolled ? 'text-white' : 'text-gray-300'}`}>{student.name}</p>
                                                             <p className="text-[10px] text-gray-500">{student.batch || 'No Batch'}</p>
                                                         </div>
                                                     </div>
+                                                    
                                                     {isBatchEnrolled && (
-                                                        <div className="flex items-center gap-1 text-xs text-brand-500 font-bold bg-brand-900/10 px-2 py-1 rounded border border-brand-500/20">
+                                                        <div className="flex items-center gap-1 text-[10px] font-bold text-brand-400 bg-brand-900/20 px-2 py-1 rounded border border-brand-500/20 uppercase tracking-wide">
                                                             <Layers className="w-3 h-3" /> Batch Added
                                                         </div>
                                                     )}
-                                                    {isDirectlyEnrolled && !isBatchEnrolled && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                                                    
+                                                    {!isBatchEnrolled && isDirectlyEnrolled && <CheckCircle className="w-4 h-4 text-blue-500" />}
                                                 </div>
                                             );
                                         })}
