@@ -3,10 +3,11 @@
 -- ZENRO DATABASE SETUP SCRIPT
 -- ----------------------------------------------------------------
 
--- 1. CLEANUP (Drop existing to ensure fresh state)
--- [NEW] Dropping assignment tables
+-- 1. CLEANUP
+-- [NEW CODE START]
 DROP TABLE IF EXISTS test_enrollments CASCADE;
 DROP TABLE IF EXISTS test_batches CASCADE;
+-- [NEW CODE END]
 
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS fees CASCADE;
@@ -23,7 +24,6 @@ DROP TABLE IF EXISTS profiles CASCADE;
 
 -- 2. CREATE TABLES
 
--- Profiles (Users)
 CREATE TABLE profiles (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   email text UNIQUE NOT NULL,
@@ -37,14 +37,12 @@ CREATE TABLE profiles (
   created_at timestamptz DEFAULT now()
 );
 
--- Batches
 CREATE TABLE batches (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name text UNIQUE NOT NULL,
   created_at timestamptz DEFAULT now()
 );
 
--- Courses
 CREATE TABLE courses (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text NOT NULL,
@@ -87,16 +85,17 @@ CREATE TABLE course_enrollments (
   created_at timestamptz DEFAULT now()
 );
 
--- [UPDATED] Tests Table with Description and Active Status
+-- [NEW CODE START] - Updated Tests Table
 CREATE TABLE tests (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text NOT NULL,
-  description text, -- [NEW]
+  description text, -- Added description field
   duration_minutes int DEFAULT 30,
   passing_score int DEFAULT 40,
-  is_active boolean DEFAULT false, -- [NEW] For Draft/Live toggling
+  is_active boolean DEFAULT false, -- Added Draft/Live toggle
   created_at timestamptz DEFAULT now()
 );
+-- [NEW CODE END]
 
 CREATE TABLE questions (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -108,7 +107,7 @@ CREATE TABLE questions (
   created_at timestamptz DEFAULT now()
 );
 
--- [NEW] Test Assignments: Batches
+-- [NEW CODE START] - Test Assignment Tables
 CREATE TABLE test_batches (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   test_id text REFERENCES tests(id) ON DELETE CASCADE,
@@ -116,13 +115,13 @@ CREATE TABLE test_batches (
   created_at timestamptz DEFAULT now()
 );
 
--- [NEW] Test Assignments: Individual Students
 CREATE TABLE test_enrollments (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   test_id text REFERENCES tests(id) ON DELETE CASCADE,
   student_id text REFERENCES profiles(id) ON DELETE CASCADE,
   created_at timestamptz DEFAULT now()
 );
+-- [NEW CODE END]
 
 CREATE TABLE submissions (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -171,14 +170,14 @@ VALUES ('c1', 'JLPT N4 Grammar Mastery', 'Comprehensive guide to N4 grammar stru
 
 INSERT INTO course_batches (course_id, batch_name) VALUES ('c1', '2024-A');
 
--- [NEW] Seed Data for Tests
+-- [NEW CODE START] - Seed Data for Tests
 INSERT INTO tests (id, title, description, duration_minutes, passing_score, is_active)
 VALUES ('test1', 'N4 Weekly Mock Exam', 'A practice test for the upcoming JLPT.', 45, 50, true);
 
--- [NEW] Assign Test to Batch
 INSERT INTO test_batches (test_id, batch_name) VALUES ('test1', '2024-A');
 
 INSERT INTO questions (test_id, question_text, options, correct_option_index, marks)
 VALUES 
 ('test1', 'Meaning of "Taberu" (食べる)?', ARRAY['To Drink', 'To Eat', 'To Sleep', 'To Run'], 1, 2),
 ('test1', 'Select the correct particle: Watashi __ Tanaka desu.', ARRAY['wa', 'ga', 'wo', 'ni'], 0, 1);
+-- [NEW CODE END]
