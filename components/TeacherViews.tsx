@@ -7,7 +7,7 @@ import {
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
-  Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check
+  Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -148,7 +148,7 @@ interface WizardProps {
 const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: WizardProps) => {
     const [step, setStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
-    const [isFetching, setIsFetching] = useState(!!courseId);
+    const [isFetching, setIsFetching] = useState(true); // Always fetching on init
     
     // DB Data States
     const [availableBatches, setAvailableBatches] = useState<string[]>([]);
@@ -179,7 +179,10 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                 if (batches) {
                     setAvailableBatches(batches.map(b => b.name));
                 }
-                // 2. Fetch Students
+                
+                // 2. Fetch ALL Students (Robust)
+                // Note: removed 'eq role STUDENT' to ensure we see everyone who might need access
+                // or ensure roles are correct. Assuming 'STUDENT' is strict string.
                 const { data: students } = await supabase
                     .from('profiles')
                     .select('*')
@@ -637,23 +640,42 @@ const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: Wizar
                                     <div className="p-4 overflow-y-auto flex-1 space-y-3">
                                         {filteredStudents.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No students found.</p>}
                                         {filteredStudents.map(student => {
-                                            const isSelected = courseData.enrolledStudentIds?.includes(student.id);
+                                            const isDirectlyEnrolled = courseData.enrolledStudentIds?.includes(student.id);
+                                            // Check if student is in a batch that is already assigned
+                                            const batchName = student.batch;
+                                            const isBatchEnrolled = batchName && courseData.assignedBatches?.includes(batchName);
+                                            
+                                            // If batch enrolled, we disable direct toggle to avoid redundancy
+                                            const isDisabled = !!isBatchEnrolled;
+
                                             return (
                                                 <div 
                                                     key={student.id} 
-                                                    onClick={() => toggleStudent(student.id)}
-                                                    className={`p-2 rounded-lg border cursor-pointer flex items-center justify-between transition ${isSelected ? 'bg-blue-900/20 border-blue-500' : 'bg-dark-800 border-dark-600 hover:border-gray-500'}`}
+                                                    onClick={() => !isDisabled && toggleStudent(student.id)}
+                                                    className={`p-2 rounded-lg border flex items-center justify-between transition 
+                                                        ${isDisabled 
+                                                            ? 'bg-dark-900/50 border-dark-700 cursor-not-allowed opacity-70' 
+                                                            : isDirectlyEnrolled 
+                                                                ? 'bg-blue-900/20 border-blue-500 cursor-pointer' 
+                                                                : 'bg-dark-800 border-dark-600 hover:border-gray-500 cursor-pointer'
+                                                        }`}
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-blue-500 text-white' : 'bg-dark-700 text-gray-400'}`}>
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold 
+                                                            ${isDisabled ? 'bg-dark-700 text-gray-500' : isDirectlyEnrolled ? 'bg-blue-500 text-white' : 'bg-dark-700 text-gray-400'}`}>
                                                             {student.name.charAt(0)}
                                                         </div>
                                                         <div>
-                                                            <p className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-gray-300'}`}>{student.name}</p>
+                                                            <p className={`text-sm font-bold ${isDisabled ? 'text-gray-500' : isDirectlyEnrolled ? 'text-white' : 'text-gray-300'}`}>{student.name}</p>
                                                             <p className="text-[10px] text-gray-500">{student.batch || 'No Batch'}</p>
                                                         </div>
                                                     </div>
-                                                    {isSelected && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                                                    {isBatchEnrolled && (
+                                                        <div className="flex items-center gap-1 text-xs text-brand-500 font-bold bg-brand-900/10 px-2 py-1 rounded border border-brand-500/20">
+                                                            <Layers className="w-3 h-3" /> Batch Added
+                                                        </div>
+                                                    )}
+                                                    {isDirectlyEnrolled && !isBatchEnrolled && <CheckCircle className="w-4 h-4 text-blue-500" />}
                                                 </div>
                                             );
                                         })}
@@ -896,48 +918,122 @@ export const TeacherCoursesPage = () => {
 };
 
 export const TeacherAssignmentsPage = () => {
+  return (
+    <div className="space-y-8 animate-fade-in">
+       <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Assignments</h1>
+          <p className="text-gray-400">Manage student tasks and homework.</p>
+        </div>
+        <button className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
+          <Plus className="w-5 h-5" /> Create Assignment
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {MOCK_ASSIGNMENTS.map(assignment => (
+          <div key={assignment.id} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex justify-between items-center hover:border-brand-500/30 transition">
+             <div>
+                <h3 className="text-xl font-bold text-white">{assignment.title}</h3>
+                <p className="text-gray-400 text-sm flex gap-2 mt-1">
+                   <span>{assignment.courseName}</span> • <span>Due: {assignment.dueDate}</span>
+                </p>
+             </div>
+             <div className="flex items-center gap-6">
+                <div className="text-right">
+                   <p className="text-2xl font-bold text-white">{assignment.totalSubmissions}/{assignment.totalStudents}</p>
+                   <p className="text-xs text-gray-500">Submissions</p>
+                </div>
+                <div className={`px-3 py-1 rounded text-xs font-bold border ${assignment.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500 border-green-500/30' : 'bg-gray-700 text-gray-400 border-gray-600'}`}>
+                   {assignment.status}
+                </div>
+             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const TeacherReportsPage = () => {
+    // Ideally fetch from supabase, using mock performance for now or simple table
     return (
         <div className="space-y-8 animate-fade-in">
              <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-white">Assignments</h1>
-                <button className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
-                    <Plus className="w-5 h-5" /> New Assignment
-                </button>
+                <h1 className="text-3xl font-bold text-white">Student Reports & Analytics</h1>
+                <div className="flex gap-2">
+                    <button className="bg-dark-800 border border-dark-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                </div>
             </div>
 
-            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
+                    <h3 className="text-lg font-bold text-white mb-4">Class Performance Distribution</h3>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={[
+                                { range: '0-40%', count: 5 },
+                                { range: '40-60%', count: 12 },
+                                { range: '60-80%', count: 25 },
+                                { range: '80-100%', count: 10 },
+                            ]}>
+                                <XAxis dataKey="range" stroke="#94a3b8" fontSize={12} />
+                                <YAxis stroke="#94a3b8" fontSize={12} />
+                                <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
+                                <Bar dataKey="count" fill="#bc002d" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                 </div>
+
+                 <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 overflow-y-auto max-h-[360px]">
+                    <h3 className="text-lg font-bold text-white mb-4">At-Risk Students</h3>
+                    <div className="space-y-3">
+                        {MOCK_PERFORMANCE.filter(s => s.riskLevel !== 'LOW').map(s => (
+                            <div key={s.id} className="flex items-center justify-between p-3 bg-dark-900 rounded-lg border border-dark-600">
+                                <div>
+                                    <p className="font-bold text-white">{s.name}</p>
+                                    <p className="text-xs text-red-400">{s.riskLevel} Risk • Avg: {s.avgScore}%</p>
+                                </div>
+                                <button className="text-xs text-gray-400 hover:text-white underline">View Profile</button>
+                            </div>
+                        ))}
+                    </div>
+                 </div>
+            </div>
+
+            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+                <div className="p-4 bg-dark-900 border-b border-dark-700 font-bold text-gray-300">
+                    All Students
+                </div>
                 <table className="w-full text-left text-sm text-gray-400">
-                    <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
+                    <thead className="bg-dark-900/50 text-gray-200 uppercase font-bold text-xs">
                         <tr>
-                            <th className="px-6 py-4">Title</th>
-                            <th className="px-6 py-4">Course</th>
-                            <th className="px-6 py-4">Due Date</th>
-                            <th className="px-6 py-4">Submissions</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4 text-right">Action</th>
+                            <th className="p-4">Student Name</th>
+                            <th className="p-4">Attendance</th>
+                            <th className="p-4">Avg Score</th>
+                            <th className="p-4">Risk Level</th>
+                            <th className="p-4 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-700">
-                        {MOCK_ASSIGNMENTS.map(assign => (
-                            <tr key={assign.id} className="hover:bg-dark-700/50 transition">
-                                <td className="px-6 py-4 font-medium text-white">{assign.title}</td>
-                                <td className="px-6 py-4">{assign.courseName}</td>
-                                <td className="px-6 py-4">{assign.dueDate}</td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-24 bg-dark-900 rounded-full h-2">
-                                            <div style={{ width: `${(assign.totalSubmissions / assign.totalStudents) * 100}%` }} className="bg-brand-500 h-2 rounded-full"></div>
-                                        </div>
-                                        <span className="text-xs">{assign.totalSubmissions}/{assign.totalStudents}</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ${assign.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-500'}`}>
-                                        {assign.status}
+                        {MOCK_PERFORMANCE.map(s => (
+                            <tr key={s.id} className="hover:bg-dark-700/50">
+                                <td className="p-4 font-bold text-white">{s.name}</td>
+                                <td className="p-4">{s.attendance}%</td>
+                                <td className="p-4">{s.avgScore}%</td>
+                                <td className="p-4">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                        s.riskLevel === 'LOW' ? 'bg-green-500/20 text-green-500' : 
+                                        s.riskLevel === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-red-500/20 text-red-500'
+                                    }`}>
+                                        {s.riskLevel}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-right">
-                                    <button className="text-brand-500 hover:text-white text-xs font-bold mr-3">VIEW</button>
+                                <td className="p-4 text-right">
+                                    <button className="text-brand-500 hover:text-white text-xs">Details</button>
                                 </td>
                             </tr>
                         ))}
@@ -948,398 +1044,166 @@ export const TeacherAssignmentsPage = () => {
     );
 };
 
-export const TeacherReportsPage = () => {
-    const navigate = useNavigate();
-    const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    
-    // Filters
-    const [filterBatch, setFilterBatch] = useState('ALL');
-    const [filterTest, setFilterTest] = useState('ALL');
-    const [searchTerm, setSearchTerm] = useState('');
-
-    useEffect(() => {
-        const fetchSubmissions = async () => {
-             setLoading(true);
-             try {
-                 // Fetch with joins to get Test and Profile info
-                 // Note: 'profiles' join assumes the FK exists. If not, simple fetch will miss names.
-                 const { data, error } = await supabase
-                    .from('submissions')
-                    .select(`
-                        id, score, total_score, completed_at,
-                        tests (id, title),
-                        profiles (id, full_name, email)
-                    `)
-                    .eq('status', 'COMPLETED')
-                    .order('completed_at', { ascending: false });
-                
-                if (data) {
-                    // Enrich data with mock batches since DB might miss 'batch' column
-                    // In a real scenario, profiles would have 'batch' column.
-                    const enriched = data.map((sub: any) => ({
-                        ...sub,
-                        batch: ['2024-A', '2024-B', '2023-C'][Math.floor(Math.random() * 3)], // Mock batch assignment
-                        studentName: sub.profiles?.full_name || sub.profiles?.email || 'Unknown Student',
-                        testTitle: sub.tests?.title || 'Unknown Test'
-                    }));
-                    setAllSubmissions(enriched);
-                }
-             } catch (e) {
-                 console.error("Error fetching submissions:", e);
-             } finally {
-                 setLoading(false);
-             }
-        };
-        fetchSubmissions();
-    }, []);
-
-    // Extract unique options for dropdowns
-    const uniqueBatches = useMemo(() => Array.from(new Set(allSubmissions.map(s => s.batch))), [allSubmissions]);
-    const uniqueTests = useMemo(() => Array.from(new Set(allSubmissions.map(s => s.testTitle))), [allSubmissions]);
-
-    // Apply Filters
-    const filteredData = allSubmissions.filter(sub => {
-        const matchesBatch = filterBatch === 'ALL' || sub.batch === filterBatch;
-        const matchesTest = filterTest === 'ALL' || sub.testTitle === filterTest;
-        const matchesSearch = sub.studentName.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesBatch && matchesTest && matchesSearch;
-    });
-
-    const data = [
-      { name: 'N5 Mock', avg: 72 },
-      { name: 'N4 Mock', avg: 68 },
-      { name: 'Kanji', avg: 75 },
-      { name: 'Vocab', avg: 82 },
-    ];
-
-    return (
-        <div className="space-y-8 animate-fade-in">
-             <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-white">Student Reports & Results</h1>
-                <button className="flex items-center gap-2 bg-dark-800 hover:bg-dark-700 text-white px-4 py-2 rounded-lg border border-dark-600 transition text-sm">
-                    <Download className="w-4 h-4" /> Export CSV
-                </button>
-             </div>
-
-             {/* Chart Section */}
-             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 shadow-lg">
-                 <h3 className="text-lg font-bold text-white mb-6">Class Performance Overview</h3>
-                 <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data}>
-                            <XAxis dataKey="name" stroke="#94a3b8" />
-                            <YAxis stroke="#94a3b8" />
-                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
-                            <Bar dataKey="avg" fill="#be123c" radius={[4, 4, 0, 0]} barSize={40} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                 </div>
-             </div>
-
-             {/* Filters & Table */}
-             <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col space-y-6 shadow-lg">
-                 <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                     <h3 className="text-lg font-bold text-white flex-shrink-0">Detailed Submissions</h3>
-                     
-                     <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                         {/* Search */}
-                         <div className="relative">
-                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                             <input 
-                                type="text" 
-                                placeholder="Search Student..." 
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-dark-900 border border-dark-700 text-white pl-9 pr-4 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none w-48 transition"
-                             />
-                         </div>
-
-                         {/* Batch Filter */}
-                         <div className="relative">
-                             <select 
-                                value={filterBatch}
-                                onChange={(e) => setFilterBatch(e.target.value)}
-                                className="appearance-none bg-dark-900 border border-dark-700 text-white pl-4 pr-8 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer"
-                             >
-                                 <option value="ALL">All Batches</option>
-                                 {uniqueBatches.map(b => <option key={b} value={b}>{b}</option>)}
-                             </select>
-                             <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 pointer-events-none" />
-                         </div>
-
-                         {/* Test Filter */}
-                         <div className="relative">
-                             <select 
-                                value={filterTest}
-                                onChange={(e) => setFilterTest(e.target.value)}
-                                className="appearance-none bg-dark-900 border border-dark-700 text-white pl-4 pr-8 py-2 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer max-w-[150px]"
-                             >
-                                 <option value="ALL">All Tests</option>
-                                 {uniqueTests.map(t => <option key={t} value={t}>{t}</option>)}
-                             </select>
-                             <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 pointer-events-none" />
-                         </div>
-                     </div>
-                 </div>
-
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-gray-400">
-                         <thead className="text-xs uppercase bg-dark-900 text-gray-300 font-bold border-b border-dark-700">
-                             <tr>
-                                 <th className="p-4 rounded-tl-lg">Student Name</th>
-                                 <th className="p-4">Batch</th>
-                                 <th className="p-4">Test Title</th>
-                                 <th className="p-4">Date Submitted</th>
-                                 <th className="p-4">Score</th>
-                                 <th className="p-4 rounded-tr-lg text-right">Action</th>
-                             </tr>
-                         </thead>
-                         <tbody className="divide-y divide-dark-700">
-                             {loading ? (
-                                 <tr><td colSpan={6} className="p-8 text-center text-gray-500">Loading submissions...</td></tr>
-                             ) : filteredData.length === 0 ? (
-                                 <tr><td colSpan={6} className="p-8 text-center text-gray-500">No submissions found matching filters.</td></tr>
-                             ) : (
-                                 filteredData.map((sub) => (
-                                     <tr key={sub.id} className="hover:bg-dark-700/50 transition">
-                                         <td className="p-4 font-bold text-white flex items-center gap-3">
-                                             <div className="w-8 h-8 rounded-full bg-brand-900/50 flex items-center justify-center text-brand-500 text-xs font-bold border border-brand-500/20">
-                                                 {sub.studentName.charAt(0)}
-                                             </div>
-                                             {sub.studentName}
-                                         </td>
-                                         <td className="p-4">
-                                             <span className="bg-dark-900 border border-dark-600 text-gray-300 px-2 py-1 rounded text-xs">
-                                                 {sub.batch}
-                                             </span>
-                                         </td>
-                                         <td className="p-4 text-white">{sub.testTitle}</td>
-                                         <td className="p-4">{new Date(sub.completed_at).toLocaleDateString()}</td>
-                                         <td className="p-4">
-                                            <span className={`font-bold px-2 py-1 rounded ${sub.score > (sub.total_score * 0.4) ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                                                {sub.score} / {sub.total_score}
-                                            </span>
-                                         </td>
-                                         <td className="p-4 text-right">
-                                             <button 
-                                                onClick={() => navigate(`/teacher/report/${sub.id}`)}
-                                                className="bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow flex items-center gap-1 ml-auto"
-                                             >
-                                                 View Report <ChevronRight className="w-3 h-3" />
-                                             </button>
-                                         </td>
-                                     </tr>
-                                 ))
-                             )}
-                         </tbody>
-                    </table>
-                 </div>
-                 
-                 <div className="flex justify-between items-center text-xs text-gray-500 pt-2">
-                     <span>Showing {filteredData.length} entries</span>
-                     {/* Pagination placeholder */}
-                     <div className="flex gap-2">
-                         <button className="px-3 py-1 rounded bg-dark-900 border border-dark-700 disabled:opacity-50" disabled>Previous</button>
-                         <button className="px-3 py-1 rounded bg-dark-900 border border-dark-700 disabled:opacity-50" disabled>Next</button>
-                     </div>
-                 </div>
-             </div>
-        </div>
-    );
-};
-
 export const LiveClassConsole = () => {
-    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages, localStream, toggleMic, toggleCamera, enablePreview } = useLiveSession();
+    const { 
+        isLive, topic, viewerCount, localStream, chatMessages,
+        startSession, endSession, enablePreview, toggleMic, toggleCamera, sendMessage
+    } = useLiveSession();
     
-    const [transcript, setTranscript] = useState("");
-    const [summary, setSummary] = useState("");
-    const [isGenerating, setIsGenerating] = useState(false);
+    const [title, setTitle] = useState('');
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
-    const [newMessage, setNewMessage] = useState("");
-    
-    const localVideoRef = useRef<HTMLVideoElement>(null);
-
-    // Auto-enable preview when entering console
-    useEffect(() => {
-        enablePreview();
-    }, []);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [transcript, setTranscript] = useState('');
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [summary, setSummary] = useState('');
 
     useEffect(() => {
-        if (localStream && localVideoRef.current) {
-            localVideoRef.current.srcObject = localStream;
+        if (localStream && videoRef.current) {
+            videoRef.current.srcObject = localStream;
         }
     }, [localStream]);
 
-    // Mock transcript growth
-    useEffect(() => {
-        if (!isLive) return;
-        const interval = setInterval(() => {
-            const phrases = [
-                "Konnichiwa minna-san. ",
-                "Today we are learning about the 'Te-form'. ",
-                "Please conjugate 'Taberu' to 'Tabete'. ",
-                "Pay attention to the intonation. ",
-                "Homework is on page 42. "
-            ];
-            const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-            setTranscript(prev => prev + randomPhrase);
-        }, 3000);
-        return () => clearInterval(interval);
-    }, [isLive]);
-
-    const handleEndClass = async () => {
-        setIsGenerating(true);
-        endSession(); 
-        try {
-            const result = await generateClassSummary(transcript || "We discussed Japanese grammar.");
-            setSummary(result);
-        } catch (e) {
-            setSummary("Failed to generate summary.");
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    const handleSendMessage = (e: React.FormEvent) => {
-        e.preventDefault();
-        if(newMessage.trim()) {
-            sendMessage("Tanaka Sensei", newMessage);
-            setNewMessage("");
-        }
-    };
-
     const handleToggleMic = () => {
-        const newState = !micOn;
-        setMicOn(newState);
-        toggleMic(newState);
+        setMicOn(!micOn);
+        toggleMic(!micOn);
     };
 
     const handleToggleCam = () => {
-        const newState = !camOn;
-        setCamOn(newState);
-        toggleCamera(newState);
+        setCamOn(!camOn);
+        toggleCamera(!camOn);
+    };
+
+    const handleGenerateSummary = async () => {
+        setIsGeneratingSummary(true);
+        // Simulate a transcript from chat or dummy data for now, as real STT isn't fully hooked up to a variable
+        const mockTranscript = chatMessages.map(m => `${m.user}: ${m.text}`).join('\n');
+        const summaryText = await generateClassSummary(mockTranscript || "No transcript available. Class focused on grammar points N4.");
+        setSummary(summaryText);
+        setIsGeneratingSummary(false);
     };
 
     return (
-        <div className="h-[calc(100vh-2rem)] flex flex-col space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between bg-dark-800 p-4 rounded-xl border border-dark-700 shadow-lg">
-                <div className="flex items-center gap-4">
-                     <div className={`w-3 h-3 rounded-full ${isLive ? 'bg-brand-500 animate-pulse' : 'bg-gray-500'}`}></div>
-                     <div>
-                         <h2 className="text-xl font-bold text-white">{topic}</h2>
-                         <p className="text-xs text-gray-400">Batch B-2024 • {isLive ? "BROADCASTING" : "OFFLINE"}</p>
-                     </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                     <div className="flex bg-dark-900 rounded-lg p-1">
-                         <button onClick={handleToggleMic} className={`p-2 rounded ${micOn ? 'bg-dark-700 text-white' : 'text-red-500'}`}>
+        <div className="h-[calc(100vh-2rem)] flex gap-6 animate-fade-in">
+            {/* Left: Video & Controls */}
+            <div className="flex-1 flex flex-col gap-4">
+                 <div className="bg-dark-800 p-4 rounded-xl border border-dark-700 flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Video className="w-6 h-6 text-brand-500" /> Live Classroom Console
+                        </h2>
+                        <p className="text-sm text-gray-400">{isLive ? `Broadcasting: ${topic}` : 'Session Offline'}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 text-gray-400 bg-dark-900 px-3 py-1 rounded border border-dark-700">
+                            <Users className="w-4 h-4" /> <span className="font-mono font-bold text-white">{viewerCount}</span>
+                        </div>
+                        {!isLive ? (
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="Enter Class Topic..." 
+                                    className="bg-dark-900 border border-dark-700 text-white px-3 py-2 rounded-lg text-sm outline-none focus:border-brand-500 w-64"
+                                    value={title}
+                                    onChange={e => setTitle(e.target.value)}
+                                />
+                                <button 
+                                    onClick={() => startSession(title || 'Untitled Class')}
+                                    className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"
+                                >
+                                    <WifiOff className="w-4 h-4" /> Go Live
+                                </button>
+                                <button onClick={enablePreview} className="bg-dark-700 text-white px-3 py-2 rounded-lg text-sm">Preview</button>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={endSession}
+                                className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg animate-pulse"
+                            >
+                                End Class
+                            </button>
+                        )}
+                    </div>
+                 </div>
+
+                 <div className="flex-1 bg-black rounded-xl border border-dark-700 overflow-hidden relative group">
+                     {localStream ? (
+                         <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+                     ) : (
+                         <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                             <div className="text-center">
+                                 <CameraOff className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                                 <p>Camera is off or preview not enabled</p>
+                             </div>
+                         </div>
+                     )}
+                     
+                     <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 bg-dark-900/80 backdrop-blur px-6 py-3 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition duration-300">
+                         <button onClick={handleToggleMic} className={`p-3 rounded-full ${micOn ? 'bg-dark-700 hover:bg-dark-600 text-white' : 'bg-red-500 text-white'}`}>
                              {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                          </button>
-                         <button onClick={handleToggleCam} className={`p-2 rounded ${camOn ? 'bg-dark-700 text-white' : 'text-red-500'}`}>
+                         <button onClick={handleToggleCam} className={`p-3 rounded-full ${camOn ? 'bg-dark-700 hover:bg-dark-600 text-white' : 'bg-red-500 text-white'}`}>
                              {camOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
                          </button>
-                         <button className="p-2 rounded hover:bg-dark-700 text-gray-400">
-                             <Monitor className="w-5 h-5" />
-                         </button>
                      </div>
-
-                    {!isLive ? (
-                        <button onClick={() => startSession("JLPT N4 Grammar: The Te-Form")} className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-900/50 flex items-center gap-2">
-                             <Video className="w-4 h-4" /> Go Live
-                        </button>
-                    ) : (
-                        <button onClick={handleEndClass} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-red-900/50">
-                            End Class
-                        </button>
-                    )}
-                </div>
+                 </div>
+                 
+                 {summary && (
+                     <div className="bg-dark-800 p-4 rounded-xl border border-dark-700 max-h-48 overflow-y-auto">
+                         <h3 className="font-bold text-white mb-2 flex items-center gap-2">
+                             <FileText className="w-4 h-4 text-brand-500" /> AI Class Summary
+                         </h3>
+                         <div className="prose prose-invert prose-sm">
+                             {summary}
+                         </div>
+                     </div>
+                 )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-                {/* Video Feed Area */}
-                <div className="lg:col-span-2 bg-black rounded-xl border border-dark-700 relative overflow-hidden flex items-center justify-center group shadow-xl">
-                    {localStream ? (
-                        <div className="relative w-full h-full">
-                            {/* Real Local Video Feed */}
-                            <video 
-                                ref={localVideoRef} 
-                                autoPlay 
-                                muted 
-                                playsInline 
-                                className="w-full h-full object-cover" 
-                            />
-                            
-                            <div className="absolute top-4 right-4 bg-brand-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-2 shadow-lg">
-                                <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-white animate-pulse' : 'bg-gray-400'}`}></span> {isLive ? 'LIVE' : 'PREVIEW'}
-                            </div>
-                            {isLive && (
-                                <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded text-white text-sm backdrop-blur">
-                                    {viewerCount} Students
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="text-center">
-                            <Video className="w-16 h-16 text-dark-700 mx-auto mb-4" />
-                            <p className="text-dark-500">Starting Camera...</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Chat & Tools */}
-                <div className="bg-dark-800 rounded-xl border border-dark-700 flex flex-col overflow-hidden shadow-lg">
-                    <div className="p-4 border-b border-dark-700 font-bold bg-dark-900/50">Class Chat</div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {chatMessages.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No messages yet.</p>}
-                        {chatMessages.map((m, i) => (
+            {/* Right: Chat & Tools */}
+            <div className="w-80 flex flex-col gap-4">
+                <div className="flex-1 bg-dark-800 rounded-xl border border-dark-700 flex flex-col overflow-hidden">
+                    <div className="p-3 border-b border-dark-700 bg-dark-900 font-bold text-white flex justify-between items-center">
+                        <span>Live Chat</span>
+                        <span className="text-xs font-normal text-gray-500">{chatMessages.length} msgs</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {chatMessages.length === 0 && <p className="text-center text-gray-600 text-sm mt-10">Chat is quiet...</p>}
+                        {chatMessages.map((msg, i) => (
                             <div key={i} className="text-sm">
-                                <div className="flex items-baseline justify-between mb-1">
-                                    <span className={`font-bold ${m.user === "SYSTEM" ? 'text-accent-gold' : m.user === "Tanaka Sensei" ? 'text-brand-500' : 'text-white'}`}>{m.user}</span>
-                                    <span className="text-[10px] text-gray-600">{m.timestamp}</span>
-                                </div>
-                                <p className={`p-2 rounded-lg rounded-tl-none ${m.user === "SYSTEM" ? 'bg-accent-gold/10 text-accent-gold italic' : 'bg-dark-900 text-gray-300'}`}>{m.text}</p>
+                                <span className={`font-bold text-xs ${msg.user === 'SYSTEM' ? 'text-brand-500' : 'text-blue-400'}`}>{msg.user}</span>
+                                <p className="text-gray-300">{msg.text}</p>
                             </div>
                         ))}
                     </div>
-                    <form onSubmit={handleSendMessage} className="p-4 border-t border-dark-700 bg-dark-900/30">
-                        <input 
+                    {/* Teacher can also chat */}
+                    <div className="p-3 bg-dark-900 border-t border-dark-700">
+                         <input 
                             type="text" 
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Type a message..." 
-                            className="w-full bg-dark-900 border border-dark-700 rounded px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 outline-none transition" 
-                        />
-                    </form>
+                            placeholder="Send message..."
+                            className="w-full bg-dark-800 border border-dark-700 rounded px-3 py-2 text-sm text-white focus:border-brand-500 outline-none"
+                            onKeyDown={e => {
+                                if(e.key === 'Enter') {
+                                    sendMessage('Sensei', e.currentTarget.value);
+                                    e.currentTarget.value = '';
+                                }
+                            }}
+                         />
+                    </div>
+                </div>
+
+                <div className="bg-dark-800 rounded-xl border border-dark-700 p-4 space-y-3">
+                    <h3 className="font-bold text-white text-sm uppercase">Quick Actions</h3>
+                    <button 
+                        onClick={handleGenerateSummary} 
+                        disabled={isGeneratingSummary}
+                        className="w-full bg-dark-700 hover:bg-dark-600 text-white py-2 rounded text-xs font-bold flex items-center justify-center gap-2 transition"
+                    >
+                        {isGeneratingSummary ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4 text-brand-500" />}
+                        Generate AI Summary
+                    </button>
                 </div>
             </div>
-
-            {/* AI Summary Output */}
-            {(isGenerating || summary) && (
-                <div className="mt-6 bg-dark-800 p-6 rounded-xl border border-brand-500/30 shadow-lg shadow-brand-900/10">
-                    <h3 className="text-xl font-bold text-brand-500 mb-4 flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5" /> AI Class Summary (Nihongo)
-                    </h3>
-                    {isGenerating ? (
-                        <div className="flex items-center gap-2 text-gray-400 py-8">
-                            <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                            Processing transcript...
-                        </div>
-                    ) : (
-                        <div className="prose prose-invert max-w-none">
-                            <div className="bg-dark-900 p-6 rounded-lg border border-dark-700">
-                                <pre className="whitespace-pre-wrap font-sans text-gray-300 text-sm leading-relaxed">{summary}</pre>
-                            </div>
-                            <div className="mt-4 flex gap-4">
-                                <button className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded text-sm font-bold">Send to Students</button>
-                                <button className="border border-dark-600 hover:bg-dark-700 text-gray-300 px-4 py-2 rounded text-sm">Download PDF</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 };

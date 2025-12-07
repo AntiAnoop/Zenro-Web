@@ -6,11 +6,11 @@ import {
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
   Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw, Loader2,
-  FileCheck
+  FileCheck, ArrowLeft, Menu, File, Film
 } from 'lucide-react';
-import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem } from '../types';
+import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem, CourseModule, CourseMaterial } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveSession } from '../context/LiveContext';
 import { supabase } from '../services/supabaseClient';
 import { jsPDF } from "jspdf";
@@ -191,12 +191,11 @@ export const StudentCoursesPage = () => {
   const [loading, setLoading] = useState(true);
   const [liveCourse, setLiveCourse] = useState<Course | null>(null);
 
-  // User context from Session Storage (or Auth Context if available)
+  // User context from Session Storage
   const userData = localStorage.getItem('zenro_session');
   const user: User = userData ? JSON.parse(userData) : null;
 
-  useEffect(() => {
-    const fetchMyCourses = async () => {
+  const fetchMyCourses = async () => {
         if (!user) return;
         setLoading(true);
         try {
@@ -205,7 +204,7 @@ export const StudentCoursesPage = () => {
             const { data: batchCourses } = await supabase
                 .from('course_batches')
                 .select('course_id')
-                .eq('batch_name', user.batch); // '2024-A'
+                .eq('batch_name', user.batch); 
 
             // 2. Get Courses assigned to me directly (course_enrollments)
             const { data: directCourses } = await supabase
@@ -235,13 +234,13 @@ export const StudentCoursesPage = () => {
                         instructor: c.instructor_name || 'Tanaka Sensei',
                         progress: 0, // In real app, join 'course_enrollments' to get progress
                         thumbnail: c.thumbnail,
-                        totalDuration: '10h 30m', // Mock duration until modules calc
+                        totalDuration: '10h 30m', 
                         level: c.level,
                         status: c.status
                     }));
                     setCourses(mapped);
 
-                    // Check for live match (mock logic for now as 'isLive' is transient)
+                    // Check for live match
                     const foundLive = mapped.find(c => c.title.includes(topic) || (isLive && c.id === 'c1')); 
                     if (foundLive && isLive) setLiveCourse(foundLive);
                 }
@@ -256,7 +255,31 @@ export const StudentCoursesPage = () => {
         }
     };
 
+  useEffect(() => {
     fetchMyCourses();
+
+    // REAL-TIME UPDATES: Subscribe to changes in relevant tables
+    // This makes sure if an admin adds a course, it shows up instantly.
+    const courseSub = supabase
+        .channel('public:courses')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => {
+            console.log("Course updated/added, refreshing...");
+            fetchMyCourses();
+        })
+        .subscribe();
+
+    const batchSub = supabase
+        .channel('public:course_batches')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'course_batches' }, () => {
+            console.log("Batch assignment updated, refreshing...");
+            fetchMyCourses();
+        })
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(courseSub);
+        supabase.removeChannel(batchSub);
+    };
   }, [user?.id, user?.batch]);
 
   if (loading) {
@@ -307,9 +330,13 @@ export const StudentCoursesPage = () => {
                </div>
           ) : (
             courses.map(course => (
-                <div key={course.id} className={`bg-dark-800 rounded-xl overflow-hidden border ${course.isLive ? 'border-brand-500/60 ring-1 ring-brand-500/20' : 'border-dark-700'} hover:border-brand-500/50 transition group shadow-lg`}>
-                <div className="relative aspect-video overflow-hidden">
-                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-700" />
+                <div 
+                    key={course.id} 
+                    onClick={() => !course.isLocked && navigate(`/student/course/${course.id}`)}
+                    className={`bg-dark-800 rounded-xl overflow-hidden border ${course.isLive ? 'border-brand-500/60 ring-1 ring-brand-500/20' : 'border-dark-700'} hover:border-brand-500/50 transition group shadow-lg cursor-pointer flex flex-col`}
+                >
+                <div className="relative aspect-video overflow-hidden bg-black">
+                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-700 opacity-80 group-hover:opacity-100" />
                     {course.isLocked && (
                         <div className="absolute inset-0 bg-dark-900/80 flex flex-col items-center justify-center backdrop-blur-[2px]">
                             <Lock className="w-8 h-8 text-gray-400 mb-2" />
@@ -319,30 +346,24 @@ export const StudentCoursesPage = () => {
                     <div className="absolute top-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-xs text-white border border-white/10">
                         {course.level}
                     </div>
-                    <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs text-white font-mono backdrop-blur-md border border-white/10">
-                        {course.totalDuration}
-                    </div>
-                </div>
-                <div className="p-5">
-                    <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-bold text-white truncate flex-1 text-lg" title={course.title}>{course.title}</h4>
-                    </div>
-                    <p className="text-sm text-gray-400 mb-4">Sensei: {course.instructor}</p>
-                    {!course.isLocked ? (
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-xs text-gray-500">
-                                <span>Progression</span>
-                                <span>{course.progress}%</span>
-                            </div>
-                            <div className="w-full bg-dark-900 rounded-full h-1.5 border border-dark-700">
-                                <div style={{width: `${course.progress}%`}} className="bg-brand-500 h-1.5 rounded-full"></div>
+                    {!course.isLocked && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+                            <div className="bg-brand-600/90 rounded-full p-4 shadow-xl transform scale-75 group-hover:scale-100 transition">
+                                <Play className="w-8 h-8 text-white ml-1 fill-white" />
                             </div>
                         </div>
-                    ) : (
-                        <button className="w-full py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 text-sm rounded transition border border-dark-600">
-                            Unlock Course
-                        </button>
                     )}
+                </div>
+                <div className="p-5 flex-1 flex flex-col">
+                    <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold text-white truncate flex-1 text-lg group-hover:text-brand-500 transition" title={course.title}>{course.title}</h4>
+                    </div>
+                    <p className="text-sm text-gray-400 mb-4 line-clamp-2">{course.description}</p>
+                    
+                    <div className="mt-auto pt-4 border-t border-dark-700 flex justify-between items-center text-xs text-gray-500">
+                        <span className="flex items-center gap-1"><UserIcon className="w-3 h-3" /> {course.instructor}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> 12 Lessons</span>
+                    </div>
                 </div>
                 </div>
             ))
@@ -350,6 +371,162 @@ export const StudentCoursesPage = () => {
         </div>
     </div>
   );
+};
+
+export const StudentCoursePlayer = () => {
+    const { courseId } = useParams();
+    const navigate = useNavigate();
+    const [course, setCourse] = useState<Course | null>(null);
+    const [modules, setModules] = useState<any[]>([]);
+    const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    useEffect(() => {
+        const fetchContent = async () => {
+            if(!courseId) return;
+            try {
+                // 1. Fetch Course Info
+                const { data: courseData } = await supabase.from('courses').select('*').eq('id', courseId).single();
+                if(courseData) setCourse(courseData);
+
+                // 2. Fetch Modules & Materials
+                const { data: modulesData } = await supabase
+                    .from('course_modules')
+                    .select('*, course_materials(*)')
+                    .eq('course_id', courseId)
+                    .order('order');
+                
+                if(modulesData) {
+                    setModules(modulesData);
+                    // Set first video/material as active
+                    if(modulesData.length > 0 && modulesData[0].course_materials.length > 0) {
+                        setActiveMaterial(modulesData[0].course_materials[0]);
+                    }
+                }
+            } catch(e) {
+                console.error("Content fetch failed", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchContent();
+    }, [courseId]);
+
+    if(loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-12 h-12 text-brand-500 animate-spin" /></div>;
+    if(!course) return <div>Course not found</div>;
+
+    return (
+        <div className="fixed inset-0 z-50 bg-dark-900 flex flex-col text-white">
+            {/* Header */}
+            <div className="h-16 border-b border-dark-700 bg-dark-800 flex items-center justify-between px-4 shadow-lg z-20">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => navigate('/student/courses')} className="p-2 hover:bg-dark-700 rounded-full transition text-gray-400 hover:text-white">
+                        <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <h1 className="font-bold text-lg hidden md:block">{course.title}</h1>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="text-sm text-gray-400 hidden md:block">Progress: 0%</div>
+                    <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-dark-700 rounded-lg lg:hidden">
+                        <Menu className="w-6 h-6" />
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 flex overflow-hidden">
+                {/* Main Content (Video/PDF) */}
+                <div className="flex-1 bg-black relative flex items-center justify-center overflow-y-auto">
+                    {activeMaterial ? (
+                        activeMaterial.type === 'VIDEO' ? (
+                            // Use native video for demo, iframe for YT if needed
+                            <div className="w-full h-full max-w-5xl mx-auto flex flex-col p-4">
+                                <div className="aspect-video bg-black rounded-xl overflow-hidden border border-dark-700 shadow-2xl relative group">
+                                    <video 
+                                        src={activeMaterial.url} 
+                                        controls 
+                                        className="w-full h-full object-contain" 
+                                        poster={course.thumbnail}
+                                    />
+                                </div>
+                                <div className="mt-6">
+                                    <h2 className="text-2xl font-bold">{activeMaterial.title}</h2>
+                                    <p className="text-gray-400 mt-2 text-sm">Now Playing • Module Content</p>
+                                </div>
+                            </div>
+                        ) : (
+                            // PDF / Link View
+                            <div className="w-full h-full flex flex-col p-8">
+                                <div className="flex items-center justify-between mb-6 bg-dark-800 p-4 rounded-xl border border-dark-700">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-brand-500/20 rounded-lg text-brand-500">
+                                            <FileText className="w-8 h-8" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold">{activeMaterial.title}</h2>
+                                            <p className="text-gray-400 text-sm">Course Material • {activeMaterial.type}</p>
+                                        </div>
+                                    </div>
+                                    <a 
+                                        href={activeMaterial.url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"
+                                    >
+                                        <Download className="w-4 h-4" /> Download/Open
+                                    </a>
+                                </div>
+                                <div className="flex-1 bg-dark-800 rounded-xl border border-dark-700 flex items-center justify-center text-gray-500 flex-col">
+                                    <File className="w-16 h-16 mb-4 opacity-50" />
+                                    <p>Preview not available for this file type.</p>
+                                    <p className="text-sm mt-2">Please download to view.</p>
+                                </div>
+                            </div>
+                        )
+                    ) : (
+                        <div className="text-gray-500">Select a lesson to start</div>
+                    )}
+                </div>
+
+                {/* Sidebar Playlist */}
+                <div className={`${sidebarOpen ? 'w-80 translate-x-0' : 'w-0 translate-x-full lg:w-0'} bg-dark-800 border-l border-dark-700 transition-all duration-300 flex flex-col absolute right-0 top-0 bottom-0 z-10 lg:relative lg:translate-x-0`}>
+                    <div className="p-4 border-b border-dark-700 font-bold text-white bg-dark-900/50">
+                        Course Content
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                        {modules.map((mod, idx) => (
+                            <div key={mod.id} className="border-b border-dark-700/50">
+                                <div className="p-4 bg-dark-900/30 font-bold text-sm text-gray-300 flex justify-between items-center sticky top-0">
+                                    <span>{idx + 1}. {mod.title}</span>
+                                </div>
+                                <div>
+                                    {mod.course_materials.map((mat: any) => (
+                                        <button
+                                            key={mat.id}
+                                            onClick={() => setActiveMaterial(mat)}
+                                            className={`w-full text-left p-4 flex items-start gap-3 hover:bg-dark-700/50 transition border-l-4 ${
+                                                activeMaterial?.id === mat.id 
+                                                ? 'bg-brand-900/10 border-brand-500 text-white' 
+                                                : 'border-transparent text-gray-400'
+                                            }`}
+                                        >
+                                            <div className="mt-0.5">
+                                                {mat.type === 'VIDEO' ? <Film className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                                            </div>
+                                            <div className="text-sm line-clamp-2">{mat.title}</div>
+                                        </button>
+                                    ))}
+                                    {mod.course_materials.length === 0 && (
+                                        <div className="p-4 text-xs text-gray-600 italic">No content uploaded</div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export const StudentLiveRoom = ({ user }: { user: User }) => {

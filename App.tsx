@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2 } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
-import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom } from './components/StudentViews';
+import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer } from './components/StudentViews';
 import { StudentTestPlayer } from './components/StudentTestPlayer';
 import { TestReport } from './components/TestReport';
 import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole } from './components/TeacherViews';
@@ -432,6 +433,7 @@ export default function App() {
               {/* Student Routes */}
               <Route path="/student/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentDashboardHome /></ProtectedRoute>} />
               <Route path="/student/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursesPage /></ProtectedRoute>} />
+              <Route path="/student/course/:courseId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursePlayer /></ProtectedRoute>} />
               <Route path="/student/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentLiveRoom user={user} /></ProtectedRoute>} />
               <Route path="/student/tests" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestsPage /></ProtectedRoute>} />
               <Route path="/student/test/:testId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestPlayer /></ProtectedRoute>} />
