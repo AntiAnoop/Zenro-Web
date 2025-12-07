@@ -7,7 +7,7 @@ import {
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
-  Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle
+  Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -15,6 +15,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } fro
 import { useLiveSession } from '../context/LiveContext';
 import { supabase } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
+
+// --- UI HELPERS ---
+const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => (
+    <div className={`fixed bottom-6 right-6 z-[200] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in-up transition-all ${type === 'success' ? 'bg-green-500/90 text-white' : 'bg-red-500/90 text-white'}`}>
+        {type === 'success' ? <CheckCircle className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+        <p className="font-bold text-sm">{message}</p>
+        <button onClick={onClose} className="ml-4 hover:bg-white/20 rounded-full p-1"><X className="w-4 h-4" /></button>
+    </div>
+);
 
 // --- MOCK TEACHER STATS ---
 const TEACHER_STATS = [
@@ -131,12 +140,12 @@ export const TeacherDashboardHome = () => {
 // --- ROBUST COURSE CREATION WIZARD ---
 interface WizardProps {
     onClose: () => void;
-    onSave: (course: any) => void;
     onRefresh: () => void;
     courseId?: string | null;
+    showToast: (msg: string, type: 'success'|'error') => void;
 }
 
-const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardProps) => {
+const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: WizardProps) => {
     const [step, setStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(!!courseId);
@@ -228,6 +237,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
 
             } catch (e) {
                 console.error("Error loading wizard resources:", e);
+                showToast("Failed to load course details", 'error');
             } finally {
                 setIsFetching(false);
             }
@@ -298,7 +308,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
     const handleSave = async (status: 'DRAFT' | 'PUBLISHED') => {
         // Validation
         if (!courseData.title || !courseData.level) {
-            alert("Please fill in Course Title and Level.");
+            showToast("Please fill in Course Title and Level.", 'error');
             return;
         }
 
@@ -337,15 +347,18 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
 
             if (!activeCourseId) throw new Error("Failed to resolve Course ID");
 
-            // 2. Handle Modules & Materials 
-            // Strategy: For robustness in this demo, we will wipe existing modules (cascade deletes materials) 
-            // and re-insert the current state. This ensures strict sync with the UI.
-            // *NOTE*: In a production app with progress tracking on specific material IDs, we would upsert with ID matching.
-            
-            // Delete old modules (Cascade takes care of materials)
-            await supabase.from('course_modules').delete().eq('course_id', activeCourseId);
+            // 2. Handle Modules & Materials (MANUAL CLEANUP to ensure it works even without strict CASCADE)
+            // First, find all existing modules
+            const { data: oldModules } = await supabase.from('course_modules').select('id').eq('course_id', activeCourseId);
+            if (oldModules && oldModules.length > 0) {
+                const oldModuleIds = oldModules.map(m => m.id);
+                // Delete materials for these modules
+                await supabase.from('course_materials').delete().in('module_id', oldModuleIds);
+                // Delete modules
+                await supabase.from('course_modules').delete().in('id', oldModuleIds);
+            }
 
-            // Insert new modules
+            // Insert new modules and materials
             if (courseData.modules && courseData.modules.length > 0) {
                 for (let i = 0; i < courseData.modules.length; i++) {
                     const mod = courseData.modules[i];
@@ -391,15 +404,16 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardPr
             }
 
             // Success
+            showToast(`Course ${status === 'DRAFT' ? 'saved as draft' : 'published'} successfully!`, 'success');
             onRefresh(); 
             onClose();
 
         } catch (e: any) {
             console.error("Course Save Failed:", e);
              if (e.code === '42P01' || e.code === '42703' || e.code === 'PGRST204') { 
-                alert("DATABASE SCHEMA ERROR: Please run the provided SQL script to fix missing tables/columns.");
+                showToast("DB SCHEMA ERROR: Run setup SQL.", 'error');
             } else {
-                alert(`Failed to save course: ${e.message}`);
+                showToast(`Failed to save: ${e.message}`, 'error');
             }
         } finally {
             setIsLoading(false);
@@ -715,10 +729,20 @@ export const TeacherCoursesPage = () => {
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState<{ msg: string, type: 'success'|'error' } | null>(null);
 
     useEffect(() => {
         fetchCourses();
     }, []);
+
+    useEffect(() => {
+        if(toast) {
+            const t = setTimeout(() => setToast(null), 4000);
+            return () => clearTimeout(t);
+        }
+    }, [toast]);
+
+    const showToast = (msg: string, type: 'success'|'error') => setToast({ msg, type });
 
     const fetchCourses = async () => {
         setLoading(true);
@@ -735,20 +759,45 @@ export const TeacherCoursesPage = () => {
             }
         } catch (e) {
             console.error(e);
+            showToast("Failed to load courses.", 'error');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDelete = async (id: string, title: string) => {
-        if(confirm(`⚠️ DANGER ZONE: Are you sure you want to delete "${title}"?\n\nThis action CANNOT be undone. It will permanently delete:\n- The course and all chapters\n- All student progress and stats\n- All assignments linked to this course\n\nClick OK to permanently destroy this data.`)) {
-            try {
-                const { error } = await supabase.from('courses').delete().eq('id', id);
-                if (error) throw error;
-                setCourses(prev => prev.filter(c => c.id !== id));
-            } catch (err: any) {
-                alert("Failed to delete course: " + err.message);
+        if(!confirm(`⚠️ PERMANENT DELETE WARNING ⚠️\n\nDeleting "${title}" will remove:\n- All Course Chapters & Videos\n- All Batch Assignments\n- All Student Progress\n\nThis action cannot be undone. Are you absolutely sure?`)) {
+            return;
+        }
+
+        try {
+            // ROBUST DELETE: Manual cleanup of related tables first to ensure success
+            // 1. Delete Enrollments
+            await supabase.from('course_enrollments').delete().eq('course_id', id);
+            // 2. Delete Batch Links
+            await supabase.from('course_batches').delete().eq('course_id', id);
+            
+            // 3. Find and Delete Modules & Materials
+            const { data: modules } = await supabase.from('course_modules').select('id').eq('course_id', id);
+            if (modules && modules.length > 0) {
+                const modIds = modules.map(m => m.id);
+                // 3a. Delete Materials
+                await supabase.from('course_materials').delete().in('module_id', modIds);
+                // 3b. Delete Modules
+                await supabase.from('course_modules').delete().in('id', modIds);
             }
+
+            // 4. Finally Delete Course
+            const { error } = await supabase.from('courses').delete().eq('id', id);
+            
+            if (error) throw error;
+            
+            setCourses(prev => prev.filter(c => c.id !== id));
+            showToast(`Course "${title}" deleted successfully.`, 'success');
+
+        } catch (err: any) {
+            console.error("Delete Error:", err);
+            showToast("Failed to delete. Try again or contact admin.", 'error');
         }
     };
 
@@ -763,7 +812,9 @@ export const TeacherCoursesPage = () => {
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in relative">
+            {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
              <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Course Management</h1>
@@ -835,9 +886,9 @@ export const TeacherCoursesPage = () => {
             {isWizardOpen && (
                 <CourseCreationWizard 
                     onClose={() => setIsWizardOpen(false)} 
-                    onSave={() => {}} 
                     onRefresh={fetchCourses} 
                     courseId={editingCourseId}
+                    showToast={showToast}
                 />
             )}
         </div>
