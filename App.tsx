@@ -313,7 +313,7 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
               </Link>
                <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/tests')}`}>
                <FileText className="w-4 h-4" />
-               JLPT Results
+               Tests/Reports
              </Link>
               <Link to="/student/activities" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/activities')}`}>
                 <ListTodo className="w-4 h-4" />
@@ -321,7 +321,7 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
               </Link>
                <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/fees')}`}>
                 <CreditCard className="w-4 h-4" />
-                Tuition
+                Fees
               </Link>
                <Link to="/student/profile" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/profile')}`}>
                 <UserIcon className="w-4 h-4" />

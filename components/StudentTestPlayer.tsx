@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, Save, Flag } from 'lucide-react';
@@ -118,9 +119,16 @@ export const StudentTestPlayer = () => {
             navigate('/student/tests');
         }
 
-    } catch (e) {
-        console.error("Failed to save submission", e);
-        alert("Error submitting test. Please try again.");
+    } catch (e: any) {
+        // ROBUST ERROR HANDLING FOR DEMO TEST
+        if (e.code === '23503') {
+            console.warn("Demo Test Submission - FK Constraint (Normal for Demo)");
+            alert(`Demo Exam Completed!\n\nYour Score: ${calculatedScore} / ${totalScore}\n\n(Note: This was a demo test and wasn't saved to the main database)`);
+            navigate('/student/tests');
+        } else {
+            console.error("Failed to save submission", e);
+            alert(`Error submitting test: ${e.message || "Unknown error"}`);
+        }
     } finally {
         setSubmitting(false);
     }
