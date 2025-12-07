@@ -7,7 +7,7 @@ import {
   Mic, MicOff, Camera, CameraOff, Monitor, Languages,
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
-  Briefcase, GraduationCap, Loader2
+  Briefcase, GraduationCap, Loader2, Edit3, Globe
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -129,9 +129,17 @@ export const TeacherDashboardHome = () => {
 };
 
 // --- ROBUST COURSE CREATION WIZARD ---
-const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => void, onSave: (course: any) => void, onRefresh: () => void }) => {
+interface WizardProps {
+    onClose: () => void;
+    onSave: (course: any) => void;
+    onRefresh: () => void;
+    courseId?: string | null;
+}
+
+const CourseCreationWizard = ({ onClose, onSave, onRefresh, courseId }: WizardProps) => {
     const [step, setStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
+    const [isFetching, setIsFetching] = useState(!!courseId);
     
     // DB Data States
     const [availableBatches, setAvailableBatches] = useState<string[]>([]);
@@ -153,35 +161,79 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
 
     const [newModuleTitle, setNewModuleTitle] = useState('');
 
-    // Fetch Batches & Students on Mount
+    // Fetch Batches & Students on Mount + Course Details if editing
     useEffect(() => {
         const fetchResources = async () => {
-            // 1. Fetch Batches
-            const { data: batches } = await supabase.from('batches').select('name');
-            if (batches) {
-                setAvailableBatches(batches.map(b => b.name));
-            }
-            // 2. Fetch Students
-            const { data: students } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('role', 'STUDENT')
-                .order('full_name');
-            
-            if (students) {
-                 const mapped = students.map((u: any) => ({
-                    id: u.id,
-                    name: u.full_name,
-                    role: 'STUDENT',
-                    email: u.email,
-                    avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name)}&background=random`,
-                    batch: u.batch
-                }));
-                setAvailableStudents(mapped);
+            try {
+                // 1. Fetch Batches
+                const { data: batches } = await supabase.from('batches').select('name');
+                if (batches) {
+                    setAvailableBatches(batches.map(b => b.name));
+                }
+                // 2. Fetch Students
+                const { data: students } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('role', 'STUDENT')
+                    .order('full_name');
+                
+                if (students) {
+                     const mapped = students.map((u: any) => ({
+                        id: u.id,
+                        name: u.full_name,
+                        role: 'STUDENT',
+                        email: u.email,
+                        avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name)}&background=random`,
+                        batch: u.batch
+                    }));
+                    setAvailableStudents(mapped);
+                }
+
+                // 3. Fetch Existing Course if ID present
+                if (courseId) {
+                    const { data: course, error } = await supabase.from('courses').select('*').eq('id', courseId).single();
+                    if (error) throw error;
+                    if (course) {
+                         // Fetch children
+                         const { data: modules } = await supabase
+                            .from('course_modules')
+                            .select('*, course_materials(*)')
+                            .eq('course_id', courseId)
+                            .order('order');
+                         
+                         const { data: batchLinks } = await supabase
+                            .from('course_batches')
+                            .select('batch_name')
+                            .eq('course_id', courseId);
+
+                         const { data: enrollLinks } = await supabase
+                            .from('course_enrollments')
+                            .select('student_id')
+                            .eq('course_id', courseId);
+                        
+                        setCourseData({
+                            id: course.id,
+                            title: course.title,
+                            description: course.description,
+                            level: course.level,
+                            thumbnail: course.thumbnail,
+                            status: course.status,
+                            instructor: course.instructor_name,
+                            modules: modules || [],
+                            assignedBatches: batchLinks?.map(b => b.batch_name) || [],
+                            enrolledStudentIds: enrollLinks?.map(e => e.student_id) || []
+                        });
+                    }
+                }
+
+            } catch (e) {
+                console.error("Error loading wizard resources:", e);
+            } finally {
+                setIsFetching(false);
             }
         };
         fetchResources();
-    }, []);
+    }, [courseId]);
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -189,7 +241,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
     const addModule = () => {
         if (!newModuleTitle.trim()) return;
         const newMod: CourseModule = {
-            id: crypto.randomUUID(), // Temp ID
+            id: crypto.randomUUID(), // Temp ID (or text based on setup)
             title: newModuleTitle,
             materials: [],
             duration: '0m'
@@ -201,7 +253,13 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
         setNewModuleTitle('');
     };
 
-    const addMaterialToModule = (moduleId: string, type: 'PDF' | 'LINK' | 'VIDEO') => {
+    const removeModule = (idx: number) => {
+        const newModules = [...(courseData.modules || [])];
+        newModules.splice(idx, 1);
+        setCourseData({...courseData, modules: newModules});
+    };
+
+    const addMaterialToModule = (moduleIdx: number, type: 'PDF' | 'LINK' | 'VIDEO') => {
         const title = prompt(`Enter Title for ${type}:`);
         if(!title) return;
         const url = type === 'VIDEO' ? 'https://example.com/video.mp4' : 'https://example.com/material.pdf'; 
@@ -213,12 +271,8 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
             url: url
         };
 
-        const updatedModules = courseData.modules?.map(m => {
-            if (m.id === moduleId) {
-                return { ...m, materials: [...m.materials, newMat] };
-            }
-            return m;
-        });
+        const updatedModules = [...(courseData.modules || [])];
+        updatedModules[moduleIdx].materials.push(newMat);
         setCourseData({ ...courseData, modules: updatedModules });
     };
 
@@ -240,39 +294,62 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
         }
     };
 
-    const handleFinalSave = async () => {
+    const handleSave = async (status: 'DRAFT' | 'PUBLISHED') => {
         // Validation
         if (!courseData.title || !courseData.level) {
             alert("Please fill in Course Title and Level.");
-            return;
-        }
-        if ((courseData.modules?.length || 0) === 0 && courseData.status === 'PUBLISHED') {
-            alert("You cannot publish a course with 0 chapters.");
             return;
         }
 
         setIsLoading(true);
 
         try {
-            // 1. Insert Course
-            const { data: courseInsert, error: courseError } = await supabase.from('courses').insert({
+            let activeCourseId = courseId;
+
+            // 1. Upsert Course
+            const coursePayload = {
                 title: courseData.title,
                 description: courseData.description,
                 level: courseData.level,
                 thumbnail: courseData.thumbnail,
-                status: courseData.status,
+                status: status, // Set Draft or Published
                 instructor_name: courseData.instructor
-            }).select().single();
+            };
 
-            if (courseError) throw courseError;
-            const newCourseId = courseInsert.id;
+            if (activeCourseId) {
+                // UPDATE
+                const { error } = await supabase
+                    .from('courses')
+                    .update(coursePayload)
+                    .eq('id', activeCourseId);
+                if (error) throw error;
+            } else {
+                // INSERT
+                const { data, error } = await supabase
+                    .from('courses')
+                    .insert(coursePayload)
+                    .select()
+                    .single();
+                if (error) throw error;
+                activeCourseId = data.id;
+            }
 
-            // 2. Insert Modules & Materials (Deep Insert simulation)
+            if (!activeCourseId) throw new Error("Failed to resolve Course ID");
+
+            // 2. Handle Modules & Materials 
+            // Strategy: For robustness in this demo, we will wipe existing modules (cascade deletes materials) 
+            // and re-insert the current state. This ensures strict sync with the UI.
+            // *NOTE*: In a production app with progress tracking on specific material IDs, we would upsert.
+            
+            // Delete old modules
+            await supabase.from('course_modules').delete().eq('course_id', activeCourseId);
+
+            // Insert new modules
             if (courseData.modules && courseData.modules.length > 0) {
                 for (let i = 0; i < courseData.modules.length; i++) {
                     const mod = courseData.modules[i];
                     const { data: modInsert, error: modError } = await supabase.from('course_modules').insert({
-                        course_id: newCourseId,
+                        course_id: activeCourseId,
                         title: mod.title,
                         "order": i
                     }).select().single();
@@ -292,19 +369,21 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
                 }
             }
 
-            // 3. Insert Batch Assignments
+            // 3. Update Batch Assignments (Wipe & Re-insert)
+            await supabase.from('course_batches').delete().eq('course_id', activeCourseId);
             if (courseData.assignedBatches && courseData.assignedBatches.length > 0) {
                 const batchPayload = courseData.assignedBatches.map(bName => ({
-                    course_id: newCourseId,
+                    course_id: activeCourseId,
                     batch_name: bName
                 }));
                 await supabase.from('course_batches').insert(batchPayload);
             }
 
-            // 4. Insert Individual Enrollments
+            // 4. Update Enrollments (Wipe & Re-insert)
+            await supabase.from('course_enrollments').delete().eq('course_id', activeCourseId);
             if (courseData.enrolledStudentIds && courseData.enrolledStudentIds.length > 0) {
                 const enrollPayload = courseData.enrolledStudentIds.map(sId => ({
-                    course_id: newCourseId,
+                    course_id: activeCourseId,
                     student_id: sId
                 }));
                 await supabase.from('course_enrollments').insert(enrollPayload);
@@ -315,12 +394,11 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
             onClose();
 
         } catch (e: any) {
-            console.error("Course Creation Failed:", e);
-            // 42P01: Table missing, 42703: Column missing, PGRST204: Schema cache stale/column missing
-            if (e.code === '42P01' || e.code === '42703' || e.code === 'PGRST204') { 
-                alert("DATABASE SCHEMA ERROR: Tables or Columns (like 'level') are missing. Please run the 'db_schema.sql' script in your Supabase SQL Editor to update your database structure.");
+            console.error("Course Save Failed:", e);
+             if (e.code === '42P01' || e.code === '42703' || e.code === 'PGRST204') { 
+                alert("DATABASE SCHEMA ERROR: Please run the provided SQL script to fix missing tables/columns.");
             } else {
-                alert(`Failed to create course: ${e.message || 'Check console'}`);
+                alert(`Failed to save course: ${e.message}`);
             }
         } finally {
             setIsLoading(false);
@@ -333,6 +411,17 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
         s.email.toLowerCase().includes(studentSearch.toLowerCase())
     );
 
+    if (isFetching) {
+         return (
+            <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+                 <div className="text-center">
+                     <Loader2 className="w-12 h-12 text-brand-500 animate-spin mx-auto mb-4" />
+                     <p className="text-white">Loading Course Data...</p>
+                 </div>
+            </div>
+         );
+    }
+
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-dark-800 w-full max-w-5xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[90vh]">
@@ -340,7 +429,8 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
                 <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900 rounded-t-2xl">
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                           <BookOpen className="w-6 h-6 text-brand-500" /> Course Wizard
+                           {courseId ? <Edit3 className="w-6 h-6 text-brand-500" /> : <Plus className="w-6 h-6 text-brand-500" />} 
+                           {courseId ? `Editing: ${courseData.title}` : 'Create New Course'}
                         </h2>
                         <p className="text-gray-400 text-sm mt-1">Step {step} of 4</p>
                     </div>
@@ -440,7 +530,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
                                     </div>
                                 )}
                                 {courseData.modules?.map((mod, idx) => (
-                                    <div key={mod.id} className="bg-dark-900 rounded-xl border border-dark-700 p-4">
+                                    <div key={mod.id || idx} className="bg-dark-900 rounded-xl border border-dark-700 p-4">
                                         <div className="flex justify-between items-center mb-4">
                                             <h4 className="font-bold text-white text-lg flex items-center gap-2">
                                                 <span className="bg-dark-800 text-gray-400 w-8 h-8 rounded-full flex items-center justify-center text-xs border border-dark-700">{idx + 1}</span>
@@ -448,24 +538,30 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
                                             </h4>
                                             <div className="flex gap-2">
                                                 <button 
-                                                    onClick={() => addMaterialToModule(mod.id, 'VIDEO')}
+                                                    onClick={() => addMaterialToModule(idx, 'VIDEO')}
                                                     className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white"
                                                 >
                                                     <Video className="w-3 h-3" /> Add Video
                                                 </button>
                                                 <button 
-                                                    onClick={() => addMaterialToModule(mod.id, 'PDF')}
+                                                    onClick={() => addMaterialToModule(idx, 'PDF')}
                                                     className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-dark-800 text-gray-400 border border-dark-600 hover:text-white"
                                                 >
                                                     <Upload className="w-3 h-3" /> Materials
+                                                </button>
+                                                <button 
+                                                    onClick={() => removeModule(idx)}
+                                                    className="px-2 py-1.5 rounded text-xs font-bold bg-dark-800 text-red-500 border border-dark-600 hover:bg-red-900/20"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
                                                 </button>
                                             </div>
                                         </div>
                                         
                                         {mod.materials.length > 0 && (
                                             <div className="bg-dark-800 rounded-lg p-3 space-y-2">
-                                                {mod.materials.map(mat => (
-                                                    <div key={mat.id} className="flex items-center gap-3 text-sm text-gray-300 p-2 bg-dark-900 rounded border border-dark-700">
+                                                {mod.materials.map((mat, matIdx) => (
+                                                    <div key={mat.id || matIdx} className="flex items-center gap-3 text-sm text-gray-300 p-2 bg-dark-900 rounded border border-dark-700">
                                                         {mat.type === 'VIDEO' ? <Film className="w-4 h-4 text-brand-500" /> : <Paperclip className="w-4 h-4" />} 
                                                         {mat.title} <span className="text-xs bg-dark-800 px-1 rounded text-gray-500">{mat.type}</span>
                                                     </div>
@@ -478,7 +574,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
                         </div>
                     )}
 
-                    {/* STEP 3: ENROLLMENT (ROBUST SPLIT VIEW) */}
+                    {/* STEP 3: ENROLLMENT */}
                     {step === 3 && (
                         <div className="space-y-6 animate-fade-in h-full flex flex-col">
                             <div className="flex justify-between items-center">
@@ -552,40 +648,36 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
                         </div>
                     )}
 
-                    {/* STEP 4: REVIEW */}
+                    {/* STEP 4: REVIEW & SAVE */}
                     {step === 4 && (
                         <div className="space-y-8 animate-fade-in text-center max-w-2xl mx-auto pt-10">
-                            <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-500/30">
-                                <CheckCircle className="w-12 h-12 text-green-500" />
+                            <div className="w-24 h-24 bg-brand-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-brand-500/30">
+                                <Globe className="w-12 h-12 text-brand-500" />
                             </div>
-                            <h2 className="text-3xl font-bold text-white">Ready to Launch?</h2>
+                            <h2 className="text-3xl font-bold text-white">{courseId ? 'Save Changes?' : 'Ready to Launch?'}</h2>
                             <p className="text-gray-400">
-                                You are about to create <span className="text-white font-bold">"{courseData.title}"</span>.
+                                Choose how you want to save <span className="text-white font-bold">"{courseData.title}"</span>.
                             </p>
                             
-                            <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 text-left space-y-4">
-                                <div className="flex justify-between border-b border-dark-800 pb-2">
-                                    <span className="text-gray-500">Curriculum</span>
-                                    <span className="text-white font-bold">{courseData.modules?.length} Chapters</span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 hover:border-gray-500 transition cursor-pointer group" onClick={() => handleSave('DRAFT')}>
+                                    <div className="p-3 bg-dark-800 rounded-lg w-fit mb-4 group-hover:bg-dark-700">
+                                        <Save className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2">Save as Draft</h3>
+                                    <p className="text-sm text-gray-500">
+                                        Save all your data securely. The course will remain hidden from students until you publish it.
+                                    </p>
                                 </div>
-                                <div className="flex justify-between border-b border-dark-800 pb-2">
-                                    <span className="text-gray-500">Access Groups</span>
-                                    <span className="text-white font-bold">
-                                        {courseData.assignedBatches?.length 
-                                            ? courseData.assignedBatches.join(', ') 
-                                            : <span className="text-gray-600 italic">No batches</span>}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Status</span>
-                                    <select 
-                                        className="bg-dark-800 border border-dark-600 rounded text-xs text-white p-1 outline-none"
-                                        value={courseData.status}
-                                        onChange={e => setCourseData({...courseData, status: e.target.value as any})}
-                                    >
-                                        <option value="DRAFT">Draft (Hidden)</option>
-                                        <option value="PUBLISHED">Published (Visible)</option>
-                                    </select>
+
+                                <div className="bg-brand-900/20 p-6 rounded-xl border border-brand-500/30 hover:border-brand-500 transition cursor-pointer group" onClick={() => handleSave('PUBLISHED')}>
+                                    <div className="p-3 bg-brand-500/20 rounded-lg w-fit mb-4 group-hover:bg-brand-500/30">
+                                        <Globe className="w-6 h-6 text-brand-500" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2">Publish Now</h3>
+                                    <p className="text-sm text-brand-200/70">
+                                        Make this course immediately visible to all assigned batches and students.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -602,22 +694,13 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
                         {step === 1 ? 'Cancel' : 'Back'}
                     </button>
                     
-                    {step < 4 ? (
+                    {step < 4 && (
                         <button 
                             onClick={handleNext}
                             disabled={!courseData.title || isLoading}
                             className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
                         >
                             Next Step <ChevronRight className="w-5 h-5" />
-                        </button>
-                    ) : (
-                        <button 
-                            onClick={handleFinalSave}
-                            disabled={isLoading}
-                            className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-green-900/20 disabled:opacity-50"
-                        >
-                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                            {isLoading ? 'Creating...' : 'Create Course'}
                         </button>
                     )}
                 </div>
@@ -629,6 +712,7 @@ const CourseCreationWizard = ({ onClose, onSave, onRefresh }: { onClose: () => v
 export const TeacherCoursesPage = () => {
     const [courses, setCourses] = useState<Course[]>([]);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -638,14 +722,11 @@ export const TeacherCoursesPage = () => {
     const fetchCourses = async () => {
         setLoading(true);
         try {
-            // Fetch courses with module counts (approximate via FK lookup usually, but for now simple select)
             const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
             if (data) {
-                // To get student counts and module counts, in a real app we'd use .select('*, course_modules(count), course_enrollments(count)')
-                // For this demo, we map directly.
                 const mapped = data.map((c: any) => ({
                     ...c,
-                    instructor: c.instructor_name, // Map explicitly
+                    instructor: c.instructor_name,
                     modules: [], 
                     studentCount: 0 
                 }));
@@ -658,11 +739,21 @@ export const TeacherCoursesPage = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if(confirm("Are you sure you want to delete this course? This will remove all modules and enrollments.")) {
+    const handleDelete = async (id: string, title: string) => {
+        if(confirm(`DANGER: Are you sure you want to delete "${title}"?\n\nThis action CANNOT be undone. It will permanently delete:\n- The course and all chapters\n- All student progress and stats\n- All assignments linked to this course`)) {
             await supabase.from('courses').delete().eq('id', id);
             setCourses(prev => prev.filter(c => c.id !== id));
         }
+    };
+
+    const openCreate = () => {
+        setEditingCourseId(null);
+        setIsWizardOpen(true);
+    };
+
+    const openEdit = (id: string) => {
+        setEditingCourseId(id);
+        setIsWizardOpen(true);
     };
 
     return (
@@ -673,7 +764,7 @@ export const TeacherCoursesPage = () => {
                     <p className="text-gray-400 text-sm mt-1">Design curriculum and assign batches</p>
                 </div>
                 <button 
-                    onClick={() => setIsWizardOpen(true)}
+                    onClick={openCreate}
                     className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"
                 >
                     <Plus className="w-5 h-5" /> Create Course
@@ -689,7 +780,7 @@ export const TeacherCoursesPage = () => {
                     <h3 className="text-xl font-bold text-white mb-2">No Courses Created Yet</h3>
                     <p className="text-gray-500 max-w-md mb-8">Start by clicking the "Create Course" button to build your first curriculum, add videos, and assign students.</p>
                     <button 
-                        onClick={() => setIsWizardOpen(true)}
+                        onClick={openCreate}
                         className="bg-dark-700 hover:bg-dark-600 text-white px-6 py-3 rounded-lg font-bold border border-dark-500"
                     >
                         Launch Course Wizard
@@ -715,8 +806,17 @@ export const TeacherCoursesPage = () => {
                                 <p className="text-sm text-gray-400 line-clamp-2 mb-4 flex-1">{course.description || "No description provided."}</p>
                                 
                                 <div className="flex gap-2 mt-auto">
-                                    <button className="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded text-sm font-bold shadow-lg">Manage</button>
-                                    <button onClick={() => handleDelete(course.id)} className="p-2 bg-dark-700 hover:bg-red-900/30 text-red-500 rounded border border-dark-600">
+                                    <button 
+                                        onClick={() => openEdit(course.id)}
+                                        className="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded text-sm font-bold shadow-lg flex items-center justify-center gap-2"
+                                    >
+                                        <Edit3 className="w-4 h-4" /> Edit
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDelete(course.id, course.title)} 
+                                        className="p-2 bg-dark-700 hover:bg-red-900/30 text-red-500 rounded border border-dark-600 transition"
+                                        title="Delete Course Permanently"
+                                    >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -727,7 +827,12 @@ export const TeacherCoursesPage = () => {
             )}
 
             {isWizardOpen && (
-                <CourseCreationWizard onClose={() => setIsWizardOpen(false)} onSave={() => {}} onRefresh={fetchCourses} />
+                <CourseCreationWizard 
+                    onClose={() => setIsWizardOpen(false)} 
+                    onSave={() => {}} 
+                    onRefresh={fetchCourses} 
+                    courseId={editingCourseId}
+                />
             )}
         </div>
     );
