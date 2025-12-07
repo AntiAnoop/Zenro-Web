@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2 } from 'lucide-react';
+import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
+import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2, Menu, X } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer } from './components/StudentViews';
@@ -254,130 +254,151 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
   );
 };
 
-// 2. Sidebar with Zenro Branding
-const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
+// 2. Sidebar with Zenro Branding & Mobile Drawer Support
+const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: () => void, isOpen: boolean, onClose: () => void }) => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path 
     ? "bg-brand-900/20 text-white border-r-4 border-zenro-red" 
     : "text-gray-400 hover:text-white hover:bg-dark-800/50";
 
   return (
-    <div className="w-64 bg-dark-800/95 backdrop-blur border-r border-dark-700 flex flex-col h-screen fixed left-0 top-0 z-50 font-sans shadow-2xl">
-      {/* Tricolor Border Stripe */}
-      <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-zenro-orange via-white to-zenro-green opacity-30"></div>
+    <>
+      {/* Mobile Backdrop Overlay - "Levitating" Effect */}
+      <div 
+        className={`fixed inset-0 bg-black/80 z-40 lg:hidden transition-opacity duration-300 backdrop-blur-sm ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-      <div className="p-6 flex items-center gap-3 border-b border-dark-700/50 bg-dark-900/30">
-        <div className="w-10 h-10 flex-shrink-0 bg-white/10 rounded-full p-1.5 border border-white/5">
-            <ZenroLogo className="w-full h-full" />
+      <div className={`
+        w-64 bg-dark-800/95 backdrop-blur border-r border-dark-700 flex flex-col h-screen 
+        fixed left-0 top-0 z-50 font-sans shadow-2xl transition-transform duration-300 ease-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
+      `}>
+        {/* Tricolor Border Stripe */}
+        <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-zenro-orange via-white to-zenro-green opacity-30"></div>
+
+        {/* Mobile Close Button */}
+        <button 
+            onClick={onClose} 
+            className="absolute top-4 right-4 p-2 bg-dark-700/50 text-gray-400 hover:text-white rounded-full lg:hidden z-10"
+        >
+            <X className="w-5 h-5" />
+        </button>
+
+        <div className="p-6 flex items-center gap-3 border-b border-dark-700/50 bg-dark-900/30">
+          <div className="w-10 h-10 flex-shrink-0 bg-white/10 rounded-full p-1.5 border border-white/5">
+              <ZenroLogo className="w-full h-full" />
+          </div>
+          <div>
+              <h1 className="text-xl font-black tracking-tight text-white font-serif">ZENRO</h1>
+              <p className="text-[9px] text-gray-400 uppercase tracking-widest">Institute</p>
+          </div>
         </div>
-        <div>
-            <h1 className="text-xl font-black tracking-tight text-white font-serif">ZENRO</h1>
-            <p className="text-[9px] text-gray-400 uppercase tracking-widest">Institute</p>
-        </div>
-      </div>
-      
-      <nav className="flex-1 px-3 space-y-1 mt-6 overflow-y-auto">
-        <p className="px-4 text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
-            <span className="w-8 h-[1px] bg-gray-700"></span> MENU
-        </p>
         
-        {user.role === UserRole.STUDENT && (
-          <>
-            <Link to="/student/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/dashboard')}`}>
-              <Layout className="w-4 h-4" />
-              Overview
-            </Link>
-            <Link to="/student/courses" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/courses')}`}>
-              <Book className="w-4 h-4" />
-              Curriculum
-            </Link>
-             <Link to="/student/tests" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/tests')}`}>
-             <FileText className="w-4 h-4" />
-             JLPT Results
-           </Link>
-            <Link to="/student/activities" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/activities')}`}>
-              <ListTodo className="w-4 h-4" />
-              Practice
-            </Link>
-             <Link to="/student/fees" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/fees')}`}>
-              <CreditCard className="w-4 h-4" />
-              Tuition
-            </Link>
-             <Link to="/student/profile" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/profile')}`}>
-              <UserIcon className="w-4 h-4" />
-              Profile
-            </Link>
-          </>
-        )}
-
-        {user.role === UserRole.TEACHER && (
-           <>
-             <Link to="/teacher/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/dashboard')}`}>
-               <Layout className="w-4 h-4" />
-               Overview
-             </Link>
-             <Link to="/teacher/courses" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/courses')}`}>
-               <Book className="w-4 h-4" />
-               Classes
-             </Link>
-             <Link to="/teacher/assignments" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/assignments')}`}>
+        <nav className="flex-1 px-3 space-y-1 mt-6 overflow-y-auto">
+          <p className="px-4 text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+              <span className="w-8 h-[1px] bg-gray-700"></span> MENU
+          </p>
+          
+          {user.role === UserRole.STUDENT && (
+            <>
+              <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/dashboard')}`}>
+                <Layout className="w-4 h-4" />
+                Overview
+              </Link>
+              <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/courses')}`}>
+                <Book className="w-4 h-4" />
+                Curriculum
+              </Link>
+               <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/tests')}`}>
                <FileText className="w-4 h-4" />
-               Assignments
+               JLPT Results
              </Link>
-             <Link to="/teacher/reports" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/reports')}`}>
-               <BarChart2 className="w-4 h-4" />
-               Analytics
-             </Link>
-             <Link to="/teacher/live" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/live')}`}>
-               <Video className="w-4 h-4" />
-               Live Console
-             </Link>
-           </>
-        )}
+              <Link to="/student/activities" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/activities')}`}>
+                <ListTodo className="w-4 h-4" />
+                Practice
+              </Link>
+               <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/fees')}`}>
+                <CreditCard className="w-4 h-4" />
+                Tuition
+              </Link>
+               <Link to="/student/profile" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/profile')}`}>
+                <UserIcon className="w-4 h-4" />
+                Profile
+              </Link>
+            </>
+          )}
 
-        {user.role === UserRole.ADMIN && (
-          <>
-             <Link to="/admin/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/dashboard')}`}>
-               <Layout className="w-4 h-4" />
-               Overview
-             </Link>
-             <Link to="/admin/users" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/users')}`}>
-               <Users className="w-4 h-4" />
-               User Mgmt
-             </Link>
-             <Link to="/admin/courses" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/courses')}`}>
-               <BookOpen className="w-4 h-4" />
-               Course Mgmt
-             </Link>
-             <Link to="/admin/reports" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/reports')}`}>
-               <BarChart2 className="w-4 h-4" />
-               Test Results
-             </Link>
-             <Link to="/admin/finance" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/finance')}`}>
-               <DollarSign className="w-4 h-4" />
-               Financials
-             </Link>
-             <Link to="/admin/settings" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/settings')}`}>
-               <Settings className="w-4 h-4" />
-               Settings
-             </Link>
-          </>
-        )}
-      </nav>
+          {user.role === UserRole.TEACHER && (
+             <>
+               <Link to="/teacher/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/dashboard')}`}>
+                 <Layout className="w-4 h-4" />
+                 Overview
+               </Link>
+               <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/courses')}`}>
+                 <Book className="w-4 h-4" />
+                 Classes
+               </Link>
+               <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/assignments')}`}>
+                 <FileText className="w-4 h-4" />
+                 Assignments
+               </Link>
+               <Link to="/teacher/reports" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/reports')}`}>
+                 <BarChart2 className="w-4 h-4" />
+                 Analytics
+               </Link>
+               <Link to="/teacher/live" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/live')}`}>
+                 <Video className="w-4 h-4" />
+                 Live Console
+               </Link>
+             </>
+          )}
 
-      <div className="p-4 border-t border-dark-700/50 bg-dark-900/30">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-dark-800 border border-dark-700">
-            <img src={user.avatar} alt="User" className="w-8 h-8 rounded-full bg-dark-700 border border-dark-600 object-cover" />
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-white truncate">{user.name}</p>
-                <p className="text-[10px] text-zenro-orange truncate font-bold">{user.role}</p>
-            </div>
-            <button onClick={onLogout} className="p-1.5 hover:bg-dark-700 rounded-md transition text-gray-500 hover:text-white" title="Logout">
-                <LogOut className="w-4 h-4" />
-            </button>
+          {user.role === UserRole.ADMIN && (
+            <>
+               <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/dashboard')}`}>
+                 <Layout className="w-4 h-4" />
+                 Overview
+               </Link>
+               <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/users')}`}>
+                 <Users className="w-4 h-4" />
+                 User Mgmt
+               </Link>
+               <Link to="/admin/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/courses')}`}>
+                 <BookOpen className="w-4 h-4" />
+                 Course Mgmt
+               </Link>
+               <Link to="/admin/reports" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/reports')}`}>
+                 <BarChart2 className="w-4 h-4" />
+                 Test Results
+               </Link>
+               <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/finance')}`}>
+                 <DollarSign className="w-4 h-4" />
+                 Financials
+               </Link>
+               <Link to="/admin/settings" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/settings')}`}>
+                 <Settings className="w-4 h-4" />
+                 Settings
+               </Link>
+            </>
+          )}
+        </nav>
+
+        <div className="p-4 border-t border-dark-700/50 bg-dark-900/30">
+          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-dark-800 border border-dark-700">
+              <img src={user.avatar} alt="User" className="w-8 h-8 rounded-full bg-dark-700 border border-dark-600 object-cover" />
+              <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{user.name}</p>
+                  <p className="text-[10px] text-zenro-orange truncate font-bold">{user.role}</p>
+              </div>
+              <button onClick={onLogout} className="p-1.5 hover:bg-dark-700 rounded-md transition text-gray-500 hover:text-white" title="Logout">
+                  <LogOut className="w-4 h-4" />
+              </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -397,6 +418,116 @@ const ProtectedRoute = ({ children, allowedRoles, user }: ProtectedRouteProps) =
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
+};
+
+// 4. Main App Layout Logic
+const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Close sidebar automatically on route change (Mobile UX)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location]);
+
+  return (
+    <div className="flex h-screen bg-dark-900 text-white font-sans selection:bg-zenro-red selection:text-white overflow-hidden">
+       {/* Mobile Header (Levitating Top Bar) */}
+       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-dark-900/90 backdrop-blur-md border-b border-white/10 z-40 flex items-center justify-between px-4 shadow-lg animate-fade-in-down">
+          {/* Hamburger Menu (Left) */}
+          <button 
+            onClick={() => setSidebarOpen(true)} 
+            className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition"
+          >
+             <Menu className="w-6 h-6" />
+          </button>
+          
+          {/* Branding (Center) */}
+          <div className="flex items-center gap-2">
+             <ZenroLogo className="w-8 h-8" />
+             <span className="font-serif font-bold text-white tracking-tight text-lg">ZENRO</span>
+          </div>
+          
+          {/* Profile (Right) - Clicking opens profile */}
+          <button 
+            onClick={() => {
+                if(user.role === UserRole.STUDENT) navigate('/student/profile');
+                // Could expand for other roles if they have profiles
+            }} 
+            className="w-10 h-10 rounded-full overflow-hidden border border-white/20 p-0.5 bg-gradient-to-br from-zenro-red to-zenro-orange shadow-lg active:scale-95 transition"
+          >
+             <img src={user.avatar} alt="Profile" className="w-full h-full object-cover rounded-full bg-dark-800" />
+          </button>
+       </div>
+
+       <Sidebar 
+         user={user} 
+         onLogout={handleLogout} 
+         isOpen={sidebarOpen} 
+         onClose={() => setSidebarOpen(false)} 
+       />
+       
+       {/* Main Content Area */}
+       <main className="flex-1 overflow-auto p-4 lg:p-8 pt-20 lg:pt-8 bg-seigaiha relative scroll-smooth lg:ml-64 w-full transition-all duration-300">
+          <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-dark-800 to-transparent pointer-events-none -z-10"></div>
+          
+          <div className="max-w-7xl mx-auto">
+                <Routes>
+                <Route path="/" element={
+                    user.role === UserRole.STUDENT ? <Navigate to="/student/dashboard" /> : 
+                    user.role === UserRole.TEACHER ? <Navigate to="/teacher/dashboard" /> : <Navigate to="/admin/dashboard" />
+                } />
+                
+                {/* Student Routes */}
+                <Route path="/student/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentDashboardHome /></ProtectedRoute>} />
+                <Route path="/student/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursesPage /></ProtectedRoute>} />
+                <Route path="/student/course/:courseId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursePlayer /></ProtectedRoute>} />
+                <Route path="/student/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentLiveRoom user={user} /></ProtectedRoute>} />
+                <Route path="/student/tests" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestsPage /></ProtectedRoute>} />
+                <Route path="/student/test/:testId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestPlayer /></ProtectedRoute>} />
+                <Route path="/student/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><TestReport role="STUDENT" /></ProtectedRoute>} />
+                <Route path="/student/activities" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentActivityPage /></ProtectedRoute>} />
+                <Route path="/student/fees" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentFeesPage user={user} /></ProtectedRoute>} />
+                <Route path="/student/profile" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentProfilePage user={user} /></ProtectedRoute>} />
+                
+                <Route path="/exam-intro" element={
+                    <ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}>
+                        <div className="p-8 flex justify-center items-center h-full">
+                            <div className="bg-dark-800 p-8 rounded-xl max-w-md text-center border border-dark-700">
+                                <ShieldAlert className="w-16 h-16 text-brand-500 mx-auto mb-4" />
+                                <h1 className="text-2xl font-bold mb-2">JLPT Mock Exam</h1>
+                                <p className="text-gray-400 mb-6">Duration: 60 mins • N4 Level</p>
+                                <button onClick={() => setIsExamMode(true)} className="w-full bg-brand-600 py-3 rounded text-white font-bold hover:bg-brand-500">
+                                    Start Examination
+                                </button>
+                            </div>
+                        </div>
+                    </ProtectedRoute>
+                } />
+                
+                {/* Teacher Routes */}
+                <Route path="/teacher/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherDashboardHome /></ProtectedRoute>} />
+                <Route path="/teacher/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
+                <Route path="/teacher/assignments" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherAssignmentsPage /></ProtectedRoute>} />
+                <Route path="/teacher/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
+                <Route path="/teacher/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TestReport role="TEACHER" /></ProtectedRoute>} />
+                <Route path="/teacher/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><LiveClassConsole /></ProtectedRoute>} />
+
+                {/* Admin Routes */}
+                <Route path="/admin/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminUserManagement /></ProtectedRoute>} />
+                <Route path="/admin/finance" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminFinancials /></ProtectedRoute>} />
+                <Route path="/admin/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
+                <Route path="/admin/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
+                <Route path="/admin/settings" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><div className="text-center p-12 text-gray-500">Settings Module Loading...</div></ProtectedRoute>} />
+
+                <Route path="*" element={<Navigate to="/" />} />
+                </Routes>
+          </div>
+       </main>
+    </div>
+  );
 };
 
 
@@ -463,67 +594,7 @@ export default function App() {
   return (
     <LiveProvider user={user}>
       <Router>
-        <div className="flex h-screen bg-dark-900 text-white font-sans selection:bg-zenro-red selection:text-white overflow-hidden">
-          <Sidebar user={user} onLogout={handleLogout} />
-          <main className="ml-64 flex-1 overflow-auto p-8 bg-seigaiha relative scroll-smooth">
-            {/* Background Gradient Mesh for Content Area */}
-            <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-dark-800 to-transparent pointer-events-none -z-10"></div>
-            
-            <div className="max-w-7xl mx-auto">
-                <Routes>
-                <Route path="/" element={
-                    user.role === UserRole.STUDENT ? <Navigate to="/student/dashboard" /> : 
-                    user.role === UserRole.TEACHER ? <Navigate to="/teacher/dashboard" /> : <Navigate to="/admin/dashboard" />
-                } />
-                
-                {/* Student Routes */}
-                <Route path="/student/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentDashboardHome /></ProtectedRoute>} />
-                <Route path="/student/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursesPage /></ProtectedRoute>} />
-                <Route path="/student/course/:courseId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursePlayer /></ProtectedRoute>} />
-                <Route path="/student/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentLiveRoom user={user} /></ProtectedRoute>} />
-                <Route path="/student/tests" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestsPage /></ProtectedRoute>} />
-                <Route path="/student/test/:testId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentTestPlayer /></ProtectedRoute>} />
-                <Route path="/student/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><TestReport role="STUDENT" /></ProtectedRoute>} />
-                <Route path="/student/activities" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentActivityPage /></ProtectedRoute>} />
-                <Route path="/student/fees" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentFeesPage user={user} /></ProtectedRoute>} />
-                <Route path="/student/profile" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentProfilePage user={user} /></ProtectedRoute>} />
-                
-                <Route path="/exam-intro" element={
-                    <ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}>
-                        <div className="p-8 flex justify-center items-center h-full">
-                            <div className="bg-dark-800 p-8 rounded-xl max-w-md text-center border border-dark-700">
-                                <ShieldAlert className="w-16 h-16 text-brand-500 mx-auto mb-4" />
-                                <h1 className="text-2xl font-bold mb-2">JLPT Mock Exam</h1>
-                                <p className="text-gray-400 mb-6">Duration: 60 mins • N4 Level</p>
-                                <button onClick={() => setIsExamMode(true)} className="w-full bg-brand-600 py-3 rounded text-white font-bold hover:bg-brand-500">
-                                    Start Examination
-                                </button>
-                            </div>
-                        </div>
-                    </ProtectedRoute>
-                } />
-                
-                {/* Teacher Routes */}
-                <Route path="/teacher/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherDashboardHome /></ProtectedRoute>} />
-                <Route path="/teacher/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
-                <Route path="/teacher/assignments" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherAssignmentsPage /></ProtectedRoute>} />
-                <Route path="/teacher/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
-                <Route path="/teacher/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TestReport role="TEACHER" /></ProtectedRoute>} />
-                <Route path="/teacher/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><LiveClassConsole /></ProtectedRoute>} />
-
-                {/* Admin Routes */}
-                <Route path="/admin/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminDashboard /></ProtectedRoute>} />
-                <Route path="/admin/users" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminUserManagement /></ProtectedRoute>} />
-                <Route path="/admin/finance" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminFinancials /></ProtectedRoute>} />
-                <Route path="/admin/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
-                <Route path="/admin/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
-                <Route path="/admin/settings" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><div className="text-center p-12 text-gray-500">Settings Module Loading...</div></ProtectedRoute>} />
-
-                <Route path="*" element={<Navigate to="/" />} />
-                </Routes>
-            </div>
-          </main>
-        </div>
+         <AppContent user={user} handleLogout={handleLogout} setIsExamMode={setIsExamMode} />
       </Router>
     </LiveProvider>
   );
