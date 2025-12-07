@@ -43,11 +43,11 @@ const ATTENDANCE_DATA = [
 
 const StatusBadge = ({ status }: { status: string }) => {
   const styles: Record<string, string> = {
-    PAID: 'bg-green-500/20 text-green-500 border-green-500/30',
-    SUCCESS: 'bg-green-500/20 text-green-500 border-green-500/30',
-    PENDING: 'bg-accent-gold/20 text-accent-gold border-accent-gold/30',
-    OVERDUE: 'bg-red-500/20 text-red-500 border-red-500/30',
-    FAILED: 'bg-red-500/20 text-red-500 border-red-500/30',
+    PAID: 'bg-zenro-green/10 text-zenro-green border-zenro-green/30',
+    SUCCESS: 'bg-zenro-green/10 text-zenro-green border-zenro-green/30',
+    PENDING: 'bg-zenro-orange/10 text-zenro-orange border-zenro-orange/30',
+    OVERDUE: 'bg-zenro-red/10 text-zenro-red border-zenro-red/30',
+    FAILED: 'bg-zenro-red/10 text-zenro-red border-zenro-red/30',
     COMPLETED: 'bg-brand-500/20 text-brand-500 border-brand-500/30',
   };
   return (
@@ -64,77 +64,81 @@ export const StudentDashboardHome = () => {
     <div className="space-y-8 animate-fade-in">
       {/* 1. Header & Overview Stats with Japanese Theme */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-2 bg-gradient-to-br from-brand-900 to-dark-800 rounded-2xl p-8 border border-brand-500/30 relative overflow-hidden flex flex-col justify-center">
+        <div className="lg:col-span-2 bg-gradient-to-br from-brand-900 via-zenro-red to-brand-800 rounded-2xl p-8 border border-white/10 relative overflow-hidden flex flex-col justify-center shadow-2xl">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl transform translate-x-20 -translate-y-20"></div>
           <div className="relative z-10">
-            <h2 className="text-3xl font-bold text-white mb-2 font-sans">Konnichiwa, Alex-san! <span className="text-xl font-normal ml-2"> (こんにちは)</span></h2>
-            <p className="text-brand-100 mb-6">Your JLPT N4 exam is in <span className="font-bold text-white">45 days</span>. Keep pushing! 頑張ってください!</p>
+            <h2 className="text-3xl font-bold text-white mb-2 font-serif">Konnichiwa, Alex-san! <span className="text-xl font-normal ml-2 opacity-80"> (こんにちは)</span></h2>
+            <p className="text-white/80 mb-6 font-light">Your JLPT N4 exam is in <span className="font-bold text-white bg-white/20 px-2 py-0.5 rounded">45 days</span>. Keep pushing! 頑張ってください!</p>
             <div className="flex gap-3">
-              <button className="bg-white text-brand-900 font-bold px-6 py-2 rounded-lg hover:bg-brand-50 transition shadow-lg">
-                Continue Learning
+              <button className="bg-white text-zenro-red font-bold px-6 py-2 rounded-lg hover:bg-gray-50 transition shadow-lg flex items-center gap-2">
+                <Play className="w-4 h-4 fill-current" /> Continue Learning
               </button>
             </div>
           </div>
-          {/* Decorative Torii Gate or similar abstract shape */}
+          {/* Decorative globe abstract */}
           <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10">
              <Globe className="w-64 h-64 text-white" />
           </div>
         </div>
 
-        <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700 flex flex-col justify-between">
+        <div className="glass-card rounded-2xl p-6 flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-gray-400 text-sm font-semibold uppercase tracking-widest">Attendance</p>
-              <h3 className="text-4xl font-bold text-white mt-2">88%</h3>
+              <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Attendance</p>
+              <h3 className="text-4xl font-black text-white mt-2 font-serif">88%</h3>
               <p className="text-xs text-gray-500 mt-1">Shusseki (出席)</p>
             </div>
-            <div className="p-3 bg-blue-500/20 rounded-lg">
-              <Calendar className="w-6 h-6 text-blue-500" />
+            <div className="p-3 bg-zenro-green/20 rounded-lg border border-zenro-green/20">
+              <Calendar className="w-6 h-6 text-zenro-green" />
             </div>
           </div>
           <div className="flex gap-1 mt-4">
              {ATTENDANCE_DATA.map((d, i) => (
-               <div key={i} className={`h-2 flex-1 rounded-full ${d.present ? 'bg-brand-500' : 'bg-dark-600'}`} title={d.day}></div>
+               <div key={i} className={`h-1.5 flex-1 rounded-full ${d.present ? 'bg-zenro-green' : 'bg-dark-700'}`} title={d.day}></div>
              ))}
           </div>
         </div>
 
-        <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700 flex flex-col justify-between">
+        <div className="glass-card rounded-2xl p-6 flex flex-col justify-between">
           <div className="flex justify-between items-start">
              <div>
-              <p className="text-gray-400 text-sm font-semibold uppercase tracking-widest">Next Payment</p>
-              <h3 className="text-4xl font-bold text-accent-gold mt-2">¥35,000</h3> 
+              <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Next Payment</p>
+              <h3 className="text-4xl font-black text-zenro-orange mt-2 font-serif">¥35k</h3> 
               <p className="text-xs text-gray-500 mt-1">Due: Month 3</p>
             </div>
-            <div className="p-3 bg-accent-gold/20 rounded-lg">
-              <CreditCard className="w-6 h-6 text-accent-gold" />
+            <div className="p-3 bg-zenro-orange/20 rounded-lg border border-zenro-orange/20">
+              <CreditCard className="w-6 h-6 text-zenro-orange" />
             </div>
           </div>
-          <button className="text-xs text-accent-gold hover:text-white mt-2 underline text-left">View Details</button>
+          <button className="text-xs text-zenro-orange hover:text-white mt-2 text-left font-bold flex items-center gap-1 transition">
+              View Details <ChevronRight className="w-3 h-3" />
+          </button>
         </div>
       </div>
 
       {/* 2. Hero Section - Styled like a Japanese Scroll/Poster */}
       <div className="relative rounded-2xl overflow-hidden bg-dark-800 border border-dark-700 group shadow-2xl">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528360983277-13d9012356ee?auto=format&fit=crop&q=80&w=1600')] bg-cover bg-center opacity-40 group-hover:opacity-30 transition"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/60 to-transparent"></div>
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528360983277-13d9012356ee?auto=format&fit=crop&q=80&w=1600')] bg-cover bg-center opacity-30 group-hover:opacity-20 transition duration-700"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-dark-900 via-dark-900/80 to-transparent"></div>
         
         <div className="relative z-10 p-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
            <div className="space-y-4 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500 text-white text-xs font-bold uppercase tracking-wider shadow-lg shadow-brand-900/50">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zenro-red text-white text-[10px] font-bold uppercase tracking-wider shadow-lg shadow-zenro-red/30 border border-white/10">
                 <Play className="w-3 h-3 fill-current" /> Continue JLPT N4
               </div>
               <div>
-                <h1 className="text-4xl font-bold text-white leading-tight font-sans">Grammar: The Causative Form</h1>
+                <h1 className="text-4xl font-bold text-white leading-tight font-serif">Grammar: The Causative Form</h1>
                 <h2 className="text-2xl text-gray-300 font-light mt-1">使役形 (Shieki-kei)</h2>
               </div>
-              <p className="text-gray-300">Resume from 12:05 • Lesson 4 of 12 • Tanaka Sensei</p>
-              <div className="w-full max-w-md bg-white/10 rounded-full h-1.5 backdrop-blur">
-                  <div style={{width: '45%'}} className="bg-brand-500 h-1.5 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.6)]"></div>
+              <p className="text-gray-400 font-light">Resume from 12:05 • Lesson 4 of 12 • Tanaka Sensei</p>
+              <div className="w-full max-w-md bg-white/5 rounded-full h-1.5 backdrop-blur border border-white/5">
+                  <div style={{width: '45%'}} className="bg-gradient-to-r from-zenro-red to-zenro-orange h-1.5 rounded-full shadow-[0_0_10px_rgba(188,0,45,0.5)]"></div>
               </div>
            </div>
            
-           <button className="bg-white hover:bg-gray-100 text-brand-900 px-8 py-3 rounded-xl font-bold flex items-center gap-3 transition shadow-xl">
-              <Play className="w-5 h-5 fill-current" /> Resume Lesson
+           <button className="bg-white/10 backdrop-blur hover:bg-white text-white hover:text-dark-900 border border-white/20 px-8 py-3 rounded-xl font-bold flex items-center gap-3 transition shadow-xl group/btn">
+              <Play className="w-5 h-5 fill-current text-zenro-red" /> 
+              <span>Resume Lesson</span>
            </button>
         </div>
       </div>
@@ -142,37 +146,37 @@ export const StudentDashboardHome = () => {
       {/* 3. Daily Kanji & Activities */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Kanji of the Day */}
-          <div className="bg-dark-800 rounded-xl border border-dark-700 p-6 flex flex-col items-center text-center relative overflow-hidden">
-              <div className="absolute -right-4 -top-4 text-9xl text-dark-700/50 font-serif select-none pointer-events-none">夢</div>
-              <h3 className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-4">Kanji of the Day</h3>
-              <div className="text-6xl font-bold text-white mb-2 font-serif">夢</div>
-              <p className="text-2xl text-brand-500 mb-1">Yume</p>
+          <div className="glass-card rounded-xl p-6 flex flex-col items-center text-center relative overflow-hidden group">
+              <div className="absolute -right-4 -top-4 text-9xl text-white/5 font-serif select-none pointer-events-none group-hover:scale-110 transition duration-700">夢</div>
+              <h3 className="text-zenro-orange text-[10px] font-bold uppercase tracking-widest mb-4 border border-zenro-orange/30 px-2 py-1 rounded">Kanji of the Day</h3>
+              <div className="text-6xl font-black text-white mb-2 font-serif">夢</div>
+              <p className="text-2xl text-zenro-red mb-1 font-medium">Yume</p>
               <p className="text-gray-400">Dream</p>
-              <div className="mt-4 text-sm text-gray-500 bg-dark-900 p-3 rounded w-full">
+              <div className="mt-4 text-sm text-gray-400 bg-dark-900/50 p-3 rounded w-full border border-white/5">
                   Ex: 将来の夢 (Future dream)
               </div>
           </div>
 
           {/* Activities List */}
-          <div className="md:col-span-2 bg-dark-800 rounded-xl border border-dark-700 p-6">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <ListTodo className="w-5 h-5 text-brand-500" /> Pending Tasks
+          <div className="md:col-span-2 glass-card rounded-xl p-6">
+            <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2 font-serif">
+                    <ListTodo className="w-5 h-5 text-zenro-red" /> Pending Tasks
                 </h3>
             </div>
             <div className="space-y-3">
                 {MOCK_ACTIVITIES.filter(a => a.status === 'PENDING').slice(0, 3).map(act => (
-                    <div key={act.id} className="flex items-center justify-between p-4 bg-dark-900 rounded-lg border-l-4 border-brand-500">
+                    <div key={act.id} className="flex items-center justify-between p-4 bg-dark-900/40 rounded-xl border-l-4 border-zenro-red hover:bg-dark-900/60 transition group">
                         <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-full ${act.type === 'ASSIGNMENT' ? 'bg-brand-500/20 text-brand-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                            <div className={`p-2 rounded-full ${act.type === 'ASSIGNMENT' ? 'bg-zenro-red/10 text-zenro-red' : 'bg-blue-500/10 text-blue-500'}`}>
                                 {act.type === 'ASSIGNMENT' ? <FileText className="w-4 h-4" /> : <Languages className="w-4 h-4" />}
                             </div>
                             <div>
-                                <p className="text-white font-medium">{act.title}</p>
+                                <p className="text-white font-medium group-hover:text-zenro-red transition">{act.title}</p>
                                 <p className="text-xs text-gray-500">{act.courseName} • Due {act.dueDate}</p>
                             </div>
                         </div>
-                        <button className="text-xs bg-dark-800 hover:bg-dark-700 text-white px-4 py-2 rounded border border-dark-600 transition">Start</button>
+                        <button className="text-xs bg-dark-800 hover:bg-white hover:text-dark-900 text-gray-300 px-4 py-2 rounded-lg border border-dark-600 transition font-bold">Start</button>
                     </div>
                 ))}
             </div>
@@ -292,28 +296,28 @@ export const StudentCoursesPage = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <BookOpen className="w-8 h-8 text-brand-500" /> My Curriculum
+        <h1 className="text-3xl font-black text-white flex items-center gap-3 font-serif">
+            <BookOpen className="w-8 h-8 text-zenro-red" /> My Curriculum
         </h1>
 
         {/* Live Class Hero */}
         {liveCourse && (
-            <div className="bg-gradient-to-r from-brand-900/60 to-dark-800 rounded-2xl border border-brand-500/30 p-1">
-                <div className="bg-dark-900/80 backdrop-blur-sm rounded-xl p-6 flex flex-col md:flex-row items-center gap-6">
-                    <div className="relative w-full md:w-64 aspect-video bg-black rounded-lg overflow-hidden border border-brand-500/50 shadow-[0_0_30px_rgba(188,0,45,0.3)]">
+            <div className="bg-gradient-to-r from-zenro-red to-brand-900 rounded-2xl p-[1px] shadow-2xl shadow-zenro-red/20">
+                <div className="bg-dark-900 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6">
+                    <div className="relative w-full md:w-64 aspect-video bg-black rounded-xl overflow-hidden border border-white/10 shadow-[0_0_30px_rgba(188,0,45,0.3)]">
                         <img src={liveCourse.thumbnail} alt="Live" className="w-full h-full object-cover opacity-70" />
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm shadow-lg ${isLive ? 'bg-brand-600 text-white animate-pulse' : 'bg-gray-600 text-gray-200'}`}>
+                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm shadow-lg ${isLive ? 'bg-zenro-red text-white animate-pulse' : 'bg-gray-600 text-gray-200'}`}>
                                 <span className={`w-2 h-2 bg-white rounded-full ${isLive ? 'animate-pulse' : ''}`}></span> {isLive ? 'LIVE NOW' : 'WAITING ROOM'}
                             </div>
                         </div>
                     </div>
                     <div className="flex-1 text-center md:text-left">
                         <h2 className="text-2xl font-bold text-white mb-1">{topic}</h2>
-                        <p className="text-brand-200 mb-4 font-medium">Instructor: {liveCourse.instructor}</p>
+                        <p className="text-gray-400 mb-4 font-medium text-sm uppercase tracking-wide">Instructor: {liveCourse.instructor}</p>
                         <button 
                             onClick={() => navigate('/student/live')}
-                            className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 mx-auto md:mx-0 transition shadow-lg shadow-brand-900/40"
+                            className="bg-zenro-red hover:bg-brand-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 mx-auto md:mx-0 transition shadow-lg shadow-zenro-red/20"
                         >
                             <Video className="w-5 h-5" /> Join Classroom
                         </button>
@@ -325,7 +329,7 @@ export const StudentCoursesPage = () => {
         {/* Course Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {courses.length === 0 ? (
-               <div className="col-span-3 p-12 text-center text-gray-500 border-2 border-dashed border-dark-700 rounded-xl">
+               <div className="col-span-3 p-12 text-center text-gray-500 border-2 border-dashed border-dark-700 rounded-xl bg-dark-800/50">
                    No courses assigned to your batch ({user?.batch}) yet. Please contact admin.
                </div>
           ) : (
@@ -333,7 +337,7 @@ export const StudentCoursesPage = () => {
                 <div 
                     key={course.id} 
                     onClick={() => !course.isLocked && navigate(`/student/course/${course.id}`)}
-                    className={`bg-dark-800 rounded-xl overflow-hidden border ${course.isLive ? 'border-brand-500/60 ring-1 ring-brand-500/20' : 'border-dark-700'} hover:border-brand-500/50 transition group shadow-lg cursor-pointer flex flex-col`}
+                    className={`bg-dark-800 rounded-xl overflow-hidden border ${course.isLive ? 'border-zenro-red ring-1 ring-zenro-red/50' : 'border-dark-700'} hover:border-zenro-red/50 transition group shadow-lg cursor-pointer flex flex-col hover:-translate-y-1 duration-300`}
                 >
                 <div className="relative aspect-video overflow-hidden bg-black">
                     <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-700 opacity-80 group-hover:opacity-100" />
@@ -343,26 +347,26 @@ export const StudentCoursesPage = () => {
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Locked</span>
                         </div>
                     )}
-                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-xs text-white border border-white/10">
+                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] text-white border border-white/10 uppercase font-bold tracking-wider">
                         {course.level}
                     </div>
                     {!course.isLocked && (
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
-                            <div className="bg-brand-600/90 rounded-full p-4 shadow-xl transform scale-75 group-hover:scale-100 transition">
-                                <Play className="w-8 h-8 text-white ml-1 fill-white" />
+                            <div className="bg-zenro-red rounded-full p-4 shadow-xl transform scale-75 group-hover:scale-100 transition">
+                                <Play className="w-6 h-6 text-white ml-1 fill-white" />
                             </div>
                         </div>
                     )}
                 </div>
-                <div className="p-5 flex-1 flex flex-col">
+                <div className="p-5 flex-1 flex flex-col bg-gradient-to-b from-dark-800 to-dark-900">
                     <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-bold text-white truncate flex-1 text-lg group-hover:text-brand-500 transition" title={course.title}>{course.title}</h4>
+                        <h4 className="font-bold text-white truncate flex-1 text-lg group-hover:text-zenro-red transition font-serif" title={course.title}>{course.title}</h4>
                     </div>
-                    <p className="text-sm text-gray-400 mb-4 line-clamp-2">{course.description}</p>
+                    <p className="text-sm text-gray-400 mb-4 line-clamp-2 font-light">{course.description}</p>
                     
-                    <div className="mt-auto pt-4 border-t border-dark-700 flex justify-between items-center text-xs text-gray-500">
+                    <div className="mt-auto pt-4 border-t border-dark-700 flex justify-between items-center text-xs text-gray-500 font-medium">
                         <span className="flex items-center gap-1"><UserIcon className="w-3 h-3" /> {course.instructor}</span>
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> 12 Lessons</span>
+                        <span className="flex items-center gap-1 text-zenro-orange"><Clock className="w-3 h-3" /> 12 Lessons</span>
                     </div>
                 </div>
                 </div>
@@ -891,25 +895,25 @@ export const StudentFeesPage = ({ user }: { user: User }) => {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-        <CreditCard className="w-8 h-8 text-brand-500" /> Tuition & Fees
+      <h1 className="text-3xl font-black text-white flex items-center gap-3 font-serif">
+        <CreditCard className="w-8 h-8 text-zenro-red" /> Tuition & Fees
       </h1>
       
       {/* Phase 1 */}
-      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-lg">
-        <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-gradient-to-r from-dark-900 to-dark-800">
+      <div className="glass-card rounded-xl border border-dark-700 overflow-hidden shadow-lg">
+        <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900/50">
             <div>
                 <h2 className="text-xl font-bold text-white">Phase 1: Domestic Training</h2>
                 <p className="text-sm text-gray-400">Total Due: ¥{calculateTotal(phase1Fees.filter(f => f.status !== 'PAID')).toLocaleString()}</p>
             </div>
-             <div className="px-3 py-1 bg-green-500/10 text-green-500 rounded text-xs font-bold border border-green-500/20">Active</div>
+             <div className="px-3 py-1 bg-zenro-green/10 text-zenro-green rounded text-xs font-bold border border-zenro-green/20 uppercase tracking-widest">Active</div>
         </div>
         <div className="divide-y divide-dark-700">
             {phase1Fees.length === 0 && <div className="p-6 text-center text-gray-500">No Phase 1 fees found.</div>}
             {phase1Fees.map(fee => (
                 <div key={fee.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-dark-700/30 transition">
                     <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-green-500/20 text-green-500' : fee.status === 'OVERDUE' ? 'bg-red-500/20 text-red-500' : 'bg-gray-500/20 text-gray-400'}`}>
+                        <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-zenro-green/20 text-zenro-green' : fee.status === 'OVERDUE' ? 'bg-zenro-red/20 text-zenro-red' : 'bg-gray-500/20 text-gray-400'}`}>
                             {fee.status === 'PAID' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                         </div>
                         <div>
@@ -927,7 +931,7 @@ export const StudentFeesPage = ({ user }: { user: User }) => {
                             <button 
                                 onClick={() => handlePay(fee)}
                                 disabled={payingFeeId === fee.id}
-                                className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg disabled:opacity-50 flex items-center gap-2"
+                                className="bg-zenro-red hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg disabled:opacity-50 flex items-center gap-2 transition"
                             >
                                 {payingFeeId === fee.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
                                 Pay Now
@@ -947,20 +951,20 @@ export const StudentFeesPage = ({ user }: { user: User }) => {
       </div>
 
        {/* Phase 2 */}
-       <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-lg opacity-90">
-        <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-gradient-to-r from-dark-900 to-dark-800">
+       <div className="glass-card rounded-xl border border-dark-700 overflow-hidden shadow-lg opacity-90">
+        <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900/50">
             <div>
                 <h2 className="text-xl font-bold text-white">Phase 2: Placement & Visa</h2>
                 <p className="text-sm text-gray-400">Total: ¥{calculateTotal(phase2Fees).toLocaleString()}</p>
             </div>
-             <div className="px-3 py-1 bg-blue-500/10 text-blue-500 rounded text-xs font-bold border border-blue-500/20">Installments</div>
+             <div className="px-3 py-1 bg-zenro-orange/10 text-zenro-orange rounded text-xs font-bold border border-zenro-orange/20 uppercase tracking-widest">Installments</div>
         </div>
         <div className="divide-y divide-dark-700">
              {phase2Fees.length === 0 && <div className="p-6 text-center text-gray-500">No Phase 2 fees assigned yet.</div>}
             {phase2Fees.map(fee => (
                 <div key={fee.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-dark-700/30 transition">
                     <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                        <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-zenro-green/20 text-zenro-green' : 'bg-zenro-orange/20 text-zenro-orange'}`}>
                              {fee.status === 'PAID' ? <CheckCircle className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
                         </div>
                         <div>
@@ -978,7 +982,7 @@ export const StudentFeesPage = ({ user }: { user: User }) => {
                             <button 
                                 onClick={() => handlePay(fee)}
                                 disabled={payingFeeId === fee.id}
-                                className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg disabled:opacity-50 flex items-center gap-2"
+                                className="bg-zenro-red hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg disabled:opacity-50 flex items-center gap-2 transition"
                             >
                                 {payingFeeId === fee.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
                                 Pay Now
@@ -1052,19 +1056,19 @@ export const StudentTestsPage = () => {
     return (
         <div className="space-y-8 animate-fade-in">
              <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-brand-500" /> Assessments
+                <h1 className="text-3xl font-black text-white flex items-center gap-3 font-serif">
+                    <FileText className="w-8 h-8 text-zenro-red" /> Assessments
                 </h1>
                 <div className="bg-dark-800 p-1 rounded-lg flex border border-dark-700">
                     <button 
                         onClick={() => setTab('ACTIVE')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${tab === 'ACTIVE' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${tab === 'ACTIVE' ? 'bg-zenro-red text-white' : 'text-gray-400 hover:text-white'}`}
                     >
                         Active Tests
                     </button>
                     <button 
                         onClick={() => setTab('HISTORY')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${tab === 'HISTORY' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${tab === 'HISTORY' ? 'bg-zenro-red text-white' : 'text-gray-400 hover:text-white'}`}
                     >
                         History & Reports
                     </button>
@@ -1074,14 +1078,14 @@ export const StudentTestsPage = () => {
             {tab === 'ACTIVE' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {displayTests.map((test, idx) => (
-                        <div key={test.id || idx} className="bg-dark-800 rounded-xl border border-dark-700 p-6 flex flex-col relative overflow-hidden group hover:border-brand-500/50 transition shadow-lg">
+                        <div key={test.id || idx} className="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-zenro-red/50 transition shadow-lg">
                             <div className="absolute top-0 right-0 p-3">
-                                <span className="bg-brand-900/40 text-brand-500 px-2 py-1 rounded text-xs font-bold border border-brand-500/30 animate-pulse">
+                                <span className="bg-zenro-red/20 text-zenro-red px-2 py-1 rounded text-[10px] font-bold border border-zenro-red/30 animate-pulse">
                                     ACTIVE
                                 </span>
                             </div>
                             <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 bg-brand-900/20 text-brand-500 rounded-lg">
+                                <div className="p-3 bg-zenro-red/10 text-zenro-red rounded-lg">
                                     <Activity className="w-6 h-6" />
                                 </div>
                             </div>
@@ -1091,7 +1095,7 @@ export const StudentTestsPage = () => {
                             <div className="mt-auto">
                             <button 
                                 onClick={() => navigate(`/student/test/${test.id}`)}
-                                className="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-lg transition flex items-center justify-center gap-2"
+                                className="w-full py-3 bg-zenro-red hover:bg-brand-600 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-zenro-red/20"
                             >
                                 Start Test <ChevronRight className="w-4 h-4" />
                             </button>
@@ -1100,9 +1104,9 @@ export const StudentTestsPage = () => {
                     ))}
                 </div>
             ) : (
-                <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+                <div className="glass-card rounded-xl overflow-hidden">
                     <table className="w-full text-left text-sm text-gray-400">
-                         <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
+                         <thead className="bg-dark-900/50 text-gray-200 uppercase font-bold text-xs">
                            <tr>
                              <th className="px-6 py-4">Test Title</th>
                              <th className="px-6 py-4">Date Completed</th>
@@ -1119,14 +1123,14 @@ export const StudentTestsPage = () => {
                                     <td className="px-6 py-4 font-bold text-white">{sub.tests?.title || 'Unknown Test'}</td>
                                     <td className="px-6 py-4">{new Date(sub.completed_at).toLocaleDateString()}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`font-bold ${sub.score > (sub.total_score * 0.4) ? 'text-green-500' : 'text-red-500'}`}>
+                                        <span className={`font-bold ${sub.score > (sub.total_score * 0.4) ? 'text-zenro-green' : 'text-zenro-red'}`}>
                                             {sub.score} / {sub.total_score}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <button 
                                             onClick={() => navigate(`/student/report/${sub.id}`)}
-                                            className="text-brand-500 hover:text-white font-bold text-xs border border-brand-500/30 px-3 py-1 rounded hover:bg-brand-500 transition"
+                                            className="text-zenro-orange hover:text-white font-bold text-xs border border-zenro-orange/30 px-3 py-1 rounded hover:bg-zenro-orange transition"
                                         >
                                             View Report
                                         </button>
@@ -1145,16 +1149,16 @@ export const StudentTestsPage = () => {
 export const StudentActivityPage = () => {
      return (
         <div className="space-y-8 animate-fade-in">
-             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <ListTodo className="w-8 h-8 text-brand-500" /> Practice & Assignments
+             <h1 className="text-3xl font-black text-white flex items-center gap-3 font-serif">
+                <ListTodo className="w-8 h-8 text-zenro-red" /> Practice & Assignments
             </h1>
 
-            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+            <div className="glass-card rounded-xl overflow-hidden">
                 <div className="divide-y divide-dark-700">
                     {MOCK_ACTIVITIES.map(act => (
                         <div key={act.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-dark-700/30 transition">
                             <div className="flex items-start gap-4">
-                                <div className={`p-3 rounded-lg ${act.type === 'ASSIGNMENT' ? 'bg-blue-500/20 text-blue-500' : act.type === 'QUIZ' ? 'bg-purple-500/20 text-purple-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                                <div className={`p-3 rounded-lg ${act.type === 'ASSIGNMENT' ? 'bg-blue-500/10 text-blue-500' : act.type === 'QUIZ' ? 'bg-zenro-orange/10 text-zenro-orange' : 'bg-zenro-green/10 text-zenro-green'}`}>
                                     {act.type === 'ASSIGNMENT' ? <FileText className="w-6 h-6" /> : act.type === 'QUIZ' ? <AlertCircle className="w-6 h-6" /> : <Briefcase className="w-6 h-6" />}
                                 </div>
                                 <div>
@@ -1166,7 +1170,7 @@ export const StudentActivityPage = () => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                <span className={`px-3 py-1 rounded text-xs font-bold border ${act.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}`}>
+                                <span className={`px-3 py-1 rounded text-xs font-bold border ${act.status === 'COMPLETED' ? 'bg-zenro-green/10 text-zenro-green border-zenro-green/20' : 'bg-zenro-orange/10 text-zenro-orange border-zenro-orange/20'}`}>
                                     {act.status}
                                 </span>
                                 <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
@@ -1214,7 +1218,7 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            <div className="relative h-48 bg-gradient-to-r from-brand-900 to-dark-800 rounded-xl overflow-hidden border border-brand-500/30">
+            <div className="relative h-48 bg-gradient-to-r from-zenro-red to-dark-800 rounded-xl overflow-hidden border border-white/10">
                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-30"></div>
                  <div className="absolute bottom-4 right-4 flex gap-2">
                      <span className="bg-black/50 backdrop-blur px-3 py-1 rounded text-xs text-white border border-white/20">
@@ -1228,61 +1232,61 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
                     <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 mb-2">
-                    <h1 className="text-3xl font-bold text-white">{user.name}</h1>
+                    <h1 className="text-3xl font-black text-white font-serif">{user.name}</h1>
                     <p className="text-gray-400 flex items-center gap-2">
-                        <span className="bg-brand-500/20 text-brand-500 px-2 py-0.5 rounded text-xs font-bold border border-brand-500/30 uppercase">{user.role}</span>
+                        <span className="bg-zenro-red/20 text-zenro-red px-2 py-0.5 rounded text-[10px] font-bold border border-zenro-red/30 uppercase tracking-wider">{user.role}</span>
                         <span>•</span>
                         <span>ID: {user.rollNumber || user.id.slice(0, 8).toUpperCase()}</span>
                     </p>
                 </div>
                 <div className="mb-4 flex gap-3">
-                    <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg font-bold text-sm border border-dark-600">Edit Profile</button>
+                    <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg font-bold text-sm border border-dark-600 transition">Edit Profile</button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="md:col-span-2 space-y-8">
-                     <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
-                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                     <div className="glass-card rounded-xl p-6">
+                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2 font-serif">
                             <UserIcon className="w-5 h-5 text-gray-400" /> Personal Information
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Email Address</label>
+                                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Email Address</label>
                                 <p className="text-white font-medium mt-1">{user.email}</p>
                             </div>
                              <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Phone Number</label>
+                                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Phone Number</label>
                                 <p className="text-white font-medium mt-1">{user.phone || 'N/A'}</p>
                             </div>
                              <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Student ID</label>
+                                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Student ID</label>
                                 <p className="text-white font-mono font-medium mt-1">{user.rollNumber || user.id.toUpperCase()}</p>
                             </div>
                              <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Enrolled Batch</label>
+                                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Enrolled Batch</label>
                                 <p className="text-white font-medium mt-1">{user.batch || 'N/A'}</p>
                             </div>
                         </div>
                      </div>
 
-                     <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
-                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                     <div className="glass-card rounded-xl p-6">
+                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2 font-serif">
                             <Activity className="w-5 h-5 text-gray-400" /> Academic Performance
                         </h3>
                         
                         <div className="grid grid-cols-3 gap-4 mb-6">
-                            <div className="bg-dark-900 p-4 rounded-lg text-center">
-                                <div className="text-2xl font-bold text-white">{testStats.attempts}</div>
-                                <div className="text-xs text-gray-500 uppercase">Tests Taken</div>
+                            <div className="bg-dark-900/50 p-4 rounded-lg text-center border border-white/5">
+                                <div className="text-2xl font-black text-white">{testStats.attempts}</div>
+                                <div className="text-[10px] text-gray-500 uppercase font-bold">Tests Taken</div>
                             </div>
-                            <div className="bg-dark-900 p-4 rounded-lg text-center">
-                                <div className="text-2xl font-bold text-brand-500">{testStats.avgScore}%</div>
-                                <div className="text-xs text-gray-500 uppercase">Avg Score</div>
+                            <div className="bg-dark-900/50 p-4 rounded-lg text-center border border-white/5">
+                                <div className="text-2xl font-black text-zenro-red">{testStats.avgScore}%</div>
+                                <div className="text-[10px] text-gray-500 uppercase font-bold">Avg Score</div>
                             </div>
-                            <div className="bg-dark-900 p-4 rounded-lg text-center">
-                                <div className="text-2xl font-bold text-green-500">{testStats.passed}</div>
-                                <div className="text-xs text-gray-500 uppercase">Tests Passed</div>
+                            <div className="bg-dark-900/50 p-4 rounded-lg text-center border border-white/5">
+                                <div className="text-2xl font-black text-zenro-green">{testStats.passed}</div>
+                                <div className="text-[10px] text-gray-500 uppercase font-bold">Tests Passed</div>
                             </div>
                         </div>
 
@@ -1292,11 +1296,11 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
                                 <p className="text-sm text-gray-500 italic">No test history found.</p>
                             ) : (
                                 recentTests.map((t, i) => (
-                                    <div key={i} className="flex justify-between items-center p-3 bg-dark-900 rounded border border-dark-700">
+                                    <div key={i} className="flex justify-between items-center p-3 bg-dark-900/50 rounded border border-dark-700">
                                         <span className="text-white text-sm font-medium">{t.tests?.title}</span>
                                         <div className="flex items-center gap-4">
                                             <span className="text-xs text-gray-500">{new Date(t.completed_at).toLocaleDateString()}</span>
-                                            <span className={`text-xs font-bold px-2 py-1 rounded ${t.score/t.total_score > 0.4 ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                            <span className={`text-xs font-bold px-2 py-1 rounded ${t.score/t.total_score > 0.4 ? 'bg-zenro-green/20 text-zenro-green' : 'bg-zenro-red/20 text-zenro-red'}`}>
                                                 {t.score}/{t.total_score}
                                             </span>
                                         </div>
@@ -1308,15 +1312,15 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
                 </div>
 
                 <div className="space-y-6">
-                     <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
-                        <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Certificates</h3>
+                     <div className="glass-card rounded-xl p-6">
+                        <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-4 tracking-widest">Certificates</h3>
                         <div className="space-y-3">
-                             <div className="flex items-center gap-3 p-3 bg-dark-900 rounded border border-dark-600 hover:border-brand-500 transition cursor-pointer group">
-                                 <GraduationCap className="w-5 h-5 text-gray-500 group-hover:text-brand-500" />
+                             <div className="flex items-center gap-3 p-3 bg-dark-900/50 rounded border border-dark-600 hover:border-zenro-red transition cursor-pointer group">
+                                 <GraduationCap className="w-5 h-5 text-gray-500 group-hover:text-zenro-red" />
                                  <span className="text-sm text-gray-300">JLPT N5 Certificate</span>
                              </div>
-                             <div className="flex items-center gap-3 p-3 bg-dark-900 rounded border border-dark-600 hover:border-brand-500 transition cursor-pointer group">
-                                 <GraduationCap className="w-5 h-5 text-gray-500 group-hover:text-brand-500" />
+                             <div className="flex items-center gap-3 p-3 bg-dark-900/50 rounded border border-dark-600 hover:border-zenro-red transition cursor-pointer group">
+                                 <GraduationCap className="w-5 h-5 text-gray-500 group-hover:text-zenro-red" />
                                  <span className="text-sm text-gray-300">Course Completion</span>
                              </div>
                         </div>

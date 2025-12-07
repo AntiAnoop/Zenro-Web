@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -6,7 +7,7 @@
     <title>Zenro - Japanese Language Institute</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Razorpay SDK -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -19,21 +20,34 @@
             },
             colors: {
               brand: {
-                50: '#fff1f2',
-                100: '#ffe4e6',
-                500: '#be123c', // Crimson/Red
-                600: '#9f1239', // Darker Red
-                900: '#881337', // Deep Red
+                50: '#fff0f2',
+                100: '#ffe4e8',
+                200: '#fecdd6',
+                300: '#fda4b4',
+                400: '#fb718a',
+                500: '#f43f5e',
+                600: '#be123c', // Zenro Red (Primary)
+                700: '#be123c', 
+                800: '#9f1239',
+                900: '#881337',
               },
-              accent: {
-                gold: '#C5A059', // Traditional Gold
-                sakura: '#F8C8DC', // Cherry Blossom
+              zenro: {
+                red: '#BC002D',    // Japan Flag Red
+                orange: '#FF9933', // India Saffron
+                green: '#138808',  // India Green
+                white: '#F5F5F5',  // Off White
+                dark: '#0B1121',   // Deep Imperial Navy
+                card: '#151e32',   // Lighter Navy for cards
               },
               dark: {
-                900: '#0f172a', // Deep Indigo/Slate
-                800: '#1e293b',
-                700: '#334155',
+                900: '#0B1121', // Main BG
+                800: '#151e32', // Card BG
+                700: '#242f47', // Border/Hover
               }
+            },
+            backgroundImage: {
+              'zenro-gradient': 'linear-gradient(135deg, #BC002D 0%, #881337 100%)',
+              'india-gradient': 'linear-gradient(to right, #FF9933, #FFFFFF, #138808)',
             }
           }
         }
@@ -42,23 +56,37 @@
     <style>
       /* Custom Scrollbar for sleek look */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: #0f172a; 
+        background: #0B1121; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #334155; 
-        border-radius: 4px;
+        background: #242f47; 
+        border-radius: 3px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #475569; 
+        background: #BC002D; 
       }
-      .bg-pattern {
-        background-color: #0f172a;
-        background-image: radial-gradient(#1e293b 1px, transparent 1px);
-        background-size: 20px 20px;
+      
+      /* Seigaiha Pattern (Japanese Wave) - Subtle Background */
+      .bg-seigaiha {
+        background-color: #0B1121;
+        background-image: radial-gradient(circle at 100% 150%, #0B1121 24%, #151e32 25%, #151e32 28%, #0B1121 29%, #0B1121 36%, #151e32 36%, #151e32 40%, transparent 40%, transparent),
+        radial-gradient(circle at 0    150%, #0B1121 24%, #151e32 25%, #151e32 28%, #0B1121 29%, #0B1121 36%, #151e32 36%, #151e32 40%, transparent 40%, transparent),
+        radial-gradient(circle at 50%  100%, #151e32 10%, #0B1121 11%, #0B1121 23%, #151e32 24%, #151e32 30%, #0B1121 31%, #0B1121 43%, #151e32 44%, #151e32 50%, #0B1121 51%, #0B1121 63%, #151e32 64%, #151e32 71%, transparent 71%, transparent),
+        radial-gradient(circle at 100% 50%, #151e32 5%, #0B1121 6%, #0B1121 15%, #151e32 16%, #151e32 20%, #0B1121 21%, #0B1121 30%, #151e32 31%, #151e32 35%, #0B1121 36%, #0B1121 45%, #151e32 46%, #151e32 49%, transparent 50%, transparent),
+        radial-gradient(circle at 0    50%, #151e32 5%, #0B1121 6%, #0B1121 15%, #151e32 16%, #151e32 20%, #0B1121 21%, #0B1121 30%, #151e32 31%, #151e32 35%, #0B1121 36%, #0B1121 45%, #151e32 46%, #151e32 49%, transparent 50%, transparent);
+        background-size: 64px 32px;
+        opacity: 1;
+      }
+      
+      .glass-card {
+        background: rgba(21, 30, 50, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
       }
     </style>
   <script type="importmap">
