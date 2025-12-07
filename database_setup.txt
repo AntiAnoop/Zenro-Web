@@ -5,6 +5,8 @@
 -- ----------------------------------------------------------------
 
 -- 1. CLEANUP
+DROP TABLE IF EXISTS test_enrollments CASCADE;
+DROP TABLE IF EXISTS test_batches CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS fees CASCADE;
 DROP TABLE IF EXISTS submissions CASCADE;
@@ -92,9 +94,10 @@ CREATE TABLE course_enrollments (
 CREATE TABLE tests (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text,
+  description text,
   duration_minutes int,
   passing_score int DEFAULT 40,
-  is_active boolean DEFAULT true,
+  is_active boolean DEFAULT false,
   created_at timestamptz DEFAULT now()
 );
 
@@ -106,6 +109,21 @@ CREATE TABLE questions (
   options text[],
   correct_option_index int,
   marks int DEFAULT 1,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Test Assignments (New)
+CREATE TABLE test_batches (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  test_id text REFERENCES tests(id) ON DELETE CASCADE,
+  batch_name text,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE test_enrollments (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  test_id text REFERENCES tests(id) ON DELETE CASCADE,
+  student_id text REFERENCES profiles(id) ON DELETE CASCADE,
   created_at timestamptz DEFAULT now()
 );
 

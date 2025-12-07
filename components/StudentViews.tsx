@@ -1005,25 +1005,56 @@ export const StudentTestsPage = () => {
     const [tab, setTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
     const [loading, setLoading] = useState(true);
     
+    // Get logged in user
+    const userData = localStorage.getItem('zenro_session');
+    const user: User | null = userData ? JSON.parse(userData) : null;
+
     useEffect(() => {
+        if (!user) return;
+
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Fetch Active Tests - REAL DB DATA ONLY
-                const { data: tests } = await supabase.from('tests').select('*').eq('is_active', true);
-                if(tests) setActiveTests(tests);
-
-                // Fetch Past Submissions
+                // FETCH SUBMISSIONS FIRST
                 const { data: subs } = await supabase
                     .from('submissions')
-                    .select(`
-                        id, score, total_score, completed_at,
-                        tests (title, duration_minutes)
-                    `)
+                    .select(`id, score, total_score, completed_at, test_id, tests (title, duration_minutes)`)
                     .eq('status', 'COMPLETED')
+                    .eq('student_id', user.id)
                     .order('completed_at', { ascending: false });
                 
+                const submittedTestIds = new Set(subs?.map((s:any) => s.test_id) || []);
                 if(subs) setPastSubmissions(subs);
+
+                // FETCH RELEVANT TESTS
+                // Logic: 
+                // 1. Get tests assigned to my Batch
+                // 2. Get tests assigned to me directly
+                // 3. Filter for active only
+                // 4. Exclude tests already submitted (optional, usually you can't retake immediately)
+
+                const { data: batchTests } = await supabase.from('test_batches').select('test_id').eq('batch_name', user.batch);
+                const { data: directTests } = await supabase.from('test_enrollments').select('test_id').eq('student_id', user.id);
+
+                const eligibleTestIds = new Set<string>();
+                if(batchTests) batchTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
+                if(directTests) directTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
+
+                if (eligibleTestIds.size > 0) {
+                    const { data: tests } = await supabase
+                        .from('tests')
+                        .select('*')
+                        .in('id', Array.from(eligibleTestIds))
+                        .eq('is_active', true);
+                    
+                    // Filter out already taken tests if needed, or show them with "Retake" option
+                    // For now, let's show them but maybe mark as done visually or just list available ones
+                    const available = (tests || []).filter((t:any) => !submittedTestIds.has(t.id));
+                    setActiveTests(available);
+                } else {
+                    setActiveTests([]);
+                }
+
             } catch (error) {
                 console.error("Fetch tests error:", error);
             } finally {
@@ -1031,10 +1062,7 @@ export const StudentTestsPage = () => {
             }
         };
         fetchData();
-    }, []);
-
-    // No MOCK Data Fallback - We want a clean slate as requested
-    const displayTests = activeTests;
+    }, [user?.id, user?.batch]);
 
     if (loading) {
         return (
@@ -1067,7 +1095,7 @@ export const StudentTestsPage = () => {
              </div>
 
             {tab === 'ACTIVE' ? (
-                displayTests.length === 0 ? (
+                activeTests.length === 0 ? (
                     <div className="p-12 text-center border-2 border-dashed border-dark-700 rounded-xl bg-dark-800/50">
                         <div className="flex justify-center mb-4">
                             <FileCheck className="w-12 h-12 text-gray-600" />
@@ -1077,7 +1105,7 @@ export const StudentTestsPage = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {displayTests.map((test, idx) => (
+                        {activeTests.map((test, idx) => (
                             <div key={test.id || idx} className="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-zenro-red/50 transition shadow-lg">
                                 <div className="absolute top-0 right-0 p-3">
                                     <span className="bg-zenro-red/20 text-zenro-red px-2 py-1 rounded text-[10px] font-bold border border-zenro-red/30 animate-pulse">

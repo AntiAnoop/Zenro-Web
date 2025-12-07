@@ -8,7 +8,7 @@ import {
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
   Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff,
-  FileCheck, HelpCircle
+  FileCheck, HelpCircle, CheckSquare, Target
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User, Test, Question } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -143,18 +143,67 @@ export const TeacherDashboardHome = () => {
 interface TestModalProps {
     onClose: () => void;
     onRefresh: () => void;
+    initialData?: Test | null;
 }
 
-const TestCreationModal = ({ onClose, onRefresh }: TestModalProps) => {
+const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [testData, setTestData] = useState<Partial<Test>>({
         title: '',
+        description: '',
         duration_minutes: 30,
         passing_score: 40,
-        is_active: true
+        is_active: false, // Default draft
+        assignedBatches: [],
+        assignedStudentIds: []
     });
     const [questions, setQuestions] = useState<Partial<Question>[]>([]);
+    
+    // Assignment Data
+    const [availableBatches, setAvailableBatches] = useState<string[]>([]);
+    const [availableStudents, setAvailableStudents] = useState<User[]>([]);
+    const [studentSearch, setStudentSearch] = useState('');
+
+    useEffect(() => {
+        const loadResources = async () => {
+            // Batches
+            const { data: bData } = await supabase.from('batches').select('name');
+            if(bData) setAvailableBatches(bData.map(b => b.name));
+            
+            // Students
+            const { data: sData } = await supabase.from('profiles').select('*').eq('role', 'STUDENT');
+            if(sData) {
+                const mapped = sData.map((u: any) => ({
+                    id: u.id,
+                    name: u.full_name,
+                    role: 'STUDENT',
+                    email: u.email,
+                    avatar: u.avatar_url,
+                    batch: u.batch,
+                    rollNumber: u.student_id
+                }));
+                setAvailableStudents(mapped);
+            }
+
+            // Load Initial Data if Editing
+            if(initialData) {
+                // Fetch assignments and questions
+                const { data: qData } = await supabase.from('questions').select('*').eq('test_id', initialData.id);
+                setQuestions(qData || []);
+
+                const { data: bAssign } = await supabase.from('test_batches').select('batch_name').eq('test_id', initialData.id);
+                const { data: sAssign } = await supabase.from('test_enrollments').select('student_id').eq('test_id', initialData.id);
+
+                setTestData({
+                    ...initialData,
+                    assignedBatches: bAssign?.map(b => b.batch_name) || [],
+                    assignedStudentIds: sAssign?.map(s => s.student_id) || []
+                });
+            }
+        };
+        loadResources();
+    }, [initialData]);
 
     const addQuestion = () => {
         setQuestions([
@@ -185,7 +234,7 @@ const TestCreationModal = ({ onClose, onRefresh }: TestModalProps) => {
         setQuestions(updated);
     };
 
-    const handleSave = async () => {
+    const handleSave = async (activate: boolean) => {
         if (!testData.title) return alert("Title is required");
         if (questions.length === 0) return alert("Add at least one question");
         
@@ -195,30 +244,58 @@ const TestCreationModal = ({ onClose, onRefresh }: TestModalProps) => {
             if (q.options?.some(o => !o.trim())) return alert("All options must be filled");
         }
 
+        if (activate) {
+            if (!confirm("Are you sure you want to PUBLISH this test? It will be visible to assigned students immediately.")) return;
+        }
+
         setLoading(true);
         try {
-            // 1. Create Test
-            const { data: test, error: testError } = await supabase
-                .from('tests')
-                .insert(testData)
-                .select()
-                .single();
-            
-            if (testError) throw testError;
+            let testId = initialData?.id;
 
-            // 2. Add Questions
+            const payload = {
+                title: testData.title,
+                description: testData.description,
+                duration_minutes: testData.duration_minutes,
+                passing_score: testData.passing_score,
+                is_active: activate
+            };
+
+            // 1. Create/Update Test
+            if (testId) {
+                const { error } = await supabase.from('tests').update(payload).eq('id', testId);
+                if (error) throw error;
+            } else {
+                const { data, error } = await supabase.from('tests').insert(payload).select().single();
+                if (error) throw error;
+                testId = data.id;
+            }
+
+            // 2. Handle Questions (Delete all old, insert new for simplicity, or upsert)
+            // Simpler robust method: Delete all associated, then re-insert
+            await supabase.from('questions').delete().eq('test_id', testId);
+            
             const questionsPayload = questions.map(q => ({
-                test_id: test.id,
+                test_id: testId,
                 question_text: q.question_text,
                 options: q.options,
                 correct_option_index: q.correct_option_index,
                 marks: q.marks
             }));
-
             const { error: qError } = await supabase.from('questions').insert(questionsPayload);
             if (qError) throw qError;
 
-            alert("Test Created Successfully!");
+            // 3. Handle Assignments
+            await supabase.from('test_batches').delete().eq('test_id', testId);
+            if(testData.assignedBatches && testData.assignedBatches.length > 0) {
+                await supabase.from('test_batches').insert(testData.assignedBatches.map(b => ({ test_id: testId, batch_name: b })));
+            }
+
+            await supabase.from('test_enrollments').delete().eq('test_id', testId);
+            if(testData.assignedStudentIds && testData.assignedStudentIds.length > 0) {
+                await supabase.from('test_enrollments').insert(testData.assignedStudentIds.map(s => ({ test_id: testId, student_id: s })));
+            }
+
+            alert(`Test ${activate ? 'Published' : 'Saved as Draft'} Successfully!`);
             onRefresh();
             onClose();
 
@@ -230,23 +307,50 @@ const TestCreationModal = ({ onClose, onRefresh }: TestModalProps) => {
         }
     };
 
+    const toggleBatch = (b: string) => {
+        const current = testData.assignedBatches || [];
+        setTestData({
+            ...testData,
+            assignedBatches: current.includes(b) ? current.filter(x => x !== b) : [...current, b]
+        });
+    };
+
+    const toggleStudent = (id: string) => {
+        const current = testData.assignedStudentIds || [];
+        setTestData({
+            ...testData,
+            assignedStudentIds: current.includes(id) ? current.filter(x => x !== id) : [...current, id]
+        });
+    };
+
+    const filteredStudents = availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()));
+
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-dark-800 w-full max-w-4xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+            <div className="bg-dark-800 w-full max-w-5xl rounded-2xl border border-dark-700 shadow-2xl flex flex-col h-[90vh] overflow-hidden">
                 <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-900">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <FileCheck className="w-6 h-6 text-brand-500" /> Create New Assessment
-                    </h2>
+                    <div>
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <FileCheck className="w-6 h-6 text-brand-500" /> {initialData ? 'Edit Assessment' : 'Create New Assessment'}
+                        </h2>
+                        <div className="flex gap-4 mt-2">
+                            {[1, 2, 3, 4].map(s => (
+                                <div key={s} className={`flex items-center gap-2 text-xs font-bold ${step === s ? 'text-brand-500' : 'text-gray-600'}`}>
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${step === s ? 'border-brand-500 bg-brand-500/10' : 'border-gray-600'}`}>{s}</div>
+                                    <span>{s === 1 ? 'Details' : s === 2 ? 'Questions' : s === 3 ? 'Access' : 'Review'}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                     <button onClick={onClose} className="p-2 hover:bg-dark-800 rounded-full text-gray-500 hover:text-white"><X className="w-6 h-6"/></button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-8 bg-dark-800/50">
-                    {/* Test Meta */}
-                    <div className="bg-dark-900 p-6 rounded-xl border border-dark-700 mb-8">
-                        <h3 className="text-lg font-bold text-white mb-4">Test Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Test Title</label>
+                    {/* STEP 1: DETAILS */}
+                    {step === 1 && (
+                        <div className="max-w-2xl mx-auto space-y-6">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Test Title <span className="text-red-500">*</span></label>
                                 <input 
                                     type="text" 
                                     className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
@@ -256,91 +360,219 @@ const TestCreationModal = ({ onClose, onRefresh }: TestModalProps) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Duration (Minutes)</label>
-                                <input 
-                                    type="number" 
-                                    className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
-                                    value={testData.duration_minutes}
-                                    onChange={e => setTestData({...testData, duration_minutes: parseInt(e.target.value)})}
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Description / Instructions</label>
+                                <textarea 
+                                    className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-32 resize-none"
+                                    placeholder="Instructions for students..."
+                                    value={testData.description || ''}
+                                    onChange={e => setTestData({...testData, description: e.target.value})}
                                 />
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Questions Builder */}
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-bold text-white">Questions ({questions.length})</h3>
-                            <button onClick={addQuestion} className="text-sm bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                                <Plus className="w-4 h-4" /> Add Question
-                            </button>
-                        </div>
-
-                        {questions.map((q, idx) => (
-                            <div key={idx} className="bg-dark-900 p-6 rounded-xl border border-dark-700 relative group">
-                                <button 
-                                    onClick={() => removeQuestion(idx)}
-                                    className="absolute top-4 right-4 p-2 bg-dark-800 text-gray-500 hover:text-red-500 rounded border border-dark-600 hover:border-red-500 transition"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                                
-                                <div className="mb-4 pr-12">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Question {idx + 1}</label>
-                                    <textarea 
-                                        className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-24 resize-none"
-                                        placeholder="Enter question text..."
-                                        value={q.question_text}
-                                        onChange={e => updateQuestion(idx, 'question_text', e.target.value)}
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Duration (Minutes)</label>
+                                    <input 
+                                        type="number" 
+                                        className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                        value={testData.duration_minutes}
+                                        onChange={e => setTestData({...testData, duration_minutes: parseInt(e.target.value)})}
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Passing Score (%)</label>
+                                    <input 
+                                        type="number" 
+                                        className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none"
+                                        value={testData.passing_score}
+                                        onChange={e => setTestData({...testData, passing_score: parseInt(e.target.value)})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    {q.options?.map((opt, oIdx) => (
-                                        <div key={oIdx} className="flex items-center gap-3">
+                    {/* STEP 2: QUESTIONS */}
+                    {step === 2 && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-white">Question Builder ({questions.length})</h3>
+                                <button onClick={addQuestion} className="text-sm bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                                    <Plus className="w-4 h-4" /> Add Question
+                                </button>
+                            </div>
+
+                            {questions.map((q, idx) => (
+                                <div key={idx} className="bg-dark-900 p-6 rounded-xl border border-dark-700 relative group animate-fade-in-up">
+                                    <button 
+                                        onClick={() => removeQuestion(idx)}
+                                        className="absolute top-4 right-4 p-2 bg-dark-800 text-gray-500 hover:text-red-500 rounded border border-dark-600 hover:border-red-500 transition"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                    
+                                    <div className="mb-4 pr-12">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Question {idx + 1}</label>
+                                        <textarea 
+                                            className="w-full bg-dark-800 border border-dark-600 rounded-lg p-3 text-white focus:border-brand-500 outline-none h-24 resize-none"
+                                            placeholder="Enter question text..."
+                                            value={q.question_text}
+                                            onChange={e => updateQuestion(idx, 'question_text', e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        {q.options?.map((opt, oIdx) => (
+                                            <div key={oIdx} className="flex items-center gap-3">
+                                                <div 
+                                                    onClick={() => updateQuestion(idx, 'correct_option_index', oIdx)}
+                                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${q.correct_option_index === oIdx ? 'border-brand-500 bg-brand-500/20' : 'border-gray-600 hover:border-gray-400'}`}
+                                                >
+                                                    {q.correct_option_index === oIdx && <div className="w-3 h-3 bg-brand-500 rounded-full"></div>}
+                                                </div>
+                                                <input 
+                                                    type="text" 
+                                                    className={`flex-1 bg-dark-800 border rounded-lg p-2 text-sm text-white outline-none transition ${q.correct_option_index === oIdx ? 'border-brand-500 bg-brand-900/10' : 'border-dark-600 focus:border-brand-500'}`}
+                                                    placeholder={`Option ${oIdx + 1}`}
+                                                    value={opt}
+                                                    onChange={e => updateOption(idx, oIdx, e.target.value)}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Marks:</label>
                                             <input 
-                                                type="radio" 
-                                                name={`correct-${idx}`}
-                                                checked={q.correct_option_index === oIdx}
-                                                onChange={() => updateQuestion(idx, 'correct_option_index', oIdx)}
-                                                className="w-4 h-4 text-brand-500 focus:ring-brand-500 cursor-pointer"
-                                            />
-                                            <input 
-                                                type="text" 
-                                                className={`flex-1 bg-dark-800 border rounded-lg p-2 text-sm text-white outline-none transition ${q.correct_option_index === oIdx ? 'border-brand-500 bg-brand-900/10' : 'border-dark-600 focus:border-brand-500'}`}
-                                                placeholder={`Option ${oIdx + 1}`}
-                                                value={opt}
-                                                onChange={e => updateOption(idx, oIdx, e.target.value)}
+                                                type="number" 
+                                                className="w-16 bg-dark-800 border border-dark-600 rounded p-1 text-white text-sm text-center outline-none focus:border-brand-500"
+                                                value={q.marks}
+                                                onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value))}
                                             />
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
-                                <div className="flex justify-end">
-                                    <div className="flex items-center gap-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Marks:</label>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* STEP 3: ACCESS */}
+                    {step === 3 && (
+                        <div className="h-full flex flex-col">
+                            <h3 className="text-lg font-bold text-white mb-2">Access Control</h3>
+                            <p className="text-gray-400 text-sm mb-6">Select which Batches or Students can access this exam.</p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                                {/* Batches */}
+                                <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-4 bg-dark-800 border-b border-dark-700 font-bold text-white flex items-center gap-2">
+                                        <Layers className="w-4 h-4 text-brand-500" /> Assign Batches
+                                    </div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                                        {availableBatches.length === 0 && <p className="text-gray-500 text-sm">No batches found.</p>}
+                                        {availableBatches.map(b => (
+                                            <div 
+                                                key={b} 
+                                                onClick={() => toggleBatch(b)}
+                                                className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition ${testData.assignedBatches?.includes(b) ? 'bg-brand-900/20 border-brand-500' : 'bg-dark-800 border-dark-600 hover:border-gray-500'}`}
+                                            >
+                                                <span className="text-sm font-bold text-white">{b}</span>
+                                                {testData.assignedBatches?.includes(b) && <CheckCircle className="w-4 h-4 text-brand-500" />}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Students */}
+                                <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-4 bg-dark-800 border-b border-dark-700 font-bold text-white flex items-center justify-between">
+                                        <div className="flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Specific Students</div>
                                         <input 
-                                            type="number" 
-                                            className="w-16 bg-dark-800 border border-dark-600 rounded p-1 text-white text-sm text-center outline-none focus:border-brand-500"
-                                            value={q.marks}
-                                            onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value))}
+                                            type="text" 
+                                            placeholder="Search..." 
+                                            value={studentSearch}
+                                            onChange={e => setStudentSearch(e.target.value)}
+                                            className="bg-dark-900 border border-dark-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 w-32"
                                         />
+                                    </div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                                        {filteredStudents.length === 0 && <p className="text-gray-500 text-sm">No students found.</p>}
+                                        {filteredStudents.map(s => {
+                                            const inBatch = s.batch && testData.assignedBatches?.includes(s.batch);
+                                            const explicitlyAssigned = testData.assignedStudentIds?.includes(s.id);
+                                            
+                                            return (
+                                                <div 
+                                                    key={s.id} 
+                                                    onClick={() => !inBatch && toggleStudent(s.id)}
+                                                    className={`p-2 rounded-lg border flex items-center justify-between transition 
+                                                        ${inBatch ? 'opacity-60 bg-dark-800 border-transparent cursor-default' : explicitlyAssigned ? 'bg-blue-900/20 border-blue-500 cursor-pointer' : 'bg-dark-800 border-dark-600 hover:border-gray-500 cursor-pointer'}
+                                                    `}
+                                                >
+                                                    <div>
+                                                        <p className="text-sm font-bold text-white">{s.name}</p>
+                                                        <p className="text-[10px] text-gray-500">{s.email}</p>
+                                                    </div>
+                                                    {inBatch ? (
+                                                        <span className="text-[10px] bg-dark-700 px-2 py-1 rounded text-gray-400">Via Batch</span>
+                                                    ) : explicitlyAssigned && (
+                                                        <CheckCircle className="w-4 h-4 text-blue-500" />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    )}
+
+                    {/* STEP 4: REVIEW */}
+                    {step === 4 && (
+                        <div className="max-w-2xl mx-auto text-center py-10 space-y-8">
+                            <div className="w-24 h-24 bg-brand-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-brand-500/30 animate-pulse">
+                                <Target className="w-12 h-12 text-brand-500" />
+                            </div>
+                            <h2 className="text-3xl font-bold text-white">Ready to Finalize?</h2>
+                            <div className="grid grid-cols-2 gap-4 text-left bg-dark-900 p-6 rounded-xl border border-dark-700">
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Title</p>
+                                    <p className="text-white font-bold">{testData.title}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Questions</p>
+                                    <p className="text-white font-bold">{questions.length}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Assignments</p>
+                                    <p className="text-white font-bold">{(testData.assignedBatches?.length || 0) + (testData.assignedStudentIds?.length || 0)} Targets</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Passing Score</p>
+                                    <p className="text-white font-bold">{testData.passing_score}%</p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 justify-center">
+                                <button onClick={() => handleSave(false)} className="px-8 py-4 bg-dark-700 hover:bg-dark-600 rounded-xl font-bold text-white flex items-center gap-2 border border-dark-500 transition">
+                                    <Save className="w-5 h-5" /> Save as Draft
+                                </button>
+                                <button onClick={() => handleSave(true)} className="px-8 py-4 bg-brand-600 hover:bg-brand-500 rounded-xl font-bold text-white flex items-center gap-2 shadow-lg shadow-brand-900/50 transition transform hover:-translate-y-1">
+                                    <Globe className="w-5 h-5" /> Publish Live
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                <div className="p-6 border-t border-dark-700 bg-dark-900 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-6 py-3 rounded-lg text-gray-400 hover:text-white font-bold transition">Cancel</button>
-                    <button 
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50 transition shadow-lg"
-                    >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Save & Publish Test
+                <div className="p-6 border-t border-dark-700 bg-dark-900 flex justify-between">
+                    <button onClick={step === 1 ? onClose : () => setStep(step - 1)} className="px-6 py-3 rounded-lg text-gray-400 hover:text-white font-bold transition">
+                        {step === 1 ? 'Cancel' : 'Back'}
                     </button>
+                    {step < 4 && (
+                        <button onClick={() => setStep(step + 1)} className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 transition">
+                            Next Step <ChevronRight className="w-5 h-5" />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -351,6 +583,9 @@ export const TeacherTestsPage = () => {
     const [tests, setTests] = useState<Test[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+    const [editingTest, setEditingTest] = useState<Test | null>(null);
+    const [statusModal, setStatusModal] = useState<{ test: Test, targetStatus: boolean } | null>(null);
+    const [deleteModal, setDeleteModal] = useState<Test | null>(null);
 
     useEffect(() => {
         fetchTests();
@@ -373,41 +608,50 @@ export const TeacherTestsPage = () => {
         }
     };
 
-    const deleteTest = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this test? All student submissions will be lost.")) return;
+    const confirmStatusChange = async () => {
+        if(!statusModal) return;
         try {
-            const { error } = await supabase.from('tests').delete().eq('id', id);
+            const { error } = await supabase
+                .from('tests')
+                .update({ is_active: statusModal.targetStatus })
+                .eq('id', statusModal.test.id);
             if (error) throw error;
-            fetchTests(); // Refresh
+            setTests(prev => prev.map(t => t.id === statusModal.test.id ? { ...t, is_active: statusModal.targetStatus } : t));
+            setStatusModal(null);
+        } catch (e) {
+            console.error("Update Error:", e);
+            alert("Failed to update status");
+        }
+    };
+
+    const confirmDelete = async () => {
+        if(!deleteModal) return;
+        try {
+            // Delete assigned relations first (if cascade fails, do manually)
+            await supabase.from('test_batches').delete().eq('test_id', deleteModal.id);
+            await supabase.from('test_enrollments').delete().eq('test_id', deleteModal.id);
+            await supabase.from('questions').delete().eq('test_id', deleteModal.id);
+            
+            const { error } = await supabase.from('tests').delete().eq('id', deleteModal.id);
+            if (error) throw error;
+            
+            fetchTests();
+            setDeleteModal(null);
         } catch (e) {
             console.error("Delete Error:", e);
             alert("Failed to delete test.");
         }
     };
 
-    const toggleActive = async (test: Test) => {
-        try {
-            const { error } = await supabase
-                .from('tests')
-                .update({ is_active: !test.is_active })
-                .eq('id', test.id);
-            if (error) throw error;
-            // Optimistic update
-            setTests(prev => prev.map(t => t.id === test.id ? { ...t, is_active: !t.is_active } : t));
-        } catch (e) {
-            console.error("Update Error:", e);
-        }
-    };
-
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in relative">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Test Management</h1>
                     <p className="text-gray-400">Create, edit and manage exams.</p>
                 </div>
                 <button 
-                    onClick={() => setIsCreatorOpen(true)}
+                    onClick={() => { setEditingTest(null); setIsCreatorOpen(true); }}
                     className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"
                 >
                     <Plus className="w-5 h-5" /> Create Assessment
@@ -425,7 +669,12 @@ export const TeacherTestsPage = () => {
                     {tests.map(test => (
                         <div key={test.id} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex justify-between items-center hover:border-brand-500/30 transition shadow-lg group">
                             <div>
-                                <h3 className="text-xl font-bold text-white mb-1 group-hover:text-brand-500 transition">{test.title}</h3>
+                                <div className="flex items-center gap-3 mb-1">
+                                    <h3 className="text-xl font-bold text-white group-hover:text-brand-500 transition">{test.title}</h3>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${test.is_active ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-gray-700 text-gray-400 border-gray-600'}`}>
+                                        {test.is_active ? 'Live' : 'Draft'}
+                                    </span>
+                                </div>
                                 <div className="flex gap-4 text-sm text-gray-400">
                                     <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {test.duration_minutes} Mins</span>
                                     <span className="flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Pass: {test.passing_score}%</span>
@@ -434,34 +683,90 @@ export const TeacherTestsPage = () => {
                             </div>
                             <div className="flex items-center gap-4">
                                 <button 
-                                    onClick={() => toggleActive(test)}
+                                    onClick={() => setStatusModal({ test, targetStatus: !test.is_active })}
                                     className={`px-4 py-2 rounded-lg text-sm font-bold border transition ${test.is_active ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20' : 'bg-gray-700 text-gray-400 border-gray-600 hover:text-white'}`}
                                 >
-                                    {test.is_active ? 'Active' : 'Draft'}
+                                    {test.is_active ? 'Active' : 'Publish'}
                                 </button>
                                 <div className="h-8 w-[1px] bg-dark-600"></div>
-                                <button className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded transition"><Edit3 className="w-5 h-5" /></button>
-                                <button onClick={() => deleteTest(test.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-900/20 rounded transition"><Trash2 className="w-5 h-5" /></button>
+                                <button 
+                                    onClick={() => { setEditingTest(test); setIsCreatorOpen(true); }}
+                                    className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded transition"
+                                >
+                                    <Edit3 className="w-5 h-5" />
+                                </button>
+                                <button 
+                                    onClick={() => setDeleteModal(test)} 
+                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-900/20 rounded transition"
+                                >
+                                    <Trash2 className="w-5 h-5" />
+                                </button>
                             </div>
                         </div>
                     ))}
                 </div>
             )}
 
-            {isCreatorOpen && <TestCreationModal onClose={() => setIsCreatorOpen(false)} onRefresh={fetchTests} />}
+            {isCreatorOpen && (
+                <TestCreationModal 
+                    initialData={editingTest} 
+                    onClose={() => setIsCreatorOpen(false)} 
+                    onRefresh={fetchTests} 
+                />
+            )}
+
+            {/* STATUS CONFIRMATION MODAL */}
+            {statusModal && (
+                <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 shadow-2xl p-6 text-center">
+                        <div className={`mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 ${statusModal.targetStatus ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'}`}>
+                            {statusModal.targetStatus ? <Globe className="w-6 h-6" /> : <Save className="w-6 h-6" />}
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">{statusModal.targetStatus ? 'Publish Assessment?' : 'Unpublish Assessment?'}</h3>
+                        <p className="text-gray-400 text-sm mb-6">
+                            {statusModal.targetStatus 
+                                ? "This test will become visible to all assigned students immediately." 
+                                : "Students will no longer be able to see or take this test."}
+                        </p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setStatusModal(null)} className="flex-1 py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-white font-bold text-sm">Cancel</button>
+                            <button onClick={confirmStatusChange} className="flex-1 py-2 bg-brand-600 hover:bg-brand-500 rounded-lg text-white font-bold text-sm">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* DELETE CONFIRMATION MODAL */}
+            {deleteModal && (
+                <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-red-500/50 shadow-2xl p-6 text-center">
+                        <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-red-500/20 text-red-500 animate-pulse">
+                            <AlertTriangle className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Delete Assessment?</h3>
+                        <p className="text-red-300 text-sm mb-6">
+                            Are you sure you want to delete <strong className="text-white">"{deleteModal.title}"</strong>? 
+                            This will remove all student submissions and cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setDeleteModal(null)} className="flex-1 py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-white font-bold text-sm">Cancel</button>
+                            <button onClick={confirmDelete} className="flex-1 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-bold text-sm shadow-lg">Delete Forever</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-// --- ROBUST COURSE CREATION WIZARD ---
 interface WizardProps {
     onClose: () => void;
     onRefresh: () => void;
-    courseId?: string | null;
-    showToast: (msg: string, type: 'success'|'error') => void;
+    courseId: string | null;
+    showToast: (msg: string, type: 'success' | 'error') => void;
 }
 
-const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: WizardProps) => {
+export const CourseCreationWizard = ({ onClose, onRefresh, courseId, showToast }: WizardProps) => {
     const [step, setStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true); // Default to true to load resources

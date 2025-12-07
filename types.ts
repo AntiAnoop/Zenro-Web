@@ -73,11 +73,16 @@ export interface Question {
 export interface Test {
   id: string;
   title: string;
+  description?: string;
   duration_minutes: number;
   passing_score: number;
   is_active: boolean;
   questions?: Question[];
   created_at?: string;
+  
+  // Assignment Logic
+  assignedBatches?: string[]; 
+  assignedStudentIds?: string[];
 }
 
 export interface ExamSession {
