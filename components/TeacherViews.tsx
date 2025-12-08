@@ -154,7 +154,7 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
         description: '',
         duration_minutes: 30,
         passing_score: 40,
-        is_active: false, // Default draft
+        is_active: false, 
         assignedBatches: [],
         assignedStudentIds: []
     });
@@ -238,70 +238,79 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
         if (!testData.title) return alert("Title is required");
         if (questions.length === 0) return alert("Add at least one question");
         
-        // Validation check for empty fields
         for (const q of questions) {
             if (!q.question_text) return alert("All questions must have text");
             if (q.options?.some(o => !o.trim())) return alert("All options must be filled");
         }
 
         if (activate) {
-            if (!confirm("Are you sure you want to PUBLISH this test? It will be visible to assigned students immediately.")) return;
+            if (!confirm("Confirm Publish: This test will be immediately available to assigned students.")) return;
         }
 
         setLoading(true);
         try {
-            let testId = initialData?.id;
-
+            // Explicit payload construction to ensure is_active is honored
             const payload = {
                 title: testData.title,
-                description: testData.description,
-                duration_minutes: testData.duration_minutes,
-                passing_score: testData.passing_score,
-                is_active: activate
+                description: testData.description || '',
+                duration_minutes: testData.duration_minutes || 30,
+                passing_score: testData.passing_score || 40,
+                is_active: activate // FORCE overrides default
             };
 
-            // 1. Create/Update Test
-            if (testId) {
-                const { error } = await supabase.from('tests').update(payload).eq('id', testId);
-                if (error) throw error;
+            let currentTestId = initialData?.id;
+
+            if (currentTestId) {
+                // UPDATE EXISTING
+                const { error } = await supabase.from('tests').update(payload).eq('id', currentTestId);
+                if (error) throw new Error("Failed to update test header: " + error.message);
             } else {
+                // CREATE NEW
                 const { data, error } = await supabase.from('tests').insert(payload).select().single();
-                if (error) throw error;
-                testId = data.id;
+                if (error) throw new Error("Failed to create new test: " + error.message);
+                if (!data) throw new Error("Database did not return new test ID.");
+                currentTestId = data.id;
             }
 
-            // 2. Handle Questions (Delete all old, insert new for simplicity, or upsert)
-            // Simpler robust method: Delete all associated, then re-insert
-            await supabase.from('questions').delete().eq('test_id', testId);
+            // --- QUESTIONS ---
+            // Remove old questions to prevent duplicates/orphans
+            await supabase.from('questions').delete().eq('test_id', currentTestId);
             
-            const questionsPayload = questions.map(q => ({
-                test_id: testId,
-                question_text: q.question_text,
-                options: q.options,
-                correct_option_index: q.correct_option_index,
-                marks: q.marks
-            }));
-            const { error: qError } = await supabase.from('questions').insert(questionsPayload);
-            if (qError) throw qError;
+            if (questions.length > 0) {
+                const questionsPayload = questions.map(q => ({
+                    test_id: currentTestId,
+                    question_text: q.question_text,
+                    options: q.options,
+                    correct_option_index: q.correct_option_index,
+                    marks: q.marks
+                }));
+                const { error: qError } = await supabase.from('questions').insert(questionsPayload);
+                if (qError) throw new Error("Failed to save questions: " + qError.message);
+            }
 
-            // 3. Handle Assignments
-            await supabase.from('test_batches').delete().eq('test_id', testId);
+            // --- ASSIGNMENTS ---
+            // Reset assignments
+            await supabase.from('test_batches').delete().eq('test_id', currentTestId);
             if(testData.assignedBatches && testData.assignedBatches.length > 0) {
-                await supabase.from('test_batches').insert(testData.assignedBatches.map(b => ({ test_id: testId, batch_name: b })));
+                const batchPayload = testData.assignedBatches.map(b => ({ test_id: currentTestId, batch_name: b }));
+                const { error: bError } = await supabase.from('test_batches').insert(batchPayload);
+                if(bError) console.error("Batch assignment warning:", bError);
             }
 
-            await supabase.from('test_enrollments').delete().eq('test_id', testId);
+            await supabase.from('test_enrollments').delete().eq('test_id', currentTestId);
             if(testData.assignedStudentIds && testData.assignedStudentIds.length > 0) {
-                await supabase.from('test_enrollments').insert(testData.assignedStudentIds.map(s => ({ test_id: testId, student_id: s })));
+                const studentPayload = testData.assignedStudentIds.map(s => ({ test_id: currentTestId, student_id: s }));
+                const { error: sError } = await supabase.from('test_enrollments').insert(studentPayload);
+                if(sError) console.error("Student assignment warning:", sError);
             }
 
-            alert(`Test ${activate ? 'Published' : 'Saved as Draft'} Successfully!`);
+            alert(`Test ${activate ? 'Published' : 'Saved'} Successfully!`);
             onRefresh();
             onClose();
 
         } catch (e: any) {
             console.error("Save Test Error:", e);
-            alert("Failed to save test: " + e.message);
+            alert(`Error saving test: ${e.message}`);
         } finally {
             setLoading(false);
         }
@@ -553,11 +562,19 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
                             </div>
 
                             <div className="flex gap-4 justify-center">
-                                <button onClick={() => handleSave(false)} className="px-8 py-4 bg-dark-700 hover:bg-dark-600 rounded-xl font-bold text-white flex items-center gap-2 border border-dark-500 transition">
-                                    <Save className="w-5 h-5" /> Save as Draft
+                                <button 
+                                    onClick={() => handleSave(false)}
+                                    disabled={loading}
+                                    className="px-8 py-4 bg-dark-700 hover:bg-dark-600 rounded-xl font-bold text-white flex items-center gap-2 border border-dark-500 transition disabled:opacity-50"
+                                >
+                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-5 h-5" />} Save as Draft
                                 </button>
-                                <button onClick={() => handleSave(true)} className="px-8 py-4 bg-brand-600 hover:bg-brand-500 rounded-xl font-bold text-white flex items-center gap-2 shadow-lg shadow-brand-900/50 transition transform hover:-translate-y-1">
-                                    <Globe className="w-5 h-5" /> Publish Live
+                                <button 
+                                    onClick={() => handleSave(true)}
+                                    disabled={loading}
+                                    className="px-8 py-4 bg-brand-600 hover:bg-brand-500 rounded-xl font-bold text-white flex items-center gap-2 shadow-lg shadow-brand-900/50 transition transform hover:-translate-y-1 disabled:opacity-50"
+                                >
+                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-5 h-5" />} Publish Live
                                 </button>
                             </div>
                         </div>
