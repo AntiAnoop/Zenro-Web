@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2, Menu, X, FileCheck } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2, Menu, X, FileCheck, Calendar } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer } from './components/StudentViews';
 import { StudentTestPlayer } from './components/StudentTestPlayer';
 import { TestReport } from './components/TestReport';
-import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage } from './components/TeacherViews';
-import { AdminDashboard, AdminUserManagement, AdminFinancials } from './components/AdminViews';
+import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage, TeacherSchedulePage } from './components/TeacherViews';
+import { AdminDashboard, AdminUserManagement, AdminFinancials, AdminTeacherAnalytics, AdminScheduleView } from './components/AdminViews';
 import { LiveProvider } from './context/LiveContext';
 import { supabase } from './services/supabaseClient';
 
@@ -302,6 +302,9 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
                <Link to="/teacher/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/dashboard')}`}>
                  <Layout className="w-4 h-4" /> Dashboard
                </Link>
+               <Link to="/teacher/schedule" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/schedule')}`}>
+                 <Calendar className="w-4 h-4" /> Class Schedule
+               </Link>
                <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/courses')}`}>
                  <Book className="w-4 h-4" /> My Classes
                </Link>
@@ -325,14 +328,17 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
                <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/dashboard')}`}>
                  <Layout className="w-4 h-4" /> Dashboard
                </Link>
+               <Link to="/admin/schedule" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/schedule')}`}>
+                 <Calendar className="w-4 h-4" /> Master Schedule
+               </Link>
                <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/users')}`}>
                  <Users className="w-4 h-4" /> User Mgmt
                </Link>
                <Link to="/admin/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/courses')}`}>
                  <BookOpen className="w-4 h-4" /> Course Mgmt
                </Link>
-               <Link to="/admin/reports" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/reports')}`}>
-                 <BarChart2 className="w-4 h-4" /> Reports
+               <Link to="/admin/analytics" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/analytics')}`}>
+                 <BarChart2 className="w-4 h-4" /> Teacher Analytics
                </Link>
                <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/finance')}`}>
                  <DollarSign className="w-4 h-4" /> Financials
@@ -458,6 +464,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
                 
                 {/* Teacher Routes */}
                 <Route path="/teacher/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherDashboardHome /></ProtectedRoute>} />
+                <Route path="/teacher/schedule" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherSchedulePage /></ProtectedRoute>} />
                 <Route path="/teacher/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
                 <Route path="/teacher/tests" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherTestsPage /></ProtectedRoute>} />
                 <Route path="/teacher/assignments" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherAssignmentsPage /></ProtectedRoute>} />
@@ -470,6 +477,8 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
                 <Route path="/admin/users" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminUserManagement /></ProtectedRoute>} />
                 <Route path="/admin/finance" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminFinancials /></ProtectedRoute>} />
                 <Route path="/admin/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherCoursesPage /></ProtectedRoute>} />
+                <Route path="/admin/schedule" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminScheduleView /></ProtectedRoute>} />
+                <Route path="/admin/analytics" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminTeacherAnalytics /></ProtectedRoute>} />
                 <Route path="/admin/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
                 <Route path="/admin/settings" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><div className="text-center p-12 text-gray-500">Settings Module Loading...</div></ProtectedRoute>} />
 

@@ -6,9 +6,9 @@ import {
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
   Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw, Loader2,
-  FileCheck, ArrowLeft, Menu, File, Film, AlertTriangle, Monitor
+  FileCheck, ArrowLeft, Menu, File, Film, AlertTriangle, Monitor, WifiOff
 } from 'lucide-react';
-import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem, CourseModule, CourseMaterial } from '../types';
+import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem, CourseModule, CourseMaterial, Schedule } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveSession } from '../context/LiveContext';
@@ -53,6 +53,24 @@ const StatusBadge = ({ status }: { status: string }) => {
 // --- PAGES ---
 
 export const StudentDashboardHome = () => {
+  const [schedule, setSchedule] = useState<Schedule[]>([]);
+  const userData = localStorage.getItem('zenro_session');
+  const user = userData ? JSON.parse(userData) : null;
+
+  useEffect(() => {
+      const fetchSchedule = async () => {
+          if (!user?.batch) return;
+          const { data } = await supabase.from('schedules')
+            .select('*')
+            .eq('batch_name', user.batch)
+            .gte('start_time', new Date().toISOString())
+            .order('start_time', { ascending: true })
+            .limit(3);
+          if(data) setSchedule(data);
+      };
+      fetchSchedule();
+  }, []);
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* 1. Header & Overview Stats */}
@@ -62,7 +80,7 @@ export const StudentDashboardHome = () => {
           <div className="absolute top-0 left-0 bottom-0 w-2 bg-zenro-red"></div>
           
           <div className="relative z-10">
-            <h2 className="text-3xl font-heading font-bold text-zenro-slate mb-2">Konnichiwa, Alex-san! <span className="text-xl font-normal text-gray-400"> (こんにちは)</span></h2>
+            <h2 className="text-3xl font-heading font-bold text-zenro-slate mb-2">Konnichiwa, {user?.name.split(' ')[0]}-san! <span className="text-xl font-normal text-gray-400"> (こんにちは)</span></h2>
             <p className="text-gray-600 mb-6 font-light">Your JLPT N4 exam is in <span className="font-bold text-zenro-red">45 days</span>. Keep pushing! 頑張ってください!</p>
             <div className="flex gap-3">
               <button className="bg-zenro-red text-white font-bold px-6 py-2 rounded-lg hover:bg-red-700 transition shadow-md flex items-center gap-2">
@@ -110,49 +128,28 @@ export const StudentDashboardHome = () => {
         </div>
       </div>
 
-      {/* 2. Hero Section - Course Resume */}
-      <div className="relative rounded-xl overflow-hidden bg-white border border-gray-200 shadow-md group">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528360983277-13d9012356ee?auto=format&fit=crop&q=80&w=1600')] bg-cover bg-center"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-zenro-blue/90 via-zenro-blue/80 to-transparent"></div>
-        
-        <div className="relative z-10 p-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
-           <div className="space-y-4 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zenro-red text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                <Play className="w-3 h-3 fill-current" /> Continue JLPT N4
-              </div>
-              <div>
-                <h1 className="text-3xl font-heading font-bold text-white leading-tight">Grammar: The Causative Form</h1>
-                <h2 className="text-xl text-blue-100 font-light mt-1">使役形 (Shieki-kei)</h2>
-              </div>
-              <p className="text-blue-200 font-light text-sm">Resume from 12:05 • Lesson 4 of 12 • Tanaka Sensei</p>
-              <div className="w-full max-w-md bg-white/20 rounded-full h-1.5 backdrop-blur">
-                  <div style={{width: '45%'}} className="bg-zenro-red h-1.5 rounded-full"></div>
-              </div>
-           </div>
-           
-           <button className="bg-white text-zenro-blue hover:bg-gray-100 px-8 py-3 rounded-lg font-bold flex items-center gap-3 transition shadow-lg border border-transparent">
-              <Play className="w-5 h-5 fill-current text-zenro-red" /> 
-              <span>Resume Lesson</span>
-           </button>
-        </div>
-      </div>
-
-      {/* 3. Daily Kanji & Activities */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Kanji of the Day */}
-          <div className="bg-white rounded-xl p-6 flex flex-col items-center text-center relative overflow-hidden group border border-gray-200 shadow-sm hover:shadow-md transition">
-              <div className="absolute -right-4 -top-4 text-9xl text-gray-100 font-heading select-none pointer-events-none group-hover:scale-110 transition duration-700">夢</div>
-              <h3 className="text-zenro-red text-[10px] font-bold uppercase tracking-widest mb-4 border border-red-100 bg-red-50 px-2 py-1 rounded">Kanji of the Day</h3>
-              <div className="text-6xl font-black text-zenro-slate mb-2 font-heading">夢</div>
-              <p className="text-2xl text-zenro-red mb-1 font-medium">Yume</p>
-              <p className="text-gray-500">Dream</p>
-              <div className="mt-4 text-sm text-gray-600 bg-gray-50 p-3 rounded w-full border border-gray-200">
-                  Ex: 将来の夢 (Future dream)
+      {/* 2. Upcoming Schedule & Resume */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+              <h3 className="text-xl font-heading font-bold text-zenro-slate mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-zenro-red" /> My Schedule
+              </h3>
+              <div className="space-y-3">
+                  {schedule.length === 0 ? <p className="text-gray-500">No upcoming classes.</p> : 
+                   schedule.map(s => (
+                      <div key={s.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border-l-4 border-zenro-blue">
+                          <div>
+                              <p className="font-bold text-slate-800">{s.title}</p>
+                              <p className="text-xs text-gray-500">{new Date(s.start_time).toLocaleString()}</p>
+                          </div>
+                      </div>
+                   ))
+                  }
               </div>
           </div>
 
           {/* Activities List */}
-          <div className="md:col-span-2 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-heading font-bold text-zenro-slate flex items-center gap-2">
                     <ListTodo className="w-5 h-5 text-zenro-red" /> Pending Tasks
@@ -311,6 +308,151 @@ export const StudentCoursesPage = () => {
   );
 };
 
+export const StudentLiveRoom = ({ user }: { user: User }) => {
+    const { isLive, topic, remoteStream, joinSession, leaveSession, chatMessages, sendMessage, connectionState } = useLiveSession();
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [msgInput, setMsgInput] = useState('');
+    const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+    const attendanceInterval = useRef<any>(null);
+
+    useEffect(() => {
+        if (isLive) {
+            joinSession();
+            checkAndLogAttendance();
+        }
+        return () => {
+            leaveSession();
+            if (attendanceInterval.current) clearInterval(attendanceInterval.current);
+        };
+    }, [isLive]);
+
+    // ATTENDANCE LOGIC
+    const checkAndLogAttendance = async () => {
+        if (!user.batch) return;
+        
+        // Find Active Session for Batch
+        const { data } = await supabase.from('live_sessions')
+            .select('id')
+            .eq('batch_name', user.batch)
+            .eq('status', 'LIVE')
+            .single();
+        
+        if (data) {
+            setActiveSessionId(data.id);
+            // Log Join
+            await supabase.from('attendance').insert({
+                session_id: data.id,
+                student_id: user.id,
+                total_minutes: 0
+            });
+
+            // Start Heartbeat (Every 1 min)
+            attendanceInterval.current = setInterval(async () => {
+                await supabase.rpc('increment_attendance', { 
+                    sid: data.id, 
+                    uid: user.id 
+                }); // Note: Ideally use RPC, but for simplicity here standard update
+                
+                // Fallback update without RPC
+                const { data: current } = await supabase.from('attendance')
+                    .select('total_minutes')
+                    .eq('session_id', data.id)
+                    .eq('student_id', user.id)
+                    .single();
+                
+                if(current) {
+                    await supabase.from('attendance').update({
+                        total_minutes: current.total_minutes + 1,
+                        last_heartbeat: new Date().toISOString()
+                    }).eq('session_id', data.id).eq('student_id', user.id);
+                }
+            }, 60000);
+        }
+    };
+
+    useEffect(() => {
+        if (videoRef.current && remoteStream) {
+            videoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
+
+    const handleSend = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (msgInput.trim()) {
+            sendMessage(user.name, msgInput);
+            setMsgInput('');
+        }
+    };
+
+    if (!isLive) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center space-y-6 text-center animate-fade-in p-8">
+                <div className="bg-gray-100 p-8 rounded-full">
+                    <WifiOff className="w-16 h-16 text-gray-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800">Class is currently offline</h2>
+                <p className="text-gray-500 max-w-md">Please check your schedule or wait for the instructor to start the session.</p>
+                <button onClick={() => window.location.reload()} className="px-6 py-2 bg-zenro-blue text-white rounded-lg font-bold hover:bg-blue-800 transition">Refresh Status</button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="h-[calc(100vh-2rem)] flex flex-col gap-4 animate-fade-in">
+             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                 <div>
+                     <h1 className="text-xl font-heading font-bold text-slate-800 flex items-center gap-2">
+                         <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></span> {topic}
+                     </h1>
+                     <p className="text-xs text-gray-500">Live Interactive Session • Tracking Attendance</p>
+                 </div>
+                 <div className="flex items-center gap-2">
+                     <span className={`px-2 py-1 rounded text-xs font-bold ${connectionState === 'connected' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                         {connectionState === 'connected' ? 'Connected' : 'Connecting...'}
+                     </span>
+                 </div>
+             </div>
+
+             <div className="flex-1 flex gap-4 overflow-hidden">
+                 <div className="flex-1 bg-black rounded-xl overflow-hidden relative shadow-lg flex flex-col justify-center items-center">
+                     {remoteStream ? (
+                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+                     ) : (
+                         <div className="text-white/50 flex flex-col items-center">
+                             <Loader2 className="w-12 h-12 animate-spin mb-4" />
+                             <p>Waiting for video stream...</p>
+                         </div>
+                     )}
+                 </div>
+
+                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm">
+                     <div className="p-3 border-b border-gray-200 font-bold text-sm text-slate-800 bg-gray-50">Class Chat</div>
+                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                         {chatMessages.map((msg, i) => (
+                             <div key={i} className="text-sm">
+                                 <p className="text-xs font-bold text-slate-500">{msg.user} <span className="opacity-50 font-normal ml-1">{msg.timestamp}</span></p>
+                                 <p className="text-slate-800">{msg.text}</p>
+                             </div>
+                         ))}
+                     </div>
+                     <form onSubmit={handleSend} className="p-3 border-t border-gray-200 bg-gray-50">
+                         <div className="flex gap-2">
+                             <input 
+                                type="text" 
+                                value={msgInput}
+                                onChange={e => setMsgInput(e.target.value)}
+                                className="flex-1 bg-white border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-zenro-blue"
+                                placeholder="Type a message..."
+                             />
+                             <button type="submit" className="bg-zenro-blue text-white p-2 rounded hover:bg-blue-800 transition"><Send className="w-4 h-4" /></button>
+                         </div>
+                     </form>
+                 </div>
+             </div>
+        </div>
+    );
+}
+
 export const StudentTestsPage = () => {
     const navigate = useNavigate();
     const [activeTests, setActiveTests] = useState<any[]>([]);
@@ -371,24 +513,11 @@ export const StudentTestsPage = () => {
 
     useEffect(() => {
         fetchTestsAndHistory();
-
-        // --- REAL-TIME SUBSCRIPTION ---
-        // Subscribe to changes in the 'submissions' table for this user
         const subscription = supabase
             .channel('public:submissions')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'submissions', filter: `student_id=eq.${user?.id}` },
-                (payload) => {
-                    console.log('Real-time submission update:', payload);
-                    fetchTestsAndHistory(); // Refresh lists immediately
-                }
-            )
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions', filter: `student_id=eq.${user?.id}` }, () => fetchTestsAndHistory())
             .subscribe();
-
-        return () => {
-            supabase.removeChannel(subscription);
-        };
+        return () => { supabase.removeChannel(subscription); };
     }, [user?.id, user?.batch]);
 
     if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
@@ -476,8 +605,6 @@ export const StudentTestsPage = () => {
     );
 };
 
-// --- NEW COMPONENTS FOR MISSING EXPORTS ---
-
 export const StudentFeesPage = ({ user }: { user: User }) => {
     const [fees, setFees] = useState<FeeRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -499,11 +626,7 @@ export const StudentFeesPage = ({ user }: { user: User }) => {
                     }));
                     setFees(mapped);
                 }
-            } catch (e) {
-                console.error("Fetch fees error", e);
-            } finally {
-                setLoading(false);
-            }
+            } catch (e) { console.error(e); } finally { setLoading(false); }
         };
         fetchFees();
     }, [user.id]);
@@ -563,9 +686,7 @@ export const StudentFeesPage = ({ user }: { user: User }) => {
 export const StudentProfilePage = ({ user }: { user: User }) => {
     return (
         <div className="space-y-8 animate-fade-in">
-             <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
-                <UserIcon className="w-8 h-8 text-zenro-red" /> My Profile
-             </h1>
+             <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3"><UserIcon className="w-8 h-8 text-zenro-red" /> My Profile</h1>
              <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
                  <div className="flex flex-col md:flex-row gap-8 items-start">
                      <div className="flex flex-col items-center gap-4">
@@ -573,34 +694,12 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
                          <span className="bg-zenro-blue text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">{user.role}</span>
                      </div>
                      <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-6">
-                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Full Name</p>
-                             <p className="text-lg font-bold text-slate-800">{user.name}</p>
-                         </div>
-                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Student ID</p>
-                             <p className="text-lg font-bold text-slate-800 font-mono">{user.rollNumber || user.id.slice(0, 8).toUpperCase()}</p>
-                         </div>
-                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Email Address</p>
-                             <p className="text-lg font-bold text-slate-800">{user.email}</p>
-                         </div>
-                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Assigned Batch</p>
-                             <p className="text-lg font-bold text-slate-800">{user.batch || 'Unassigned'}</p>
-                         </div>
-                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Phone Number</p>
-                             <p className="text-lg font-bold text-slate-800">{user.phone || 'Not Provided'}</p>
-                         </div>
-                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Guardian Contact</p>
-                             <p className="text-lg font-bold text-slate-800">--</p>
-                         </div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200"><p className="text-xs text-gray-500 font-bold uppercase mb-1">Full Name</p><p className="text-lg font-bold text-slate-800">{user.name}</p></div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200"><p className="text-xs text-gray-500 font-bold uppercase mb-1">Student ID</p><p className="text-lg font-bold text-slate-800 font-mono">{user.rollNumber || user.id.slice(0, 8).toUpperCase()}</p></div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200"><p className="text-xs text-gray-500 font-bold uppercase mb-1">Email Address</p><p className="text-lg font-bold text-slate-800">{user.email}</p></div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200"><p className="text-xs text-gray-500 font-bold uppercase mb-1">Assigned Batch</p><p className="text-lg font-bold text-slate-800">{user.batch || 'Unassigned'}</p></div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200"><p className="text-xs text-gray-500 font-bold uppercase mb-1">Phone Number</p><p className="text-lg font-bold text-slate-800">{user.phone || 'Not Provided'}</p></div>
                      </div>
-                 </div>
-                 <div className="mt-8 pt-8 border-t border-gray-100 flex justify-end">
-                     <button className="bg-gray-100 hover:bg-gray-200 text-slate-700 px-6 py-2 rounded-lg font-bold transition">Edit Details</button>
                  </div>
              </div>
         </div>
@@ -610,132 +709,19 @@ export const StudentProfilePage = ({ user }: { user: User }) => {
 export const StudentActivityPage = () => {
     return (
         <div className="space-y-8 animate-fade-in">
-             <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
-                <ListTodo className="w-8 h-8 text-zenro-red" /> Practice & Activities
-             </h1>
+             <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3"><ListTodo className="w-8 h-8 text-zenro-red" /> Practice & Activities</h1>
              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                 <div className="p-6 border-b border-gray-200 bg-gray-50">
-                     <h3 className="font-bold text-slate-800">Assigned Tasks</h3>
-                 </div>
+                 <div className="p-6 border-b border-gray-200 bg-gray-50"><h3 className="font-bold text-slate-800">Assigned Tasks</h3></div>
                  <div className="divide-y divide-gray-100">
                      {MOCK_ACTIVITIES.map(activity => (
                          <div key={activity.id} className="p-6 hover:bg-gray-50 transition flex items-center justify-between group">
                              <div className="flex items-center gap-4">
-                                 <div className={`p-3 rounded-full ${activity.type === 'ASSIGNMENT' ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>
-                                     {activity.type === 'ASSIGNMENT' ? <FileText className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
-                                 </div>
-                                 <div>
-                                     <h4 className="font-bold text-slate-800 text-lg group-hover:text-zenro-blue transition">{activity.title}</h4>
-                                     <p className="text-sm text-gray-500">{activity.courseName} • Due: {activity.dueDate}</p>
-                                 </div>
+                                 <div className={`p-3 rounded-full ${activity.type === 'ASSIGNMENT' ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>{activity.type === 'ASSIGNMENT' ? <FileText className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}</div>
+                                 <div><h4 className="font-bold text-slate-800 text-lg group-hover:text-zenro-blue transition">{activity.title}</h4><p className="text-sm text-gray-500">{activity.courseName} • Due: {activity.dueDate}</p></div>
                              </div>
-                             <div className="flex items-center gap-4">
-                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border ${activity.status === 'COMPLETED' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>
-                                     {activity.status}
-                                 </span>
-                                 <button className="text-gray-400 hover:text-zenro-red">
-                                     <ChevronRight className="w-5 h-5" />
-                                 </button>
-                             </div>
+                             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${activity.status === 'COMPLETED' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>{activity.status}</span>
                          </div>
                      ))}
-                 </div>
-             </div>
-        </div>
-    );
-}
-
-export const StudentLiveRoom = ({ user }: { user: User }) => {
-    const { isLive, topic, remoteStream, joinSession, leaveSession, chatMessages, sendMessage, connectionState } = useLiveSession();
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const [msgInput, setMsgInput] = useState('');
-
-    useEffect(() => {
-        if (isLive) {
-            joinSession();
-        }
-        return () => {
-            leaveSession();
-        };
-    }, [isLive]);
-
-    useEffect(() => {
-        if (videoRef.current && remoteStream) {
-            videoRef.current.srcObject = remoteStream;
-        }
-    }, [remoteStream]);
-
-    const handleSend = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (msgInput.trim()) {
-            sendMessage(user.name, msgInput);
-            setMsgInput('');
-        }
-    };
-
-    if (!isLive) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center space-y-6 text-center animate-fade-in p-8">
-                <div className="bg-gray-100 p-8 rounded-full">
-                    <WifiOff className="w-16 h-16 text-gray-400" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800">Class is currently offline</h2>
-                <p className="text-gray-500 max-w-md">Please check your schedule or wait for the instructor to start the session.</p>
-                <button onClick={() => window.location.reload()} className="px-6 py-2 bg-zenro-blue text-white rounded-lg font-bold hover:bg-blue-800 transition">Refresh Status</button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="h-[calc(100vh-2rem)] flex flex-col gap-4 animate-fade-in">
-             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                 <div>
-                     <h1 className="text-xl font-heading font-bold text-slate-800 flex items-center gap-2">
-                         <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></span> {topic}
-                     </h1>
-                     <p className="text-xs text-gray-500">Live Interactive Session</p>
-                 </div>
-                 <div className="flex items-center gap-2">
-                     <span className={`px-2 py-1 rounded text-xs font-bold ${connectionState === 'connected' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                         {connectionState === 'connected' ? 'Connected' : 'Connecting...'}
-                     </span>
-                 </div>
-             </div>
-
-             <div className="flex-1 flex gap-4 overflow-hidden">
-                 <div className="flex-1 bg-black rounded-xl overflow-hidden relative shadow-lg flex flex-col justify-center items-center">
-                     {remoteStream ? (
-                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
-                     ) : (
-                         <div className="text-white/50 flex flex-col items-center">
-                             <Loader2 className="w-12 h-12 animate-spin mb-4" />
-                             <p>Waiting for video stream...</p>
-                         </div>
-                     )}
-                 </div>
-
-                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm">
-                     <div className="p-3 border-b border-gray-200 font-bold text-sm text-slate-800 bg-gray-50">Class Chat</div>
-                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                         {chatMessages.map((msg, i) => (
-                             <div key={i} className="text-sm">
-                                 <p className="text-xs font-bold text-slate-500">{msg.user} <span className="opacity-50 font-normal ml-1">{msg.timestamp}</span></p>
-                                 <p className="text-slate-800">{msg.text}</p>
-                             </div>
-                         ))}
-                     </div>
-                     <form onSubmit={handleSend} className="p-3 border-t border-gray-200 bg-gray-50">
-                         <div className="flex gap-2">
-                             <input 
-                                type="text" 
-                                value={msgInput}
-                                onChange={e => setMsgInput(e.target.value)}
-                                className="flex-1 bg-white border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-zenro-blue"
-                                placeholder="Type a message..."
-                             />
-                             <button type="submit" className="bg-zenro-blue text-white p-2 rounded hover:bg-blue-800 transition"><Send className="w-4 h-4" /></button>
-                         </div>
-                     </form>
                  </div>
              </div>
         </div>
@@ -754,21 +740,7 @@ export const StudentCoursePlayer = () => {
             try {
                 const { data } = await supabase.from('courses').select('*').eq('id', courseId).single();
                 if (data) {
-                    setCourse({
-                        id: data.id,
-                        title: data.title,
-                        description: data.description,
-                        instructor: data.instructor_name || 'Tanaka Sensei',
-                        progress: 0,
-                        thumbnail: data.thumbnail,
-                        totalDuration: '10h',
-                        level: data.level,
-                        modules: [ // Mock modules since schema might be simple
-                            { id: 'm1', title: 'Introduction', materials: [] },
-                            { id: 'm2', title: 'Chapter 1: Basics', materials: [] },
-                            { id: 'm3', title: 'Chapter 2: Grammar', materials: [] }
-                        ]
-                    });
+                    setCourse({ id: data.id, title: data.title, description: data.description, instructor: data.instructor_name || 'Tanaka Sensei', progress: 0, thumbnail: data.thumbnail, totalDuration: '10h', level: data.level, modules: [{ id: 'm1', title: 'Introduction', materials: [] }, { id: 'm2', title: 'Chapter 1: Basics', materials: [] }] });
                 }
             } catch (e) { console.error(e); } 
             finally { setLoading(false); }
@@ -785,38 +757,9 @@ export const StudentCoursePlayer = () => {
                  <button onClick={() => navigate('/student/courses')} className="p-2 hover:bg-gray-200 rounded-full transition"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
                  <h1 className="text-2xl font-heading font-bold text-slate-800">{course.title}</h1>
              </div>
-
              <div className="flex-1 flex gap-6 overflow-hidden">
-                 {/* Video Player Area */}
-                 <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-lg flex items-center justify-center relative group">
-                     <div className="text-center">
-                         <Play className="w-16 h-16 text-white/50 mx-auto mb-4" />
-                         <p className="text-white/70 font-bold">Select a lesson to start</p>
-                     </div>
-                 </div>
-
-                 {/* Playlist / Syllabus */}
-                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm overflow-hidden">
-                     <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-slate-800">Course Content</div>
-                     <div className="flex-1 overflow-y-auto">
-                         {course.modules?.map((module, i) => (
-                             <div key={module.id} className="border-b border-gray-100 last:border-0">
-                                 <div className="p-4 bg-gray-50/50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer hover:bg-gray-100">
-                                     {module.title}
-                                 </div>
-                                 <div className="bg-white">
-                                     {[1,2,3].map(lesson => (
-                                         <div key={lesson} className="p-3 pl-8 hover:bg-blue-50 cursor-pointer flex items-center gap-3 text-sm text-gray-600 transition">
-                                             <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">{lesson}</div>
-                                             <span>Lesson {lesson}</span>
-                                             <span className="ml-auto text-xs text-gray-400">10:00</span>
-                                         </div>
-                                     ))}
-                                 </div>
-                             </div>
-                         ))}
-                     </div>
-                 </div>
+                 <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-lg flex items-center justify-center relative group"><div className="text-center"><Play className="w-16 h-16 text-white/50 mx-auto mb-4" /><p className="text-white/70 font-bold">Select a lesson to start</p></div></div>
+                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm overflow-hidden"><div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-slate-800">Course Content</div><div className="flex-1 overflow-y-auto">{course.modules?.map((module, i) => (<div key={module.id} className="border-b border-gray-100 last:border-0"><div className="p-4 bg-gray-50/50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer hover:bg-gray-100">{module.title}</div><div className="bg-white">{[1,2,3].map(lesson => (<div key={lesson} className="p-3 pl-8 hover:bg-blue-50 cursor-pointer flex items-center gap-3 text-sm text-gray-600 transition"><div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">{lesson}</div><span>Lesson {lesson}</span><span className="ml-auto text-xs text-gray-400">10:00</span></div>))}</div></div>))}</div></div>
              </div>
         </div>
     );

@@ -4,6 +4,9 @@
 -- ----------------------------------------------------------------
 
 -- 1. CLEANUP
+DROP TABLE IF EXISTS attendance CASCADE;
+DROP TABLE IF EXISTS live_sessions CASCADE;
+DROP TABLE IF EXISTS schedules CASCADE;
 -- [NEW CODE START]
 DROP TABLE IF EXISTS test_enrollments CASCADE;
 DROP TABLE IF EXISTS test_batches CASCADE;
@@ -86,11 +89,6 @@ CREATE TABLE course_enrollments (
 );
 
 -- [NEW CODE START] - Updated Tests Table
--- IMPORTANT: If upgrading an existing DB without reset, run:
--- ALTER TABLE tests ADD COLUMN IF NOT EXISTS description text;
--- ALTER TABLE tests ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT false;
--- ALTER TABLE tests ADD COLUMN IF NOT EXISTS allow_multiple_attempts boolean DEFAULT false;
-
 CREATE TABLE tests (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text NOT NULL,
@@ -160,6 +158,41 @@ CREATE TABLE payments (
   amount numeric,
   payment_date timestamptz DEFAULT now()
 );
+
+-- [NEW SCHEDULING & ATTENDANCE TABLES START]
+
+CREATE TABLE schedules (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  teacher_id text REFERENCES profiles(id),
+  batch_name text NOT NULL,
+  title text NOT NULL,
+  start_time timestamptz NOT NULL,
+  end_time timestamptz NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE live_sessions (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  teacher_id text REFERENCES profiles(id),
+  batch_name text,
+  topic text,
+  start_time timestamptz DEFAULT now(),
+  end_time timestamptz,
+  status text DEFAULT 'LIVE', -- LIVE, ENDED
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE attendance (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  session_id text REFERENCES live_sessions(id),
+  student_id text REFERENCES profiles(id),
+  join_time timestamptz DEFAULT now(),
+  last_heartbeat timestamptz DEFAULT now(),
+  total_minutes int DEFAULT 0,
+  status text DEFAULT 'PRESENT'
+);
+
+-- [NEW SCHEDULING & ATTENDANCE TABLES END]
 
 -- 3. SEED DATA
 

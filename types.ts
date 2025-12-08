@@ -86,13 +86,27 @@ export interface Test {
   assignedStudentIds?: string[];
 }
 
-export interface ExamSession {
+// --- LIVE & SCHEDULING TYPES ---
+
+export interface Schedule {
   id: string;
-  courseId: string;
+  teacher_id: string;
+  teacher_name?: string; 
+  batch_name: string;
   title: string;
-  durationMinutes: number;
-  warnings: number;
-  isActive: boolean;
+  start_time: string;
+  end_time: string;
+}
+
+export interface LiveSessionRecord {
+  id: string;
+  teacher_id: string;
+  teacher_name?: string;
+  batch_name: string;
+  topic: string;
+  start_time: string;
+  end_time?: string;
+  status: 'LIVE' | 'ENDED';
 }
 
 export interface LiveSession {
@@ -102,6 +116,17 @@ export interface LiveSession {
   transcript: string; // Mock transcript for AI
   isActive: boolean;
 }
+
+export interface AttendanceRecord {
+  id: string;
+  session_id: string;
+  student_id: string;
+  join_time: string;
+  last_heartbeat: string;
+  total_minutes: number;
+}
+
+// --- ANALYTICS ---
 
 export interface AnalyticsData {
   name: string;
