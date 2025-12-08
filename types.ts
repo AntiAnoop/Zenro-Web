@@ -77,6 +77,7 @@ export interface Test {
   duration_minutes: number;
   passing_score: number;
   is_active: boolean;
+  allow_multiple_attempts: boolean; // New Field
   questions?: Question[];
   created_at?: string;
   

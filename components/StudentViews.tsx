@@ -684,19 +684,48 @@ export const StudentTestsPage = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const { data: subs } = await supabase.from('submissions').select(`id, score, total_score, completed_at, test_id, tests (title, duration_minutes)`).eq('status', 'COMPLETED').eq('student_id', user.id).order('completed_at', { ascending: false });
+                // 1. Get History
+                const { data: subs } = await supabase
+                    .from('submissions')
+                    .select(`id, score, total_score, completed_at, test_id, tests (title, duration_minutes)`)
+                    .eq('status', 'COMPLETED')
+                    .eq('student_id', user.id)
+                    .order('completed_at', { ascending: false });
+                
                 if(subs) setPastSubmissions(subs);
+
+                // 2. Get Assigned Tests (Direct & Batch)
                 const { data: batchTests } = await supabase.from('test_batches').select('test_id').eq('batch_name', user.batch);
                 const { data: directTests } = await supabase.from('test_enrollments').select('test_id').eq('student_id', user.id);
+                
                 const eligibleTestIds = new Set<string>();
                 if(batchTests) batchTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
                 if(directTests) directTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
+
                 if (eligibleTestIds.size > 0) {
-                    const { data: tests } = await supabase.from('tests').select('*').in('id', Array.from(eligibleTestIds)).eq('is_active', true);
-                    const submittedIds = new Set(subs?.map((s:any) => s.test_id) || []);
-                    setActiveTests((tests || []).filter((t:any) => !submittedIds.has(t.id)));
-                } else { setActiveTests([]); }
-            } catch (error) { console.error(error); } finally { setLoading(false); }
+                    const { data: tests } = await supabase
+                        .from('tests')
+                        .select('*')
+                        .in('id', Array.from(eligibleTestIds))
+                        .eq('is_active', true);
+                    
+                    if (tests) {
+                        const submittedTestIds = new Set(subs?.map((s:any) => s.test_id) || []);
+                        
+                        // LOGIC: Show if NOT taken OR (Taken AND AllowMultipleAttempts)
+                        const filtered = tests.filter((t: any) => 
+                            !submittedTestIds.has(t.id) || t.allow_multiple_attempts
+                        );
+                        setActiveTests(filtered);
+                    }
+                } else { 
+                    setActiveTests([]); 
+                }
+            } catch (error) { 
+                console.error(error); 
+            } finally { 
+                setLoading(false); 
+            }
         };
         fetchData();
     }, [user?.id, user?.batch]);
@@ -720,7 +749,7 @@ export const StudentTestsPage = () => {
                     <div className="p-12 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
                         <div className="flex justify-center mb-4"><FileCheck className="w-12 h-12 text-gray-400" /></div>
                         <h3 className="text-xl font-bold text-gray-600 mb-2">No Active Assessments</h3>
-                        <p className="text-gray-500">There are currently no active tests available for you.</p>
+                        <p className="text-gray-500">You have completed all pending tests or none are assigned.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -733,7 +762,10 @@ export const StudentTestsPage = () => {
                                     <div className="p-3 bg-blue-50 text-zenro-blue rounded-lg"><Activity className="w-6 h-6" /></div>
                                 </div>
                                 <h3 className="text-lg font-bold text-zenro-slate mb-1">{test.title}</h3>
-                                <p className="text-sm text-gray-500 mb-6">{test.duration_minutes} Minutes • Passing: {test.passing_score || 40}%</p>
+                                <p className="text-sm text-gray-500 mb-6">
+                                    {test.duration_minutes} Minutes • Passing: {test.passing_score || 40}%
+                                    {test.allow_multiple_attempts && <span className="block text-xs text-green-600 font-bold mt-1">Retakes Allowed</span>}
+                                </p>
                                 <div className="mt-auto">
                                 <button onClick={() => navigate(`/student/test/${test.id}`)} className="w-full py-3 bg-zenro-red hover:bg-red-700 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 shadow-sm">
                                     Start Test <ChevronRight className="w-4 h-4" />

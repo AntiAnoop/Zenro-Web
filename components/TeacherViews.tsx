@@ -8,7 +8,7 @@ import {
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
   Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff,
-  FileCheck, HelpCircle, CheckSquare, Target
+  FileCheck, HelpCircle, CheckSquare, Target, ChevronLeft, Radio
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User, Test, Question } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -132,7 +132,14 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [testData, setTestData] = useState<Partial<Test>>({
-        title: '', description: '', duration_minutes: 30, passing_score: 40, is_active: false, assignedBatches: [], assignedStudentIds: []
+        title: '', 
+        description: '', 
+        duration_minutes: 30, 
+        passing_score: 40, 
+        is_active: false, 
+        allow_multiple_attempts: false,
+        assignedBatches: [], 
+        assignedStudentIds: []
     });
     const [questions, setQuestions] = useState<Partial<Question>[]>([]);
     const [availableBatches, setAvailableBatches] = useState<string[]>([]);
@@ -155,7 +162,11 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
                 setQuestions(qData || []);
                 const { data: bAssign } = await supabase.from('test_batches').select('batch_name').eq('test_id', initialData.id);
                 const { data: sAssign } = await supabase.from('test_enrollments').select('student_id').eq('test_id', initialData.id);
-                setTestData({ ...initialData, assignedBatches: bAssign?.map(b => b.batch_name) || [], assignedStudentIds: sAssign?.map(s => s.student_id) || [] });
+                setTestData({ 
+                    ...initialData, 
+                    assignedBatches: bAssign?.map(b => b.batch_name) || [], 
+                    assignedStudentIds: sAssign?.map(s => s.student_id) || [] 
+                });
             }
         };
         loadResources();
@@ -172,18 +183,53 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
         if (activate && !confirm("Confirm Publish: This test will be immediately available.")) return;
         setLoading(true);
         try {
-            const payload = { title: testData.title, description: testData.description || '', duration_minutes: testData.duration_minutes || 30, passing_score: testData.passing_score || 40, is_active: activate };
+            const payload = { 
+                title: testData.title, 
+                description: testData.description || '', 
+                duration_minutes: testData.duration_minutes || 30, 
+                passing_score: testData.passing_score || 40, 
+                is_active: activate,
+                allow_multiple_attempts: testData.allow_multiple_attempts 
+            };
+            
             let currentTestId = initialData?.id;
-            if (currentTestId) { await supabase.from('tests').update(payload).eq('id', currentTestId); } 
-            else { const { data } = await supabase.from('tests').insert(payload).select().single(); currentTestId = data.id; }
+            if (currentTestId) { 
+                await supabase.from('tests').update(payload).eq('id', currentTestId); 
+            } else { 
+                const { data } = await supabase.from('tests').insert(payload).select().single(); 
+                currentTestId = data.id; 
+            }
+            
             await supabase.from('questions').delete().eq('test_id', currentTestId);
-            if (questions.length > 0) { await supabase.from('questions').insert(questions.map(q => ({ test_id: currentTestId, question_text: q.question_text, options: q.options, correct_option_index: q.correct_option_index, marks: q.marks }))); }
+            if (questions.length > 0) { 
+                await supabase.from('questions').insert(questions.map(q => ({ 
+                    test_id: currentTestId, 
+                    question_text: q.question_text, 
+                    options: q.options, 
+                    correct_option_index: q.correct_option_index, 
+                    marks: q.marks 
+                }))); 
+            }
+            
             await supabase.from('test_batches').delete().eq('test_id', currentTestId);
-            if(testData.assignedBatches?.length) { await supabase.from('test_batches').insert(testData.assignedBatches.map(b => ({ test_id: currentTestId, batch_name: b }))); }
+            if(testData.assignedBatches?.length) { 
+                await supabase.from('test_batches').insert(testData.assignedBatches.map(b => ({ test_id: currentTestId, batch_name: b }))); 
+            }
+            
             await supabase.from('test_enrollments').delete().eq('test_id', currentTestId);
-            if(testData.assignedStudentIds?.length) { await supabase.from('test_enrollments').insert(testData.assignedStudentIds.map(s => ({ test_id: currentTestId, student_id: s }))); }
-            alert(`Test ${activate ? 'Published' : 'Saved'} Successfully!`); onRefresh(); onClose();
-        } catch (e: any) { console.error("Save Test Error:", e); alert(`Error saving test: ${e.message}`); } finally { setLoading(false); }
+            if(testData.assignedStudentIds?.length) { 
+                await supabase.from('test_enrollments').insert(testData.assignedStudentIds.map(s => ({ test_id: currentTestId, student_id: s }))); 
+            }
+            
+            alert(`Test ${activate ? 'Published' : 'Saved'} Successfully!`); 
+            onRefresh(); 
+            onClose();
+        } catch (e: any) { 
+            console.error("Save Test Error:", e); 
+            alert(`Error saving test: ${e.message}`); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const toggleBatch = (b: string) => { const current = testData.assignedBatches || []; setTestData({ ...testData, assignedBatches: current.includes(b) ? current.filter(x => x !== b) : [...current, b] }); };
@@ -216,6 +262,20 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
                             <div className="grid grid-cols-2 gap-6">
                                 <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Duration (Minutes)</label><input type="number" className="w-full bg-white border border-gray-300 rounded-lg p-3 text-slate-800 focus:border-zenro-red outline-none" value={testData.duration_minutes} onChange={e => setTestData({...testData, duration_minutes: parseInt(e.target.value)})} /></div>
                                 <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Passing Score (%)</label><input type="number" className="w-full bg-white border border-gray-300 rounded-lg p-3 text-slate-800 focus:border-zenro-red outline-none" value={testData.passing_score} onChange={e => setTestData({...testData, passing_score: parseInt(e.target.value)})} /></div>
+                            </div>
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-5 h-5 text-zenro-red rounded focus:ring-zenro-red"
+                                        checked={testData.allow_multiple_attempts} 
+                                        onChange={e => setTestData({...testData, allow_multiple_attempts: e.target.checked})}
+                                    />
+                                    <div>
+                                        <span className="font-bold text-slate-800 text-sm">Allow Multiple Attempts</span>
+                                        <p className="text-xs text-gray-500">If checked, students can retake this test to improve their score.</p>
+                                    </div>
+                                </label>
                             </div>
                         </div>
                     )}
@@ -277,6 +337,7 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
                             <div className="grid grid-cols-2 gap-4 text-left bg-gray-50 p-6 rounded-xl border border-gray-200">
                                 <div><p className="text-xs text-gray-500 uppercase font-bold">Title</p><p className="text-slate-800 font-bold">{testData.title}</p></div>
                                 <div><p className="text-xs text-gray-500 uppercase font-bold">Questions</p><p className="text-slate-800 font-bold">{questions.length}</p></div>
+                                <div><p className="text-xs text-gray-500 uppercase font-bold">Retries</p><p className="text-slate-800 font-bold">{testData.allow_multiple_attempts ? "Allowed" : "One-time only"}</p></div>
                             </div>
                             <div className="flex gap-4 justify-center">
                                 <button onClick={() => handleSave(false)} disabled={loading} className="px-8 py-4 bg-gray-200 hover:bg-gray-300 rounded-xl font-bold text-gray-700 flex items-center gap-2 transition">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-5 h-5" />} Save as Draft</button>
@@ -294,6 +355,422 @@ const TestCreationModal = ({ onClose, onRefresh, initialData }: TestModalProps) 
     );
 };
 
+// --- TEST RESULTS ANALYTICS VIEW ---
+const TestResultsView = ({ test, onClose }: { test: Test, onClose: () => void }) => {
+    const navigate = useNavigate();
+    const [submissions, setSubmissions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchResults = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('submissions')
+                .select('*, profiles(full_name, student_id)')
+                .eq('test_id', test.id)
+                .order('completed_at', { ascending: false });
+            
+            if (data) setSubmissions(data);
+            setLoading(false);
+        };
+        fetchResults();
+    }, [test.id]);
+
+    const passedCount = submissions.filter(s => (s.score/s.total_score)*100 >= test.passing_score).length;
+    const passRate = submissions.length > 0 ? Math.round((passedCount / submissions.length) * 100) : 0;
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+                <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <div className="flex items-center gap-4">
+                        <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full text-gray-500"><ChevronLeft className="w-6 h-6"/></button>
+                        <div>
+                            <h2 className="text-xl font-bold text-zenro-slate">{test.title} - Results</h2>
+                            <p className="text-sm text-gray-500">Date Created: {new Date(test.created_at || '').toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="text-center px-4">
+                            <p className="text-xs text-gray-500 font-bold uppercase">Attempts</p>
+                            <p className="text-xl font-bold text-zenro-slate">{submissions.length}</p>
+                        </div>
+                        <div className="text-center px-4 border-l border-gray-300">
+                            <p className="text-xs text-gray-500 font-bold uppercase">Pass Rate</p>
+                            <p className={`text-xl font-bold ${passRate >= 70 ? 'text-green-600' : 'text-orange-500'}`}>{passRate}%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-auto bg-white p-6">
+                    {loading ? (
+                        <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 text-zenro-red animate-spin" /></div>
+                    ) : submissions.length === 0 ? (
+                        <div className="text-center p-12 border-2 border-dashed border-gray-200 rounded-xl text-gray-500">
+                            No students have attempted this test yet.
+                        </div>
+                    ) : (
+                        <table className="w-full text-left text-sm text-gray-500">
+                            <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs sticky top-0">
+                                <tr>
+                                    <th className="p-4">Student Name</th>
+                                    <th className="p-4">ID</th>
+                                    <th className="p-4">Submitted At</th>
+                                    <th className="p-4">Score</th>
+                                    <th className="p-4">Status</th>
+                                    <th className="p-4 text-right">Report</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {submissions.map(sub => {
+                                    const percentage = Math.round((sub.score / sub.total_score) * 100);
+                                    const isPass = percentage >= test.passing_score;
+                                    return (
+                                        <tr key={sub.id} className="hover:bg-gray-50 transition">
+                                            <td className="p-4 font-bold text-slate-800">{sub.profiles?.full_name || 'Unknown'}</td>
+                                            <td className="p-4 font-mono text-xs">{sub.profiles?.student_id || '-'}</td>
+                                            <td className="p-4">{new Date(sub.completed_at).toLocaleString()}</td>
+                                            <td className="p-4 font-bold">{sub.score} / {sub.total_score} <span className="text-xs font-normal text-gray-400">({percentage}%)</span></td>
+                                            <td className="p-4">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold border ${isPass ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                                                    {isPass ? 'Passed' : 'Failed'}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <button 
+                                                    onClick={() => navigate(`/teacher/report/${sub.id}`)}
+                                                    className="bg-white border border-gray-300 hover:border-zenro-red hover:text-zenro-red text-gray-600 px-3 py-1 rounded text-xs font-bold transition shadow-sm"
+                                                >
+                                                    View Detailed Report
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const TeacherCoursesPage = () => {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch logic similar to StudentCoursesPage but maybe all courses or instructor specific
+    const fetchCourses = async () => {
+        setLoading(true);
+        const { data } = await supabase.from('courses').select('*');
+        if (data) {
+             const mapped: Course[] = data.map((c: any) => ({
+                id: c.id,
+                title: c.title,
+                description: c.description,
+                instructor: c.instructor_name || 'Tanaka Sensei',
+                progress: 0,
+                thumbnail: c.thumbnail,
+                totalDuration: '10h 30m',
+                level: c.level,
+                status: c.status,
+                studentCount: 20 // Mock
+            }));
+            setCourses(mapped);
+        }
+        setLoading(false);
+    };
+    fetchCourses();
+  }, []);
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+        <div className="flex justify-between items-center">
+            <div>
+                <h1 className="text-3xl font-heading font-bold text-zenro-slate">Course Management</h1>
+                <p className="text-gray-500">Manage curriculum and materials.</p>
+            </div>
+            <button className="bg-zenro-red text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                <Plus className="w-5 h-5" /> New Course
+            </button>
+        </div>
+
+        {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 text-zenro-red animate-spin" /></div> : (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {courses.map(course => (
+                    <div key={course.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition group">
+                        <div className="relative aspect-video bg-gray-200">
+                             <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                             <div className="absolute top-2 right-2 bg-white/90 px-2 py-1 rounded text-xs font-bold text-zenro-slate shadow-sm">{course.level}</div>
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-bold text-zenro-slate text-lg mb-1">{course.title}</h3>
+                            <p className="text-sm text-gray-500 line-clamp-2 mb-4">{course.description}</p>
+                            <div className="flex justify-between items-center text-xs text-gray-500 font-bold">
+                                <span>{course.studentCount} Students</span>
+                                <span className={`px-2 py-1 rounded ${course.status === 'PUBLISHED' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>{course.status}</span>
+                            </div>
+                        </div>
+                         <div className="p-4 border-t border-gray-100 flex justify-end gap-2 bg-gray-50">
+                            <button className="text-gray-500 hover:text-zenro-blue p-2"><Edit3 className="w-4 h-4" /></button>
+                            <button className="text-gray-500 hover:text-zenro-red p-2"><Trash2 className="w-4 h-4" /></button>
+                         </div>
+                    </div>
+                ))}
+             </div>
+        )}
+    </div>
+  );
+};
+
+export const TeacherAssignmentsPage = () => {
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-heading font-bold text-zenro-slate">Assignments</h1>
+                    <p className="text-gray-500">Track homework and projects.</p>
+                </div>
+                <button className="bg-zenro-red text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                    <Plus className="w-5 h-5" /> New Assignment
+                </button>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                 <table className="w-full text-left text-sm text-gray-500">
+                     <thead className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200">
+                         <tr>
+                             <th className="p-4">Title</th>
+                             <th className="p-4">Course</th>
+                             <th className="p-4">Due Date</th>
+                             <th className="p-4">Submissions</th>
+                             <th className="p-4">Status</th>
+                             <th className="p-4 text-right">Actions</th>
+                         </tr>
+                     </thead>
+                     <tbody className="divide-y divide-gray-100">
+                         {MOCK_ASSIGNMENTS.map(assign => (
+                             <tr key={assign.id} className="hover:bg-gray-50 transition">
+                                 <td className="p-4 font-bold text-zenro-slate">{assign.title}</td>
+                                 <td className="p-4">{assign.courseName}</td>
+                                 <td className="p-4">{assign.dueDate}</td>
+                                 <td className="p-4">
+                                     <div className="flex items-center gap-2">
+                                         <div className="flex-1 w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
+                                             <div style={{width: `${(assign.totalSubmissions/assign.totalStudents)*100}%`}} className="bg-zenro-blue h-full rounded-full"></div>
+                                         </div>
+                                         <span className="text-xs font-bold">{assign.totalSubmissions}/{assign.totalStudents}</span>
+                                     </div>
+                                 </td>
+                                 <td className="p-4">
+                                     <span className={`px-2 py-1 rounded text-xs font-bold ${assign.status === 'ACTIVE' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
+                                         {assign.status}
+                                     </span>
+                                 </td>
+                                 <td className="p-4 text-right">
+                                     <button className="text-zenro-blue hover:underline text-xs font-bold">View</button>
+                                 </td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </table>
+            </div>
+        </div>
+    );
+};
+
+export const TeacherReportsPage = () => {
+    // This can reuse the analytics charts from Admin or display a summary
+    return (
+        <div className="space-y-6 animate-fade-in">
+             <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-heading font-bold text-zenro-slate">Performance Reports</h1>
+             </div>
+             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                 <h3 className="font-bold text-lg mb-4">Class Performance Overview</h3>
+                 <div className="h-80 w-full">
+                     <ResponsiveContainer width="100%" height="100%">
+                         <BarChart data={MOCK_PERFORMANCE}>
+                             <XAxis dataKey="name" />
+                             <YAxis />
+                             <Tooltip />
+                             <Legend />
+                             <Bar dataKey="avgScore" name="Average Score" fill="#1A237E" />
+                             <Bar dataKey="attendance" name="Attendance %" fill="#E60012" />
+                         </BarChart>
+                     </ResponsiveContainer>
+                 </div>
+             </div>
+        </div>
+    );
+};
+
+export const LiveClassConsole = () => {
+  const { 
+    isLive, topic, viewerCount, startSession, endSession, 
+    connectionState, chatMessages, sendMessage, localStream, enablePreview, toggleMic, toggleCamera
+  } = useLiveSession();
+  
+  const [topicInput, setTopicInput] = useState('');
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const [msgInput, setMsgInput] = useState('');
+  const [transcript, setTranscript] = useState('');
+  const [summary, setSummary] = useState('');
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+     if (localStream && localVideoRef.current) {
+         localVideoRef.current.srcObject = localStream;
+     }
+  }, [localStream]);
+
+  const handleToggleMic = () => {
+      toggleMic(!micOn);
+      setMicOn(!micOn);
+  }
+
+   const handleToggleCam = () => {
+      toggleCamera(!camOn);
+      setCamOn(!camOn);
+  }
+
+  const handleSendMessage = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(msgInput.trim()) {
+          sendMessage('Tanaka Sensei', msgInput);
+          setMsgInput('');
+      }
+  }
+
+  const handleGenerateSummary = async () => {
+      setIsGeneratingSummary(true);
+      const text = chatMessages.map(m => `${m.user}: ${m.text}`).join('\n') + "\n" + (transcript || "Instructor discussed Japanese grammar points related to the causative form.");
+      const result = await generateClassSummary(text);
+      setSummary(result);
+      setIsGeneratingSummary(false);
+  }
+
+  return (
+    <div className="h-[calc(100vh-2rem)] flex flex-col gap-4 animate-fade-in">
+        <div className="flex justify-between items-center">
+             <div>
+                 <h1 className="text-2xl font-heading font-bold text-zenro-slate flex items-center gap-2">
+                     <Video className="w-6 h-6 text-zenro-red" /> Live Classroom Console
+                 </h1>
+                 <p className="text-gray-500 text-sm">Control your broadcast and interact with students.</p>
+             </div>
+             <div className="flex items-center gap-4">
+                 {isLive ? (
+                     <div className="flex items-center gap-4">
+                         <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2">
+                             <span className="w-2 h-2 bg-red-600 rounded-full"></span> LIVE
+                         </div>
+                         <div className="text-sm font-bold text-gray-600 flex items-center gap-2">
+                             <Users className="w-4 h-4" /> {viewerCount} Viewers
+                         </div>
+                         <button onClick={endSession} className="bg-gray-800 text-white hover:bg-black px-6 py-2 rounded-lg font-bold text-sm shadow-md transition">End Class</button>
+                     </div>
+                 ) : (
+                     <div className="flex items-center gap-2">
+                         <input 
+                            type="text" 
+                            placeholder="Enter Class Topic..." 
+                            value={topicInput}
+                            onChange={e => setTopicInput(e.target.value)}
+                            className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm w-64 outline-none focus:border-zenro-blue"
+                         />
+                         <button 
+                            onClick={() => startSession(topicInput || 'General Discussion')}
+                            className="bg-zenro-red text-white hover:bg-red-700 px-6 py-2 rounded-lg font-bold text-sm shadow-md flex items-center gap-2 transition"
+                         >
+                             <Radio className="w-4 h-4" /> Go Live
+                         </button>
+                     </div>
+                 )}
+             </div>
+        </div>
+
+        <div className="flex-1 flex gap-6 overflow-hidden">
+            {/* Main Video Area */}
+            <div className="flex-1 bg-black rounded-xl overflow-hidden relative shadow-2xl flex flex-col group">
+                {localStream ? (
+                    <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]" />
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-500 bg-gray-900">
+                        <CameraOff className="w-16 h-16 mb-4 opacity-50" />
+                        <p className="font-bold">Camera is Off</p>
+                        <button onClick={enablePreview} className="mt-4 text-zenro-blue underline text-sm hover:text-white">Enable Preview</button>
+                    </div>
+                )}
+                
+                {/* Controls Overlay */}
+                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-gray-900/80 backdrop-blur p-3 rounded-full border border-gray-700 shadow-xl transition-opacity opacity-0 group-hover:opacity-100">
+                    <button onClick={handleToggleMic} className={`p-3 rounded-full ${micOn ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-red-600 text-white'}`}>
+                        {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                    </button>
+                    <button onClick={handleToggleCam} className={`p-3 rounded-full ${camOn ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-red-600 text-white'}`}>
+                        {camOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
+                    </button>
+                     <button className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white">
+                        <Monitor className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Side Panel: Chat & AI Summary */}
+            <div className="w-96 flex flex-col gap-4">
+                {/* Chat */}
+                <div className="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
+                    <div className="p-3 border-b border-gray-200 bg-gray-50 font-bold text-sm text-zenro-slate flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4" /> Live Chat
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
+                        {chatMessages.map((m, i) => (
+                             <div key={i} className="text-sm">
+                                 <p className="text-xs font-bold text-gray-500 mb-0.5">{m.user} <span className="text-[10px] font-normal opacity-70 ml-1">{m.timestamp}</span></p>
+                                 <p className="text-slate-700">{m.text}</p>
+                             </div>
+                        ))}
+                    </div>
+                    <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-200 bg-gray-50">
+                        <input 
+                            type="text" 
+                            value={msgInput}
+                            onChange={e => setMsgInput(e.target.value)}
+                            placeholder="Send a message..." 
+                            className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-zenro-blue"
+                        />
+                    </form>
+                </div>
+
+                {/* AI Summary Tool */}
+                <div className="h-64 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
+                     <div className="p-3 border-b border-gray-200 bg-gray-50 font-bold text-sm text-zenro-slate flex items-center justify-between">
+                        <div className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-zenro-red" /> AI Summary</div>
+                        <button onClick={handleGenerateSummary} disabled={isGeneratingSummary} className="text-[10px] bg-zenro-blue text-white px-2 py-1 rounded hover:bg-blue-800 disabled:opacity-50">
+                            {isGeneratingSummary ? 'Generating...' : 'Generate'}
+                        </button>
+                    </div>
+                    <div className="p-4 flex-1 overflow-y-auto text-xs text-slate-600 leading-relaxed">
+                        {summary ? (
+                            <div className="prose prose-sm max-w-none">
+                                {summary.split('\n').map((line, i) => <p key={i} className="mb-1">{line}</p>)}
+                            </div>
+                        ) : (
+                            <p className="text-gray-400 italic text-center mt-8">Start the class and generate a summary afterwards.</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  );
+};
+
 export const TeacherTestsPage = () => {
     const [tests, setTests] = useState<Test[]>([]);
     const [loading, setLoading] = useState(true);
@@ -301,6 +778,7 @@ export const TeacherTestsPage = () => {
     const [editingTest, setEditingTest] = useState<Test | null>(null);
     const [statusModal, setStatusModal] = useState<{ test: Test, targetStatus: boolean } | null>(null);
     const [deleteModal, setDeleteModal] = useState<Test | null>(null);
+    const [viewingResults, setViewingResults] = useState<Test | null>(null);
 
     useEffect(() => { fetchTests(); }, []);
 
@@ -330,11 +808,18 @@ export const TeacherTestsPage = () => {
                 <div className="grid grid-cols-1 gap-4">
                     {tests.map(test => (
                         <div key={test.id} className="bg-white p-6 rounded-xl border border-gray-200 flex justify-between items-center hover:shadow-md transition shadow-sm group">
-                            <div>
+                            <div className="cursor-pointer flex-1" onClick={() => setViewingResults(test)}>
                                 <div className="flex items-center gap-3 mb-1"><h3 className="text-xl font-bold text-zenro-slate group-hover:text-zenro-red transition">{test.title}</h3><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${test.is_active ? 'bg-green-100 text-green-600 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>{test.is_active ? 'Live' : 'Draft'}</span></div>
-                                <div className="flex gap-4 text-sm text-gray-500"><span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {test.duration_minutes} Mins</span><span className="flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Pass: {test.passing_score}%</span></div>
+                                <div className="flex gap-4 text-sm text-gray-500">
+                                    <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {test.duration_minutes} Mins</span>
+                                    <span className="flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Pass: {test.passing_score}%</span>
+                                    <span className="flex items-center gap-1"><Target className="w-4 h-4" /> {test.allow_multiple_attempts ? 'Retries Allowed' : 'Single Attempt'}</span>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 border-l border-gray-200 pl-6">
+                                <button onClick={() => setViewingResults(test)} className="text-xs font-bold text-zenro-blue hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded transition">
+                                    View Analytics
+                                </button>
                                 <button onClick={() => setStatusModal({ test, targetStatus: !test.is_active })} className={`px-4 py-2 rounded-lg text-sm font-bold border transition ${test.is_active ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}>{test.is_active ? 'Active' : 'Publish'}</button>
                                 <div className="h-8 w-[1px] bg-gray-200"></div>
                                 <button onClick={() => { setEditingTest(test); setIsCreatorOpen(true); }} className="p-2 text-gray-400 hover:text-zenro-blue rounded transition"><Edit3 className="w-5 h-5" /></button>
@@ -344,7 +829,11 @@ export const TeacherTestsPage = () => {
                     ))}
                 </div>
             )}
+            
             {isCreatorOpen && <TestCreationModal initialData={editingTest} onClose={() => setIsCreatorOpen(false)} onRefresh={fetchTests} />}
+            
+            {viewingResults && <TestResultsView test={viewingResults} onClose={() => setViewingResults(null)} />}
+
             {statusModal && (
                 <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="bg-white w-full max-w-sm rounded-xl border border-gray-200 shadow-2xl p-6 text-center">
@@ -363,140 +852,6 @@ export const TeacherTestsPage = () => {
                     </div>
                 </div>
             )}
-        </div>
-    );
-};
-
-export const TeacherCoursesPage = () => {
-    // Reusing same logic, simplified styles for brevity - white cards, gray text
-    return <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-200">Course Management (Use same structure as Student/Admin)</div>;
-};
-
-export const LiveClassConsole = () => {
-    const { isLive, topic, viewerCount, localStream, chatMessages, startSession, endSession, enablePreview, toggleMic, toggleCamera, sendMessage } = useLiveSession();
-    const [title, setTitle] = useState('');
-    const [micOn, setMicOn] = useState(true);
-    const [camOn, setCamOn] = useState(true);
-    const videoRef = useRef<HTMLVideoElement>(null);
-
-    useEffect(() => { if (localStream && videoRef.current) videoRef.current.srcObject = localStream; }, [localStream]);
-    const handleToggleMic = () => { setMicOn(!micOn); toggleMic(!micOn); };
-    const handleToggleCam = () => { setCamOn(!camOn); toggleCamera(!camOn); };
-
-    return (
-        <div className="h-[calc(100vh-2rem)] flex gap-6 animate-fade-in">
-            <div className="flex-1 flex flex-col gap-4">
-                 <div className="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center shadow-sm">
-                    <div><h2 className="text-xl font-bold text-zenro-slate flex items-center gap-2"><Video className="w-6 h-6 text-zenro-red" /> Console</h2><p className="text-sm text-gray-500">{isLive ? `Broadcasting: ${topic}` : 'Session Offline'}</p></div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 text-gray-500 bg-gray-100 px-3 py-1 rounded"><Users className="w-4 h-4" /> <span className="font-mono font-bold text-slate-800">{viewerCount}</span></div>
-                        {!isLive ? (
-                            <div className="flex gap-2"><input type="text" placeholder="Topic..." className="bg-gray-100 border border-gray-300 text-slate-800 px-3 py-2 rounded-lg text-sm outline-none focus:border-zenro-red w-64" value={title} onChange={e => setTitle(e.target.value)} /><button onClick={() => startSession(title || 'Class')} className="bg-zenro-red hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"><WifiOff className="w-4 h-4" /> Go Live</button><button onClick={enablePreview} className="bg-gray-200 text-slate-700 px-3 py-2 rounded-lg text-sm">Preview</button></div>
-                        ) : <button onClick={endSession} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow-md animate-pulse">End Class</button>}
-                    </div>
-                 </div>
-                 <div className="flex-1 bg-black rounded-xl border border-gray-800 overflow-hidden relative group">
-                     {localStream ? <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" /> : <div className="absolute inset-0 flex items-center justify-center text-gray-500"><div className="text-center"><CameraOff className="w-16 h-16 mx-auto mb-4 opacity-50" /><p>Camera off</p></div></div>}
-                     <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 bg-white/10 backdrop-blur px-6 py-3 rounded-full border border-white/20 opacity-0 group-hover:opacity-100 transition duration-300">
-                         <button onClick={handleToggleMic} className={`p-3 rounded-full ${micOn ? 'bg-white text-slate-900' : 'bg-red-600 text-white'}`}>{micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}</button>
-                         <button onClick={handleToggleCam} className={`p-3 rounded-full ${camOn ? 'bg-white text-slate-900' : 'bg-red-600 text-white'}`}>{camOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}</button>
-                     </div>
-                 </div>
-            </div>
-            <div className="w-80 flex flex-col gap-4">
-                <div className="flex-1 bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden shadow-sm">
-                    <div className="p-3 border-b border-gray-200 bg-gray-50 font-bold text-slate-700">Live Chat</div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
-                        {chatMessages.map((msg, i) => (<div key={i} className="text-sm"><span className="font-bold text-xs text-blue-600">{msg.user}</span><p className="text-gray-700 bg-gray-50 p-2 rounded">{msg.text}</p></div>))}
-                    </div>
-                    <div className="p-3 bg-gray-50 border-t border-gray-200"><input type="text" placeholder="Send..." className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-sm text-slate-800 outline-none" onKeyDown={e => { if(e.key === 'Enter') { sendMessage('Sensei', e.currentTarget.value); e.currentTarget.value = ''; }}} /></div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export const TeacherAssignmentsPage = () => {
-  return (
-    <div className="space-y-8 animate-fade-in">
-        <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
-            <FileText className="w-8 h-8 text-zenro-red" /> Assignments
-        </h1>
-        <div className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            <div className="divide-y divide-gray-100">
-                {MOCK_ASSIGNMENTS.map(assign => (
-                    <div key={assign.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 transition">
-                        <div className="flex items-start gap-4">
-                            <div className="p-3 rounded-lg bg-blue-100 text-blue-600">
-                                <FileText className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-zenro-slate">{assign.title}</h3>
-                                <div className="flex gap-3 text-sm text-gray-500 mt-1">
-                                    <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {assign.courseName}</span>
-                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Due: {assign.dueDate}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-8">
-                             <div className="text-right">
-                                <p className="text-lg font-bold text-zenro-slate">{assign.totalSubmissions}/{assign.totalStudents}</p>
-                                <p className="text-xs text-gray-500">Submissions</p>
-                             </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${assign.status === 'ACTIVE' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                                {assign.status}
-                            </span>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    </div>
-  );
-};
-
-export const TeacherReportsPage = () => {
-    return (
-        <div className="space-y-8 animate-fade-in">
-            <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
-                <BarChart2 className="w-8 h-8 text-zenro-red" /> Performance Reports
-            </h1>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-xl font-bold text-zenro-slate mb-4">Class Performance</h3>
-                     <div className="h-64">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={MOCK_PERFORMANCE}>
-                                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                                <Tooltip />
-                                <Bar dataKey="avgScore" fill="#E60012" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                     </div>
-                 </div>
-
-                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-xl font-bold text-zenro-slate mb-4">Student Risk Analysis</h3>
-                    <div className="space-y-4">
-                        {MOCK_PERFORMANCE.map(student => (
-                            <div key={student.id} className="flex justify-between items-center p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-8 rounded-full ${student.riskLevel === 'HIGH' ? 'bg-red-500' : student.riskLevel === 'MEDIUM' ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
-                                    <div>
-                                        <p className="font-bold text-zenro-slate">{student.name}</p>
-                                        <p className="text-xs text-gray-500">Avg Score: {student.avgScore}%</p>
-                                    </div>
-                                </div>
-                                <span className={`text-xs font-bold px-2 py-1 rounded ${student.riskLevel === 'HIGH' ? 'bg-red-100 text-red-600' : student.riskLevel === 'MEDIUM' ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
-                                    {student.riskLevel} Risk
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                 </div>
-            </div>
         </div>
     );
 };

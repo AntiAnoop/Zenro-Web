@@ -89,14 +89,16 @@ CREATE TABLE course_enrollments (
 -- IMPORTANT: If upgrading an existing DB without reset, run:
 -- ALTER TABLE tests ADD COLUMN IF NOT EXISTS description text;
 -- ALTER TABLE tests ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT false;
+-- ALTER TABLE tests ADD COLUMN IF NOT EXISTS allow_multiple_attempts boolean DEFAULT false;
 
 CREATE TABLE tests (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text NOT NULL,
-  description text, -- Added description field
+  description text, 
   duration_minutes int DEFAULT 30,
   passing_score int DEFAULT 40,
-  is_active boolean DEFAULT false, -- Added Draft/Live toggle
+  is_active boolean DEFAULT false, 
+  allow_multiple_attempts boolean DEFAULT false, -- New toggle
   created_at timestamptz DEFAULT now()
 );
 -- [NEW CODE END]
@@ -175,8 +177,8 @@ VALUES ('c1', 'JLPT N4 Grammar Mastery', 'Comprehensive guide to N4 grammar stru
 INSERT INTO course_batches (course_id, batch_name) VALUES ('c1', '2024-A');
 
 -- [NEW CODE START] - Seed Data for Tests
-INSERT INTO tests (id, title, description, duration_minutes, passing_score, is_active)
-VALUES ('test1', 'N4 Weekly Mock Exam', 'A practice test for the upcoming JLPT.', 45, 50, true);
+INSERT INTO tests (id, title, description, duration_minutes, passing_score, is_active, allow_multiple_attempts)
+VALUES ('test1', 'N4 Weekly Mock Exam', 'A practice test for the upcoming JLPT.', 45, 50, true, false);
 
 INSERT INTO test_batches (test_id, batch_name) VALUES ('test1', '2024-A');
 
