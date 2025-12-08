@@ -60,8 +60,6 @@ const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: 
 const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void }) => {
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'FEES' | 'TESTS' | 'COURSES'>('OVERVIEW');
     const [loading, setLoading] = useState(true);
-    const [fees, setFees] = useState<any[]>([]);
-    const [submissions, setSubmissions] = useState<any[]>([]);
     const [stats, setStats] = useState({ totalFees: 0, paidFees: 0, pendingFees: 0, avgScore: 0, testsTaken: 0, attendance: 88 });
 
     useEffect(() => {
@@ -70,13 +68,14 @@ const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void 
             try {
                 const { data: feeData } = await supabase.from('fees').select('*').eq('student_id', user.id);
                 const fData = feeData || [];
-                setFees(fData);
-                const { data: subData } = await supabase.from('submissions').select('*, tests(title)').eq('student_id', user.id).order('completed_at', { ascending: false });
+                
+                const { data: subData } = await supabase.from('submissions').select('*, tests(title)').eq('student_id', user.id);
                 const sData = subData || [];
-                setSubmissions(sData);
+                
                 const totalF = fData.reduce((acc:number, curr:any) => acc + curr.amount, 0);
                 const paidF = fData.filter((f:any) => f.status === 'PAID').reduce((acc:number, curr:any) => acc + curr.amount, 0);
                 const avgS = sData.length > 0 ? Math.round(sData.reduce((acc:number, curr:any) => acc + (curr.score/curr.total_score), 0) / sData.length * 100) : 0;
+                
                 setStats({ totalFees: totalF, paidFees: paidF, pendingFees: totalF - paidF, avgScore: avgS, testsTaken: sData.length, attendance: 88 });
             } catch (e) { console.error("Profile Error:", e); } finally { setLoading(false); }
         };
@@ -111,7 +110,6 @@ const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void 
                          </div>
                     </div>
                 </div>
-                {/* Simplified Tabs View */}
                 <div className="p-8 space-y-6">
                     {loading ? <div className="text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-zenro-blue"/></div> : (
                         <div className="grid grid-cols-2 gap-4">
@@ -123,54 +121,6 @@ const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void 
                     )}
                 </div>
             </div>
-        </div>
-    );
-};
-
-// --- ADMIN DASHBOARD ---
-export const AdminDashboard = () => {
-    return (
-        <div className="space-y-8 animate-fade-in">
-             <AdminHeader title="Admin Dashboard" />
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                     <div className="p-4 bg-blue-100 rounded-lg text-blue-600"><Users className="w-8 h-8" /></div>
-                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Users</p><h3 className="text-2xl font-bold text-slate-800">142</h3></div>
-                 </div>
-                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                     <div className="p-4 bg-green-100 rounded-lg text-green-600"><DollarSign className="w-8 h-8" /></div>
-                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Revenue</p><h3 className="text-2xl font-bold text-slate-800">¥12.5M</h3></div>
-                 </div>
-                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                     <div className="p-4 bg-purple-100 rounded-lg text-purple-600"><BookOpen className="w-8 h-8" /></div>
-                     <div><p className="text-gray-500 text-xs font-bold uppercase">Active Courses</p><h3 className="text-2xl font-bold text-slate-800">4</h3></div>
-                 </div>
-             </div>
-             
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-zenro-blue"/> Recent Activity</h3>
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                            <span>New user registration: <strong>Kenji Tanaka</strong></span>
-                            <span className="text-xs text-gray-500">2m ago</span>
-                        </div>
-                         <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                            <span>Payment received: <strong>¥45,000</strong></span>
-                            <span className="text-xs text-gray-500">15m ago</span>
-                        </div>
-                         <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                            <span>New course created: <strong>JLPT N3 Grammar</strong></span>
-                            <span className="text-xs text-gray-500">1h ago</span>
-                        </div>
-                    </div>
-                 </div>
-                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-green-600"/> System Health</h3>
-                    <div className="flex items-center gap-2 text-green-600 font-bold mb-2"><CheckCircle className="w-5 h-5" /> All Systems Operational</div>
-                    <p className="text-sm text-gray-500">Database connection is stable. API latency is normal (45ms). Backup completed successfully at 03:00 AM.</p>
-                 </div>
-             </div>
         </div>
     );
 };
@@ -430,6 +380,7 @@ export const AdminUserManagement = () => {
 
   const fetchBatches = async () => {
       try {
+          // Always order by newest first to meet requirements
           const { data, error } = await supabase.from('batches').select('*').order('created_at', { ascending: false });
           if (!error && data) {
               setAvailableBatches(data);
@@ -437,6 +388,23 @@ export const AdminUserManagement = () => {
       } catch (e) {
           console.error("Batch fetch error", e);
       }
+  };
+
+  const createBatch = async (batchName: string) => {
+      if(!batchName.trim()) return;
+      if(window.confirm(`Batch "${batchName}" does not exist. Do you want to create it?`)) {
+          const { data, error } = await supabase.from('batches').insert({ name: batchName }).select().single();
+          if(error) {
+              setErrorMsg(`Failed to create batch: ${error.message}`);
+              return false;
+          } else {
+              // Successfully created - add to local state immediately
+              setAvailableBatches(prev => [data, ...prev]);
+              setSuccessMsg(`Batch "${batchName}" created successfully!`);
+              return true;
+          }
+      }
+      return false;
   };
 
   const handleSaveUser = async (e: React.FormEvent) => {
@@ -465,23 +433,6 @@ export const AdminUserManagement = () => {
     }
 
     try {
-      // 1. AUTO-CREATE BATCH IF MISSING
-      if (formData.role === 'STUDENT' && formData.batch.trim()) {
-          const batchName = formData.batch.trim();
-          const batchExists = availableBatches.some(b => b.name.toLowerCase() === batchName.toLowerCase());
-          
-          if (!batchExists) {
-              // Create it explicitly so other listeners pick it up immediately
-              const { error: batchErr } = await supabase.from('batches').insert({ name: batchName });
-              if (batchErr && batchErr.code !== '23505') { // Ignore unique violation if race condition
-                  console.error("Batch creation failed:", batchErr);
-              } else {
-                  // Wait a tick for subscription to update or manually update local state
-                  fetchBatches(); 
-              }
-          }
-      }
-
       // 2. SAVE USER
       if (editingUser) {
         const { error } = await supabase.from('profiles').update(payload).eq('id', editingUser.id);
@@ -502,6 +453,21 @@ export const AdminUserManagement = () => {
     } finally {
         setIsSubmitting(false);
     }
+  };
+
+  const handleBatchSelect = async (batchName: string) => {
+      // Check if batch exists
+      const exists = availableBatches.some(b => b.name.toLowerCase() === batchName.toLowerCase());
+      if (exists) {
+          setFormData({ ...formData, batch: batchName });
+      } else {
+          // If creation succeeds, set it
+          const created = await createBatch(batchName);
+          if (created) {
+              setFormData({ ...formData, batch: batchName });
+          }
+      }
+      setShowBatchDropdown(false);
   };
 
   // ... (Delete handlers remain same)
@@ -664,11 +630,12 @@ export const AdminUserManagement = () => {
                                 </div>
                                 {showBatchDropdown && (
                                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                        {/* Sort local availableBatches ensuring latest is first (though DB fetch handles this, safety check) */}
                                         {filteredBatches.map(b => (
-                                            <div key={b.id} onClick={() => { setFormData({...formData, batch: b.name}); setShowBatchDropdown(false); }} className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-slate-700 flex justify-between items-center">{b.name} {formData.batch === b.name && <Check className="w-3 h-3 text-zenro-blue" />}</div>
+                                            <div key={b.id} onClick={() => handleBatchSelect(b.name)} className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-slate-700 flex justify-between items-center">{b.name} {formData.batch === b.name && <Check className="w-3 h-3 text-zenro-blue" />}</div>
                                         ))}
                                         {formData.batch && !filteredBatches.some(b => b.name === formData.batch) && (
-                                            <div className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-zenro-blue cursor-pointer text-sm font-bold border-t border-gray-100 flex items-center gap-2"><Plus className="w-3 h-3" /> Create "{formData.batch}"</div>
+                                            <div onClick={() => handleBatchSelect(formData.batch)} className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-zenro-blue cursor-pointer text-sm font-bold border-t border-gray-100 flex items-center gap-2"><Plus className="w-3 h-3" /> Create "{formData.batch}"</div>
                                         )}
                                     </div>
                                 )}
@@ -732,6 +699,53 @@ export const AdminFinancials = () => {
              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center text-gray-500">
                  <DollarSign className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                  <p>Detailed financial transaction history and export tools coming soon.</p>
+             </div>
+        </div>
+    );
+};
+
+export const AdminDashboard = () => {
+    return (
+        <div className="space-y-8 animate-fade-in">
+             <AdminHeader title="Admin Dashboard" />
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                     <div className="p-4 bg-blue-100 rounded-lg text-blue-600"><Users className="w-8 h-8" /></div>
+                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Users</p><h3 className="text-2xl font-bold text-slate-800">142</h3></div>
+                 </div>
+                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                     <div className="p-4 bg-green-100 rounded-lg text-green-600"><DollarSign className="w-8 h-8" /></div>
+                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Revenue</p><h3 className="text-2xl font-bold text-slate-800">¥12.5M</h3></div>
+                 </div>
+                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                     <div className="p-4 bg-purple-100 rounded-lg text-purple-600"><BookOpen className="w-8 h-8" /></div>
+                     <div><p className="text-gray-500 text-xs font-bold uppercase">Active Courses</p><h3 className="text-2xl font-bold text-slate-800">4</h3></div>
+                 </div>
+             </div>
+             
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-zenro-blue"/> Recent Activity</h3>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                            <span>New user registration: <strong>Kenji Tanaka</strong></span>
+                            <span className="text-xs text-gray-500">2m ago</span>
+                        </div>
+                         <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                            <span>Payment received: <strong>¥45,000</strong></span>
+                            <span className="text-xs text-gray-500">15m ago</span>
+                        </div>
+                         <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                            <span>New course created: <strong>JLPT N3 Grammar</strong></span>
+                            <span className="text-xs text-gray-500">1h ago</span>
+                        </div>
+                    </div>
+                 </div>
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-green-600"/> System Health</h3>
+                    <div className="flex items-center gap-2 text-green-600 font-bold mb-2"><CheckCircle className="w-5 h-5" /> All Systems Operational</div>
+                    <p className="text-sm text-gray-500">Database connection is stable. API latency is normal (45ms). Backup completed successfully at 03:00 AM.</p>
+                 </div>
              </div>
         </div>
     );
