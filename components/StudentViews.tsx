@@ -6,7 +6,7 @@ import {
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
   Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw, Loader2,
-  FileCheck, ArrowLeft, Menu, File, Film
+  FileCheck, ArrowLeft, Menu, File, Film, AlertTriangle, Monitor
 } from 'lucide-react';
 import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem, CourseModule, CourseMaterial } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
@@ -311,365 +311,6 @@ export const StudentCoursesPage = () => {
   );
 };
 
-export const StudentCoursePlayer = () => {
-    const { courseId } = useParams();
-    const navigate = useNavigate();
-    const [course, setCourse] = useState<Course | null>(null);
-    const [modules, setModules] = useState<any[]>([]);
-    const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-
-    useEffect(() => {
-        const fetchContent = async () => {
-            if(!courseId) return;
-            try {
-                const { data: courseData } = await supabase.from('courses').select('*').eq('id', courseId).single();
-                if(courseData) setCourse(courseData);
-                const { data: modulesData } = await supabase.from('course_modules').select('*, course_materials(*)').eq('course_id', courseId).order('order');
-                if(modulesData) {
-                    setModules(modulesData);
-                    if(modulesData.length > 0 && modulesData[0].course_materials.length > 0) setActiveMaterial(modulesData[0].course_materials[0]);
-                }
-            } catch(e) { console.error("Content fetch failed", e); } finally { setLoading(false); }
-        };
-        fetchContent();
-    }, [courseId]);
-
-    if(loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
-    if(!course) return <div>Course not found</div>;
-
-    return (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col">
-            {/* Header */}
-            <div className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-4 shadow-sm z-20">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/student/courses')} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-500 hover:text-zenro-slate">
-                        <ArrowLeft className="w-6 h-6" />
-                    </button>
-                    <h1 className="font-bold text-lg text-zenro-slate hidden md:block">{course.title}</h1>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-gray-100 rounded-lg lg:hidden">
-                        <Menu className="w-6 h-6 text-gray-600" />
-                    </button>
-                </div>
-            </div>
-
-            <div className="flex-1 flex overflow-hidden">
-                {/* Main Content */}
-                <div className="flex-1 bg-gray-50 relative flex items-center justify-center overflow-y-auto">
-                    {activeMaterial ? (
-                        activeMaterial.type === 'VIDEO' ? (
-                            <div className="w-full h-full max-w-5xl mx-auto flex flex-col p-4">
-                                <div className="aspect-video bg-black rounded-lg overflow-hidden shadow-lg relative group">
-                                    <video src={activeMaterial.url} controls className="w-full h-full object-contain" poster={course.thumbnail} />
-                                </div>
-                                <div className="mt-6">
-                                    <h2 className="text-2xl font-bold text-zenro-slate">{activeMaterial.title}</h2>
-                                    <p className="text-gray-500 mt-2 text-sm">Now Playing • Module Content</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="w-full h-full flex flex-col p-8">
-                                <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-red-50 rounded-lg text-zenro-red">
-                                            <FileText className="w-8 h-8" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-xl font-bold text-zenro-slate">{activeMaterial.title}</h2>
-                                            <p className="text-gray-500 text-sm">Course Material • {activeMaterial.type}</p>
-                                        </div>
-                                    </div>
-                                    <a href={activeMaterial.url} target="_blank" rel="noopener noreferrer" className="bg-zenro-red hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm transition">
-                                        <Download className="w-4 h-4" /> Download
-                                    </a>
-                                </div>
-                                <div className="flex-1 bg-white rounded-xl border border-gray-200 flex items-center justify-center text-gray-400 flex-col">
-                                    <File className="w-16 h-16 mb-4 opacity-30" />
-                                    <p>Preview not available.</p>
-                                </div>
-                            </div>
-                        )
-                    ) : (
-                        <div className="text-gray-500">Select a lesson to start</div>
-                    )}
-                </div>
-
-                {/* Sidebar Playlist - Clean Light Style */}
-                <div className={`${sidebarOpen ? 'w-80 translate-x-0' : 'w-0 translate-x-full lg:w-0'} bg-white border-l border-gray-200 transition-all duration-300 flex flex-col absolute right-0 top-0 bottom-0 z-10 lg:relative lg:translate-x-0`}>
-                    <div className="p-4 border-b border-gray-200 font-bold text-zenro-slate bg-gray-50">
-                        Course Content
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                        {modules.map((mod, idx) => (
-                            <div key={mod.id} className="border-b border-gray-100">
-                                <div className="p-4 bg-gray-50 font-bold text-sm text-gray-600 flex justify-between items-center sticky top-0">
-                                    <span>{idx + 1}. {mod.title}</span>
-                                </div>
-                                <div>
-                                    {mod.course_materials.map((mat: any) => (
-                                        <button
-                                            key={mat.id}
-                                            onClick={() => setActiveMaterial(mat)}
-                                            className={`w-full text-left p-4 flex items-start gap-3 hover:bg-red-50 transition border-l-4 ${
-                                                activeMaterial?.id === mat.id 
-                                                ? 'bg-red-50 border-zenro-red text-zenro-red font-semibold' 
-                                                : 'border-transparent text-gray-600'
-                                            }`}
-                                        >
-                                            <div className="mt-0.5">
-                                                {mat.type === 'VIDEO' ? <Film className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-                                            </div>
-                                            <div className="text-sm line-clamp-2">{mat.title}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export const StudentLiveRoom = ({ user }: { user: User }) => {
-    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession, leaveSession, checkStatus, connectionState } = useLiveSession();
-    const [message, setMessage] = useState("");
-    const navigate = useNavigate();
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
-    const [isChatOpen, setIsChatOpen] = useState(true);
-
-    useEffect(() => {
-        if (isLive && !remoteStream) joinSession();
-        const interval = setInterval(() => { if(isLive && connectionState === 'idle' && !remoteStream) joinSession(); }, 5000);
-        return () => { clearInterval(interval); leaveSession(); };
-    }, [isLive]);
-
-    useEffect(() => { if (remoteStream && remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream; }, [remoteStream]);
-
-    const handleSend = (e: React.FormEvent) => {
-        e.preventDefault();
-        if(message.trim()) { sendMessage(user.name, message); setMessage(""); }
-    }
-
-    if (!isLive) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center space-y-8 animate-fade-in relative overflow-hidden bg-gray-50">
-                <div className="bg-white p-12 rounded-2xl border border-gray-200 shadow-xl text-center max-w-xl w-full">
-                    <div className="inline-block p-4 rounded-full bg-blue-50 border border-blue-100 mb-6">
-                         <Video className="w-12 h-12 text-zenro-blue" />
-                    </div>
-                    <h2 className="text-3xl font-heading font-bold text-zenro-slate mb-2">{topic !== "Waiting for class..." ? "Class Ended" : "Waiting for Class"}</h2>
-                    <p className="text-gray-500 mb-8 font-medium">
-                        {topic !== "Waiting for class..." ? "The live session has ended." : "Waiting for host to start the class..."}
-                    </p>
-                    <div className="flex flex-col gap-4 mt-8">
-                        <button onClick={checkStatus} className="bg-zenro-blue hover:bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 shadow-md transition">
-                            <RefreshCw className="w-4 h-4" /> Refresh Status
-                        </button>
-                        <button onClick={() => navigate('/student/courses')} className="text-gray-500 hover:text-zenro-red text-sm underline">
-                            Leave Waiting Room
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="h-[calc(100vh-2rem)] flex gap-6 animate-fade-in relative">
-             <div className="flex-1 flex flex-col space-y-4">
-                 <div className="relative flex-1 bg-black rounded-xl border border-gray-800 overflow-hidden shadow-2xl group">
-                      {remoteStream ? (
-                          <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover fixed inset-0 z-10 bg-black" />
-                      ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-gray-500 bg-black z-10">
-                             <div className="text-center">
-                                 <Loader2 className="w-12 h-12 text-white animate-spin mx-auto mb-4" />
-                                 <p className="text-white font-bold text-lg mb-2">Connecting to Classroom...</p>
-                             </div>
-                          </div>
-                      )}
-                      
-                      <div className="absolute top-4 left-4 flex gap-2 z-20 pointer-events-none">
-                           <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-2 shadow-md">
-                                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
-                           </div>
-                           <div className="bg-black/60 backdrop-blur text-white px-3 py-1 rounded text-xs flex items-center gap-2">
-                                <Users className="w-3 h-3" /> {viewerCount}
-                           </div>
-                      </div>
-                      
-                      <div className="absolute bottom-4 right-4 z-40">
-                          <button onClick={() => setIsChatOpen(!isChatOpen)} className="bg-white p-3 rounded-full text-zenro-slate hover:text-zenro-red transition shadow-lg">
-                              <MessageCircle className="w-6 h-6" />
-                          </button>
-                      </div>
-                 </div>
-             </div>
-
-             {/* Chat Sidebar - Light Theme */}
-             <div className={`w-96 bg-white border-l border-gray-200 flex flex-col overflow-hidden shadow-xl fixed right-0 top-0 bottom-0 z-30 transition-transform duration-300 ${isChatOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                 <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center pt-20">
-                     <h3 className="font-bold text-zenro-slate flex items-center gap-2"><MessageCircle className="w-4 h-4 text-zenro-red" /> Live Chat</h3>
-                     <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-gray-600"><ChevronRight className="w-5 h-5" /></button>
-                 </div>
-                 
-                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                     {chatMessages.map((m, i) => (
-                         <div key={i} className="animate-fade-in-up">
-                             <div className="flex items-baseline justify-between mb-1">
-                                 <span className={`text-xs font-bold ${m.user === "Tanaka Sensei" ? 'text-zenro-red' : m.user === user.name ? 'text-blue-600' : 'text-gray-700'}`}>
-                                     {m.user}
-                                 </span>
-                                 <span className="text-[10px] text-gray-400">{m.timestamp}</span>
-                             </div>
-                             <p className={`text-sm rounded-lg p-3 shadow-sm ${m.user === "SYSTEM" ? 'bg-yellow-50 text-yellow-700 text-xs italic border border-yellow-100' : 'bg-white border border-gray-100 text-gray-700'}`}>
-                                 {m.text}
-                             </p>
-                         </div>
-                     ))}
-                 </div>
-
-                 <form onSubmit={handleSend} className="p-4 bg-white border-t border-gray-200">
-                     <div className="relative">
-                         <input 
-                            type="text" 
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            placeholder="Ask a question..." 
-                            className="w-full bg-gray-50 border border-gray-300 text-slate-800 pl-4 pr-10 py-3 rounded-lg focus:ring-2 focus:ring-zenro-blue focus:outline-none placeholder-gray-400 text-sm"
-                         />
-                         <button type="submit" className="absolute right-2 top-2 p-1.5 bg-zenro-blue hover:bg-blue-800 text-white rounded-md transition">
-                             <Send className="w-4 h-4" />
-                         </button>
-                     </div>
-                 </form>
-             </div>
-             
-             <button onClick={() => navigate('/student/courses')} className="fixed top-4 right-4 z-40 bg-white/90 hover:bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold text-sm backdrop-blur shadow-md border border-gray-200">Exit Class</button>
-        </div>
-    );
-};
-
-export const StudentFeesPage = ({ user }: { user: User }) => {
-  const [fees, setFees] = useState<FeeRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [payingFeeId, setPayingFeeId] = useState<string | null>(null);
-
-  useEffect(() => { fetchFees(); }, [user.id]);
-
-  const fetchFees = async () => {
-      setLoading(true);
-      try {
-        const { data } = await supabase.from('fees').select('*').eq('student_id', user.id).order('due_date', { ascending: true });
-        if (data) setFees(data);
-      } catch (e) { console.error("Error fetching fees:", e); } finally { setLoading(false); }
-  };
-
-  const generateReceipt = (fee: FeeRecord, paymentId: string) => {
-    try {
-        const doc = new jsPDF();
-        doc.setFillColor(230, 0, 18); // Zenro Red
-        doc.rect(0, 0, 210, 40, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(24);
-        doc.text("ZENRO INSTITUTE", 20, 20);
-        doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text("Excellence in Japanese Language Training", 20, 28);
-        doc.setFontSize(16); doc.text("PAYMENT RECEIPT", 150, 25);
-        doc.setTextColor(0, 0, 0); doc.setFontSize(10);
-        doc.text(`Receipt No: #${paymentId.slice(-8).toUpperCase()}`, 140, 55);
-        doc.text(`Student: ${user.name}`, 20, 55);
-        doc.text(`Amount: ${fee.amount}`, 140, 62);
-        doc.save(`Zenro_Receipt_${paymentId}.pdf`);
-    } catch (e) { alert("Could not generate PDF."); }
-  };
-
-  const handlePay = (fee: FeeRecord) => {
-    setPayingFeeId(fee.id);
-    const options = {
-        key: RAZORPAY_KEY_ID, 
-        amount: fee.amount * 100, 
-        currency: "INR", 
-        name: "Zenro Institute",
-        description: `Payment for ${fee.title}`,
-        handler: async function (response: any) {
-            try {
-                await supabase.from('payments').insert({ fee_id: fee.id, razorpay_payment_id: response.razorpay_payment_id, amount: fee.amount });
-                await supabase.from('fees').update({ status: 'PAID' }).eq('id', fee.id);
-                alert(`Payment Successful! ID: ${response.razorpay_payment_id}`);
-                fetchFees();
-            } catch (err: any) { alert("Payment Error"); } finally { setPayingFeeId(null); }
-        },
-        theme: { color: "#E60012" }
-    };
-    const rzp = new (window as any).Razorpay(options);
-    rzp.open();
-  };
-
-  const phase1Fees = fees.filter(f => f.phase === 1);
-  const phase2Fees = fees.filter(f => f.phase === 2);
-  const calculateTotal = (fList: FeeRecord[]) => fList.reduce((acc, curr) => acc + curr.amount, 0);
-
-  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
-
-  return (
-    <div className="space-y-8 animate-fade-in">
-      <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
-        <CreditCard className="w-8 h-8 text-zenro-red" /> Tuition & Fees
-      </h1>
-      
-      {[ { title: 'Phase 1: Domestic Training', list: phase1Fees }, { title: 'Phase 2: Placement', list: phase2Fees } ].map((phase, idx) => (
-      <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <div>
-                <h2 className="text-xl font-bold text-zenro-slate">{phase.title}</h2>
-                <p className="text-sm text-gray-500">Total Due: ¥{calculateTotal(phase.list.filter(f => f.status !== 'PAID')).toLocaleString()}</p>
-            </div>
-        </div>
-        <div className="divide-y divide-gray-100">
-            {phase.list.length === 0 && <div className="p-6 text-center text-gray-500">No fees assigned.</div>}
-            {phase.list.map(fee => (
-                <div key={fee.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 transition">
-                    <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                            {fee.status === 'PAID' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                        </div>
-                        <div>
-                            <p className="text-zenro-slate font-medium">{fee.title}</p>
-                            <p className="text-xs text-gray-500">Due: {fee.dueDate}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                        <div className="text-right">
-                            <p className="text-zenro-slate font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
-                            <StatusBadge status={fee.status} />
-                        </div>
-                        
-                        {fee.status !== 'PAID' ? (
-                            <button onClick={() => handlePay(fee)} disabled={payingFeeId === fee.id} className="bg-zenro-red hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm disabled:opacity-50 flex items-center gap-2 transition">
-                                {payingFeeId === fee.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />} Pay Now
-                            </button>
-                        ) : (
-                            <button onClick={() => generateReceipt(fee, `TXN-${fee.id.substring(0,8)}`)} className="bg-white hover:bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold text-sm border border-gray-300 flex items-center gap-2 shadow-sm">
-                                <Download className="w-4 h-4" /> Receipt
-                            </button>
-                        )}
-                    </div>
-                </div>
-            ))}
-        </div>
-      </div>
-      ))}
-    </div>
-  );
-};
-
 export const StudentTestsPage = () => {
     const navigate = useNavigate();
     const [activeTests, setActiveTests] = useState<any[]>([]);
@@ -679,55 +320,75 @@ export const StudentTestsPage = () => {
     const userData = localStorage.getItem('zenro_session');
     const user: User | null = userData ? JSON.parse(userData) : null;
 
-    useEffect(() => {
+    // --- REFACTORED DATA FETCHING FOR REAL-TIME UPDATES ---
+    const fetchTestsAndHistory = async () => {
         if (!user) return;
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                // 1. Get History
-                const { data: subs } = await supabase
-                    .from('submissions')
-                    .select(`id, score, total_score, completed_at, test_id, tests (title, duration_minutes)`)
-                    .eq('status', 'COMPLETED')
-                    .eq('student_id', user.id)
-                    .order('completed_at', { ascending: false });
-                
-                if(subs) setPastSubmissions(subs);
+        setLoading(true);
+        try {
+            // 1. Get History (Ordered Latest First)
+            const { data: subs } = await supabase
+                .from('submissions')
+                .select(`id, score, total_score, completed_at, test_id, tests (title, duration_minutes)`)
+                .eq('status', 'COMPLETED')
+                .eq('student_id', user.id)
+                .order('completed_at', { ascending: false }); // Latest first
+            
+            const currentSubs = subs || [];
+            setPastSubmissions(currentSubs);
 
-                // 2. Get Assigned Tests (Direct & Batch)
-                const { data: batchTests } = await supabase.from('test_batches').select('test_id').eq('batch_name', user.batch);
-                const { data: directTests } = await supabase.from('test_enrollments').select('test_id').eq('student_id', user.id);
-                
-                const eligibleTestIds = new Set<string>();
-                if(batchTests) batchTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
-                if(directTests) directTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
+            // 2. Get Assigned Tests
+            const { data: batchTests } = await supabase.from('test_batches').select('test_id').eq('batch_name', user.batch);
+            const { data: directTests } = await supabase.from('test_enrollments').select('test_id').eq('student_id', user.id);
+            
+            const eligibleTestIds = new Set<string>();
+            if(batchTests) batchTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
+            if(directTests) directTests.forEach((t:any) => eligibleTestIds.add(t.test_id));
 
-                if (eligibleTestIds.size > 0) {
-                    const { data: tests } = await supabase
-                        .from('tests')
-                        .select('*')
-                        .in('id', Array.from(eligibleTestIds))
-                        .eq('is_active', true);
+            if (eligibleTestIds.size > 0) {
+                const { data: tests } = await supabase
+                    .from('tests')
+                    .select('*')
+                    .in('id', Array.from(eligibleTestIds))
+                    .eq('is_active', true);
+                
+                if (tests) {
+                    const submittedTestIds = new Set(currentSubs.map((s:any) => s.test_id));
                     
-                    if (tests) {
-                        const submittedTestIds = new Set(subs?.map((s:any) => s.test_id) || []);
-                        
-                        // LOGIC: Show if NOT taken OR (Taken AND AllowMultipleAttempts)
-                        const filtered = tests.filter((t: any) => 
-                            !submittedTestIds.has(t.id) || t.allow_multiple_attempts
-                        );
-                        setActiveTests(filtered);
-                    }
-                } else { 
-                    setActiveTests([]); 
+                    const filtered = tests.filter((t: any) => 
+                        !submittedTestIds.has(t.id) || t.allow_multiple_attempts
+                    );
+                    setActiveTests(filtered);
                 }
-            } catch (error) { 
-                console.error(error); 
-            } finally { 
-                setLoading(false); 
+            } else { 
+                setActiveTests([]); 
             }
+        } catch (error) { 
+            console.error(error); 
+        } finally { 
+            setLoading(false); 
+        }
+    };
+
+    useEffect(() => {
+        fetchTestsAndHistory();
+
+        // --- REAL-TIME SUBSCRIPTION ---
+        // Subscribe to changes in the 'submissions' table for this user
+        const subscription = supabase
+            .channel('public:submissions')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'submissions', filter: `student_id=eq.${user?.id}` },
+                (payload) => {
+                    console.log('Real-time submission update:', payload);
+                    fetchTestsAndHistory(); // Refresh lists immediately
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(subscription);
         };
-        fetchData();
     }, [user?.id, user?.batch]);
 
     if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
@@ -746,9 +407,9 @@ export const StudentTestsPage = () => {
 
             {tab === 'ACTIVE' ? (
                 activeTests.length === 0 ? (
-                    <div className="p-12 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                    <div className="p-12 text-center border-2 border-dashed border-gray-300 rounded-xl bg-white shadow-sm">
                         <div className="flex justify-center mb-4"><FileCheck className="w-12 h-12 text-gray-400" /></div>
-                        <h3 className="text-xl font-bold text-gray-600 mb-2">No Active Assessments</h3>
+                        <h3 className="text-xl font-bold text-zenro-slate mb-2">No Active Assessments</h3>
                         <p className="text-gray-500">You have completed all pending tests or none are assigned.</p>
                     </div>
                 ) : (
@@ -756,7 +417,7 @@ export const StudentTestsPage = () => {
                         {activeTests.map((test, idx) => (
                             <div key={test.id || idx} className="bg-white rounded-xl p-6 flex flex-col relative overflow-hidden group border border-gray-200 shadow-sm hover:shadow-md transition">
                                 <div className="absolute top-0 right-0 p-3">
-                                    <span className="bg-red-100 text-red-600 px-2 py-1 rounded text-[10px] font-bold border border-red-200 animate-pulse">ACTIVE</span>
+                                    <span className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-bold border border-red-100 animate-pulse">ACTIVE</span>
                                 </div>
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="p-3 bg-blue-50 text-zenro-blue rounded-lg"><Activity className="w-6 h-6" /></div>
@@ -777,8 +438,8 @@ export const StudentTestsPage = () => {
                 )
             ) : (
                 <div className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                    <table className="w-full text-left text-sm text-gray-500">
-                         <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
+                    <table className="w-full text-left text-sm text-gray-600">
+                         <thead className="bg-gray-50 text-slate-700 uppercase font-bold text-xs border-b border-gray-200">
                            <tr>
                              <th className="px-6 py-4">Test Title</th>
                              <th className="px-6 py-4">Date Completed</th>
@@ -793,9 +454,9 @@ export const StudentTestsPage = () => {
                                pastSubmissions.map((sub) => (
                                  <tr key={sub.id} className="hover:bg-gray-50 transition">
                                     <td className="px-6 py-4 font-bold text-zenro-slate">{sub.tests?.title || 'Unknown Test'}</td>
-                                    <td className="px-6 py-4">{new Date(sub.completed_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4">{new Date(sub.completed_at).toLocaleDateString()} {new Date(sub.completed_at).toLocaleTimeString()}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`font-bold px-2 py-1 rounded ${sub.score > (sub.total_score * 0.4) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        <span className={`font-bold px-2 py-1 rounded text-xs ${sub.score > (sub.total_score * 0.4) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                             {sub.score} / {sub.total_score}
                                         </span>
                                     </td>
@@ -815,85 +476,348 @@ export const StudentTestsPage = () => {
     );
 };
 
-export const StudentActivityPage = () => {
-     return (
+// --- NEW COMPONENTS FOR MISSING EXPORTS ---
+
+export const StudentFeesPage = ({ user }: { user: User }) => {
+    const [fees, setFees] = useState<FeeRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchFees = async () => {
+            setLoading(true);
+            try {
+                const { data } = await supabase.from('fees').select('*').eq('student_id', user.id);
+                if (data) {
+                    const mapped: FeeRecord[] = data.map((f:any) => ({
+                        id: f.id,
+                        title: f.title,
+                        amount: f.amount,
+                        dueDate: f.due_date,
+                        status: f.status,
+                        category: f.category,
+                        phase: f.phase
+                    }));
+                    setFees(mapped);
+                }
+            } catch (e) {
+                console.error("Fetch fees error", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchFees();
+    }, [user.id]);
+
+    const totalDue = fees.filter(f => f.status === 'PENDING' || f.status === 'OVERDUE').reduce((acc, curr) => acc + curr.amount, 0);
+
+    return (
         <div className="space-y-8 animate-fade-in">
-             <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
-                <ListTodo className="w-8 h-8 text-zenro-red" /> Practice & Assignments
-            </h1>
-            <div className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                <div className="divide-y divide-gray-100">
-                    {MOCK_ACTIVITIES.map(act => (
-                        <div key={act.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 transition">
-                            <div className="flex items-start gap-4">
-                                <div className={`p-3 rounded-lg ${act.type === 'ASSIGNMENT' ? 'bg-blue-100 text-blue-600' : act.type === 'QUIZ' ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
-                                    {act.type === 'ASSIGNMENT' ? <FileText className="w-6 h-6" /> : act.type === 'QUIZ' ? <AlertCircle className="w-6 h-6" /> : <Briefcase className="w-6 h-6" />}
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-zenro-slate">{act.title}</h3>
-                                    <div className="flex gap-3 text-sm text-gray-500 mt-1">
-                                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {act.courseName}</span>
-                                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Due: {act.dueDate}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <StatusBadge status={act.status} />
-                                <button className="bg-white hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold border border-gray-300 transition">
-                                    {act.status === 'COMPLETED' ? 'Review' : 'Start'}
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+             <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
+                    <CreditCard className="w-8 h-8 text-zenro-red" /> Fee Status
+                </h1>
+                <div className="text-right">
+                    <p className="text-xs text-gray-500 font-bold uppercase">Total Outstanding</p>
+                    <p className={`text-2xl font-bold ${totalDue > 0 ? 'text-red-500' : 'text-green-500'}`}>¥{totalDue.toLocaleString()}</p>
                 </div>
-            </div>
+             </div>
+
+             {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 text-zenro-red animate-spin" /></div> : (
+                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                     <table className="w-full text-left text-sm text-gray-600">
+                         <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs border-b border-gray-200">
+                             <tr>
+                                 <th className="p-4">Description</th>
+                                 <th className="p-4">Category</th>
+                                 <th className="p-4">Due Date</th>
+                                 <th className="p-4">Amount</th>
+                                 <th className="p-4">Status</th>
+                                 <th className="p-4 text-right">Action</th>
+                             </tr>
+                         </thead>
+                         <tbody className="divide-y divide-gray-100">
+                             {fees.length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-gray-500">No fee records found.</td></tr> : fees.map(fee => (
+                                 <tr key={fee.id} className="hover:bg-gray-50 transition">
+                                     <td className="p-4 font-bold text-slate-800">{fee.title}</td>
+                                     <td className="p-4"><span className="bg-gray-100 px-2 py-1 rounded text-xs font-bold text-gray-600">{fee.category}</span></td>
+                                     <td className="p-4">{new Date(fee.dueDate).toLocaleDateString()}</td>
+                                     <td className="p-4 font-mono font-bold">¥{fee.amount.toLocaleString()}</td>
+                                     <td className="p-4"><StatusBadge status={fee.status} /></td>
+                                     <td className="p-4 text-right">
+                                         {fee.status === 'PENDING' || fee.status === 'OVERDUE' ? (
+                                             <button className="bg-zenro-red text-white text-xs px-3 py-1.5 rounded hover:bg-red-700 transition font-bold shadow-sm">Pay Now</button>
+                                         ) : (
+                                             <button className="text-gray-400 hover:text-slate-600 flex items-center gap-1 text-xs font-bold ml-auto"><Download className="w-3 h-3" /> Receipt</button>
+                                         )}
+                                     </td>
+                                 </tr>
+                             ))}
+                         </tbody>
+                     </table>
+                 </div>
+             )}
         </div>
-     );
-};
+    );
+}
 
 export const StudentProfilePage = ({ user }: { user: User }) => {
     return (
         <div className="space-y-8 animate-fade-in">
-            <div className="relative h-48 bg-gradient-to-r from-zenro-blue to-slate-800 rounded-xl overflow-hidden shadow-md">
-                 <div className="absolute bottom-4 right-4 flex gap-2">
-                     <span className="bg-white/20 backdrop-blur px-3 py-1 rounded text-xs text-white border border-white/30">
-                         Batch: {user.batch || 'Unassigned'}
-                     </span>
-                 </div>
-            </div>
-            
-            <div className="relative px-8 -mt-16 flex flex-col md:flex-row items-end gap-6">
-                <div className="w-32 h-32 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
-                    <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 mb-2">
-                    <h1 className="text-3xl font-heading font-bold text-zenro-slate">{user.name}</h1>
-                    <p className="text-gray-500 flex items-center gap-2">
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-200 uppercase tracking-wider">{user.role}</span>
-                        <span>•</span>
-                        <span>ID: {user.rollNumber || user.id.slice(0, 8).toUpperCase()}</span>
-                    </p>
-                </div>
-                <div className="mb-4 flex gap-3">
-                    <button className="bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm border border-gray-300 transition shadow-sm">Edit Profile</button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 space-y-8">
-                     <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                        <h3 className="text-xl font-bold text-zenro-slate mb-6 flex items-center gap-2 font-heading">
-                            <UserIcon className="w-5 h-5 text-gray-400" /> Personal Information
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Email</label><p className="text-slate-800 font-medium mt-1">{user.email}</p></div>
-                            <div><label className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Phone</label><p className="text-slate-800 font-medium mt-1">{user.phone || 'N/A'}</p></div>
-                            <div><label className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">ID</label><p className="text-slate-800 font-mono font-medium mt-1">{user.rollNumber || user.id.slice(0,8)}</p></div>
-                            <div><label className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Batch</label><p className="text-slate-800 font-medium mt-1">{user.batch || 'N/A'}</p></div>
-                        </div>
+             <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
+                <UserIcon className="w-8 h-8 text-zenro-red" /> My Profile
+             </h1>
+             <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+                 <div className="flex flex-col md:flex-row gap-8 items-start">
+                     <div className="flex flex-col items-center gap-4">
+                         <img src={user.avatar} alt={user.name} className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-gray-100" />
+                         <span className="bg-zenro-blue text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">{user.role}</span>
                      </div>
-                </div>
-            </div>
+                     <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Full Name</p>
+                             <p className="text-lg font-bold text-slate-800">{user.name}</p>
+                         </div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Student ID</p>
+                             <p className="text-lg font-bold text-slate-800 font-mono">{user.rollNumber || user.id.slice(0, 8).toUpperCase()}</p>
+                         </div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Email Address</p>
+                             <p className="text-lg font-bold text-slate-800">{user.email}</p>
+                         </div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Assigned Batch</p>
+                             <p className="text-lg font-bold text-slate-800">{user.batch || 'Unassigned'}</p>
+                         </div>
+                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Phone Number</p>
+                             <p className="text-lg font-bold text-slate-800">{user.phone || 'Not Provided'}</p>
+                         </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Guardian Contact</p>
+                             <p className="text-lg font-bold text-slate-800">--</p>
+                         </div>
+                     </div>
+                 </div>
+                 <div className="mt-8 pt-8 border-t border-gray-100 flex justify-end">
+                     <button className="bg-gray-100 hover:bg-gray-200 text-slate-700 px-6 py-2 rounded-lg font-bold transition">Edit Details</button>
+                 </div>
+             </div>
         </div>
     );
-};
+}
+
+export const StudentActivityPage = () => {
+    return (
+        <div className="space-y-8 animate-fade-in">
+             <h1 className="text-3xl font-heading font-bold text-zenro-slate flex items-center gap-3">
+                <ListTodo className="w-8 h-8 text-zenro-red" /> Practice & Activities
+             </h1>
+             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                 <div className="p-6 border-b border-gray-200 bg-gray-50">
+                     <h3 className="font-bold text-slate-800">Assigned Tasks</h3>
+                 </div>
+                 <div className="divide-y divide-gray-100">
+                     {MOCK_ACTIVITIES.map(activity => (
+                         <div key={activity.id} className="p-6 hover:bg-gray-50 transition flex items-center justify-between group">
+                             <div className="flex items-center gap-4">
+                                 <div className={`p-3 rounded-full ${activity.type === 'ASSIGNMENT' ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>
+                                     {activity.type === 'ASSIGNMENT' ? <FileText className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
+                                 </div>
+                                 <div>
+                                     <h4 className="font-bold text-slate-800 text-lg group-hover:text-zenro-blue transition">{activity.title}</h4>
+                                     <p className="text-sm text-gray-500">{activity.courseName} • Due: {activity.dueDate}</p>
+                                 </div>
+                             </div>
+                             <div className="flex items-center gap-4">
+                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border ${activity.status === 'COMPLETED' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>
+                                     {activity.status}
+                                 </span>
+                                 <button className="text-gray-400 hover:text-zenro-red">
+                                     <ChevronRight className="w-5 h-5" />
+                                 </button>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             </div>
+        </div>
+    );
+}
+
+export const StudentLiveRoom = ({ user }: { user: User }) => {
+    const { isLive, topic, remoteStream, joinSession, leaveSession, chatMessages, sendMessage, connectionState } = useLiveSession();
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [msgInput, setMsgInput] = useState('');
+
+    useEffect(() => {
+        if (isLive) {
+            joinSession();
+        }
+        return () => {
+            leaveSession();
+        };
+    }, [isLive]);
+
+    useEffect(() => {
+        if (videoRef.current && remoteStream) {
+            videoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
+
+    const handleSend = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (msgInput.trim()) {
+            sendMessage(user.name, msgInput);
+            setMsgInput('');
+        }
+    };
+
+    if (!isLive) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center space-y-6 text-center animate-fade-in p-8">
+                <div className="bg-gray-100 p-8 rounded-full">
+                    <WifiOff className="w-16 h-16 text-gray-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800">Class is currently offline</h2>
+                <p className="text-gray-500 max-w-md">Please check your schedule or wait for the instructor to start the session.</p>
+                <button onClick={() => window.location.reload()} className="px-6 py-2 bg-zenro-blue text-white rounded-lg font-bold hover:bg-blue-800 transition">Refresh Status</button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="h-[calc(100vh-2rem)] flex flex-col gap-4 animate-fade-in">
+             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                 <div>
+                     <h1 className="text-xl font-heading font-bold text-slate-800 flex items-center gap-2">
+                         <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></span> {topic}
+                     </h1>
+                     <p className="text-xs text-gray-500">Live Interactive Session</p>
+                 </div>
+                 <div className="flex items-center gap-2">
+                     <span className={`px-2 py-1 rounded text-xs font-bold ${connectionState === 'connected' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                         {connectionState === 'connected' ? 'Connected' : 'Connecting...'}
+                     </span>
+                 </div>
+             </div>
+
+             <div className="flex-1 flex gap-4 overflow-hidden">
+                 <div className="flex-1 bg-black rounded-xl overflow-hidden relative shadow-lg flex flex-col justify-center items-center">
+                     {remoteStream ? (
+                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+                     ) : (
+                         <div className="text-white/50 flex flex-col items-center">
+                             <Loader2 className="w-12 h-12 animate-spin mb-4" />
+                             <p>Waiting for video stream...</p>
+                         </div>
+                     )}
+                 </div>
+
+                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm">
+                     <div className="p-3 border-b border-gray-200 font-bold text-sm text-slate-800 bg-gray-50">Class Chat</div>
+                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                         {chatMessages.map((msg, i) => (
+                             <div key={i} className="text-sm">
+                                 <p className="text-xs font-bold text-slate-500">{msg.user} <span className="opacity-50 font-normal ml-1">{msg.timestamp}</span></p>
+                                 <p className="text-slate-800">{msg.text}</p>
+                             </div>
+                         ))}
+                     </div>
+                     <form onSubmit={handleSend} className="p-3 border-t border-gray-200 bg-gray-50">
+                         <div className="flex gap-2">
+                             <input 
+                                type="text" 
+                                value={msgInput}
+                                onChange={e => setMsgInput(e.target.value)}
+                                className="flex-1 bg-white border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-zenro-blue"
+                                placeholder="Type a message..."
+                             />
+                             <button type="submit" className="bg-zenro-blue text-white p-2 rounded hover:bg-blue-800 transition"><Send className="w-4 h-4" /></button>
+                         </div>
+                     </form>
+                 </div>
+             </div>
+        </div>
+    );
+}
+
+export const StudentCoursePlayer = () => {
+    const { courseId } = useParams();
+    const navigate = useNavigate();
+    const [course, setCourse] = useState<Course | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCourse = async () => {
+            setLoading(true);
+            try {
+                const { data } = await supabase.from('courses').select('*').eq('id', courseId).single();
+                if (data) {
+                    setCourse({
+                        id: data.id,
+                        title: data.title,
+                        description: data.description,
+                        instructor: data.instructor_name || 'Tanaka Sensei',
+                        progress: 0,
+                        thumbnail: data.thumbnail,
+                        totalDuration: '10h',
+                        level: data.level,
+                        modules: [ // Mock modules since schema might be simple
+                            { id: 'm1', title: 'Introduction', materials: [] },
+                            { id: 'm2', title: 'Chapter 1: Basics', materials: [] },
+                            { id: 'm3', title: 'Chapter 2: Grammar', materials: [] }
+                        ]
+                    });
+                }
+            } catch (e) { console.error(e); } 
+            finally { setLoading(false); }
+        };
+        fetchCourse();
+    }, [courseId]);
+
+    if(loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
+    if(!course) return <div className="p-8 text-center">Course not found.</div>;
+
+    return (
+        <div className="h-[calc(100vh-2rem)] flex flex-col gap-4 animate-fade-in">
+             <div className="flex items-center gap-4 mb-2">
+                 <button onClick={() => navigate('/student/courses')} className="p-2 hover:bg-gray-200 rounded-full transition"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
+                 <h1 className="text-2xl font-heading font-bold text-slate-800">{course.title}</h1>
+             </div>
+
+             <div className="flex-1 flex gap-6 overflow-hidden">
+                 {/* Video Player Area */}
+                 <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-lg flex items-center justify-center relative group">
+                     <div className="text-center">
+                         <Play className="w-16 h-16 text-white/50 mx-auto mb-4" />
+                         <p className="text-white/70 font-bold">Select a lesson to start</p>
+                     </div>
+                 </div>
+
+                 {/* Playlist / Syllabus */}
+                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm overflow-hidden">
+                     <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-slate-800">Course Content</div>
+                     <div className="flex-1 overflow-y-auto">
+                         {course.modules?.map((module, i) => (
+                             <div key={module.id} className="border-b border-gray-100 last:border-0">
+                                 <div className="p-4 bg-gray-50/50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer hover:bg-gray-100">
+                                     {module.title}
+                                 </div>
+                                 <div className="bg-white">
+                                     {[1,2,3].map(lesson => (
+                                         <div key={lesson} className="p-3 pl-8 hover:bg-blue-50 cursor-pointer flex items-center gap-3 text-sm text-gray-600 transition">
+                                             <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">{lesson}</div>
+                                             <span>Lesson {lesson}</span>
+                                             <span className="ml-auto text-xs text-gray-400">10:00</span>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         ))}
+                     </div>
+                 </div>
+             </div>
+        </div>
+    );
+}

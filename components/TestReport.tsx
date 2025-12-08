@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, ChevronLeft, Download, Clock, Calendar, User as UserIcon } from 'lucide-react';
@@ -61,14 +62,14 @@ export const TestReport = ({ role }: { role: 'STUDENT' | 'TEACHER' }) => {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
+      <div className="flex h-full items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zenro-red"></div>
       </div>
     );
   }
 
   if (!submission || !test) {
-    return <div className="p-8 text-center text-white">Report not found.</div>;
+    return <div className="p-12 text-center text-gray-500">Report not found or access denied.</div>;
   }
 
   // Analytics
@@ -86,16 +87,16 @@ export const TestReport = ({ role }: { role: 'STUDENT' | 'TEACHER' }) => {
   const COLORS = ['#22c55e', '#ef4444'];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-10">
+    <div className="space-y-8 animate-fade-in pb-10 bg-gray-50 min-h-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <button 
           onClick={() => navigate(role === 'STUDENT' ? '/student/tests' : '/teacher/reports')} 
-          className="flex items-center gap-2 text-gray-400 hover:text-white transition"
+          className="flex items-center gap-2 text-gray-500 hover:text-zenro-slate transition font-bold"
         >
           <ChevronLeft className="w-5 h-5" /> Back to {role === 'STUDENT' ? 'Tests' : 'Reports'}
         </button>
-        <button className="flex items-center gap-2 bg-dark-800 hover:bg-dark-700 text-white px-4 py-2 rounded-lg border border-dark-600 transition">
+        <button className="flex items-center gap-2 bg-white hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-lg border border-gray-300 transition font-bold shadow-sm">
           <Download className="w-4 h-4" /> Download PDF
         </button>
       </div>
@@ -103,69 +104,69 @@ export const TestReport = ({ role }: { role: 'STUDENT' | 'TEACHER' }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Score Card */}
         <div className="lg:col-span-2 space-y-6">
-          <div className={`bg-dark-800 rounded-xl border p-8 flex flex-col md:flex-row items-center justify-between gap-6 ${isPassed ? 'border-green-500/30' : 'border-red-500/30'}`}>
+          <div className={`bg-white rounded-xl border p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm ${isPassed ? 'border-green-200' : 'border-red-200'}`}>
              <div>
-                <h1 className="text-2xl font-bold text-white mb-2">{test.title}</h1>
-                <div className="flex items-center gap-4 text-sm text-gray-400">
+                <h1 className="text-2xl font-heading font-bold text-slate-800 mb-2">{test.title}</h1>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {new Date(submission.completed_at).toLocaleDateString()}</span>
                    <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {new Date(submission.completed_at).toLocaleTimeString()}</span>
                    {role === 'TEACHER' && student && (
-                     <span className="flex items-center gap-1 text-brand-400"><UserIcon className="w-4 h-4" /> {student.full_name}</span>
+                     <span className="flex items-center gap-1 text-zenro-blue font-bold"><UserIcon className="w-4 h-4" /> {student.full_name}</span>
                    )}
                 </div>
              </div>
              <div className="text-right">
-                <div className={`text-5xl font-bold mb-1 ${isPassed ? 'text-green-500' : 'text-red-500'}`}>
+                <div className={`text-5xl font-bold mb-1 ${isPassed ? 'text-green-600' : 'text-red-600'}`}>
                   {scorePercentage}%
                 </div>
-                <div className={`text-sm font-bold uppercase tracking-widest px-3 py-1 rounded-full inline-block ${isPassed ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                <div className={`text-sm font-bold uppercase tracking-widest px-3 py-1 rounded-full inline-block ${isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                   {isPassed ? 'Passed' : 'Failed'}
                 </div>
              </div>
           </div>
 
           {/* Detailed Question Review */}
-          <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
-             <div className="p-6 border-b border-dark-700 font-bold text-white">Detailed Analysis</div>
-             <div className="divide-y divide-dark-700">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+             <div className="p-6 border-b border-gray-200 font-bold text-slate-800 bg-gray-50">Detailed Analysis</div>
+             <div className="divide-y divide-gray-100">
                 {questions.map((q, idx) => {
                    const studentAnsIdx = submission.answers[q.id];
                    const correctIdx = q.correct_option_index !== undefined ? q.correct_option_index : q.correct;
                    const isCorrect = studentAnsIdx === correctIdx;
 
                    return (
-                     <div key={q.id} className="p-6 hover:bg-dark-700/20 transition">
+                     <div key={q.id} className="p-6 hover:bg-gray-50 transition">
                         <div className="flex gap-4">
                            <div className="mt-1">
                               {isCorrect ? <CheckCircle className="w-6 h-6 text-green-500" /> : <XCircle className="w-6 h-6 text-red-500" />}
                            </div>
                            <div className="flex-1">
-                              <p className="text-white font-medium mb-3">
-                                <span className="text-gray-500 mr-2">Q{idx + 1}.</span> 
+                              <p className="text-slate-800 font-medium mb-3 text-lg">
+                                <span className="text-gray-400 mr-2 font-bold text-sm">Q{idx + 1}.</span> 
                                 {q.text || q.question_text}
                               </p>
                               
                               <div className="space-y-2">
                                  {q.options.map((opt: string, optIdx: number) => {
-                                    let styleClass = "border-dark-700 bg-dark-900 text-gray-400"; // Default
+                                    let styleClass = "border-gray-200 bg-white text-gray-500"; // Default
                                     
                                     if (optIdx === correctIdx) {
-                                       styleClass = "border-green-500/50 bg-green-500/10 text-green-500 font-bold";
+                                       styleClass = "border-green-200 bg-green-50 text-green-700 font-bold";
                                     } else if (optIdx === studentAnsIdx && !isCorrect) {
-                                       styleClass = "border-red-500/50 bg-red-500/10 text-red-500";
+                                       styleClass = "border-red-200 bg-red-50 text-red-700 font-bold";
                                     }
 
                                     return (
                                       <div key={optIdx} className={`p-3 rounded-lg border text-sm flex justify-between items-center ${styleClass}`}>
                                          <span>{opt}</span>
-                                         {optIdx === studentAnsIdx && <span className="text-xs uppercase font-bold">Your Answer</span>}
-                                         {optIdx === correctIdx && optIdx !== studentAnsIdx && <span className="text-xs uppercase font-bold">Correct Answer</span>}
+                                         {optIdx === studentAnsIdx && <span className="text-[10px] uppercase font-bold tracking-wider">Your Answer</span>}
+                                         {optIdx === correctIdx && optIdx !== studentAnsIdx && <span className="text-[10px] uppercase font-bold tracking-wider">Correct Answer</span>}
                                       </div>
                                     );
                                  })}
                               </div>
                            </div>
-                           <div className="text-xs font-bold text-gray-500 pt-1">
+                           <div className="text-xs font-bold text-gray-400 pt-1">
                               {q.marks || 1} Marks
                            </div>
                         </div>
@@ -178,8 +179,8 @@ export const TestReport = ({ role }: { role: 'STUDENT' | 'TEACHER' }) => {
 
         {/* Sidebar Stats */}
         <div className="space-y-6">
-           <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
-              <h3 className="text-white font-bold mb-4">Performance Chart</h3>
+           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h3 className="text-slate-800 font-bold mb-4 border-b border-gray-100 pb-2">Performance Breakdown</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -196,27 +197,29 @@ export const TestReport = ({ role }: { role: 'STUDENT' | 'TEACHER' }) => {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
+                    <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
               <div className="flex justify-center gap-6 mt-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-300">
+                  <div className="flex items-center gap-2 text-sm text-slate-600 font-bold">
                      <div className="w-3 h-3 rounded-full bg-green-500"></div> Correct
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-300">
+                  <div className="flex items-center gap-2 text-sm text-slate-600 font-bold">
                      <div className="w-3 h-3 rounded-full bg-red-500"></div> Incorrect
                   </div>
               </div>
            </div>
 
-           <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
-              <h3 className="text-white font-bold mb-4">Instructor Feedback</h3>
+           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h3 className="text-slate-800 font-bold mb-4 border-b border-gray-100 pb-2">Instructor Feedback</h3>
               {submission.feedback ? (
-                <p className="text-gray-300 text-sm italic">"{submission.feedback}"</p>
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <p className="text-blue-800 text-sm italic">"{submission.feedback}"</p>
+                </div>
               ) : (
-                <div className="text-center py-4">
-                   <p className="text-gray-500 text-sm">No feedback provided yet.</p>
+                <div className="text-center py-4 bg-gray-50 rounded-lg border border-gray-100 border-dashed">
+                   <p className="text-gray-400 text-sm">No feedback provided yet.</p>
                 </div>
               )}
            </div>
