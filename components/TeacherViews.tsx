@@ -128,13 +128,28 @@ export const TeacherSchedulePage = () => {
 
     useEffect(() => {
         fetchData();
+        // Subscribe to changes in batches
+        const subscription = supabase
+            .channel('teacher_schedule_updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+                fetchBatchesOnly();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(subscription);
+        };
     }, []);
+
+    const fetchBatchesOnly = async () => {
+        const { data: batchData } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
+        if (batchData) setBatches(batchData.map(b => b.name));
+    };
 
     const fetchData = async () => {
         setLoading(true);
-        // Fetch Batches
-        const { data: batchData } = await supabase.from('batches').select('name');
-        if (batchData) setBatches(batchData.map(b => b.name));
+        // Fetch Batches - Always fetch fresh from DB and order by latest
+        await fetchBatchesOnly();
 
         // Fetch Schedules
         if (user) {
@@ -286,12 +301,24 @@ export const LiveClassConsole = () => {
   }, [localStream]);
 
   useEffect(() => {
-      // Fetch Batches for dropdown
+      // Fetch Batches for dropdown - Ordered by Latest
       const loadBatches = async () => {
-          const { data } = await supabase.from('batches').select('name');
+          const { data } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
           if (data) setAvailableBatches(data.map(b => b.name));
       };
       loadBatches();
+
+      // Real-time updates for batches
+      const subscription = supabase
+        .channel('live_console_batches')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+            loadBatches();
+        })
+        .subscribe();
+
+      return () => {
+          supabase.removeChannel(subscription);
+      };
   }, []);
 
   const handleToggleMic = () => {
@@ -658,51 +685,243 @@ export const TeacherReportsPage = () => {
 
 export const TestCreationModal = ({ initialData, onClose, onRefresh }: any) => {
     const [title, setTitle] = useState(initialData?.title || '');
+    const [description, setDescription] = useState(initialData?.description || '');
     const [duration, setDuration] = useState(initialData?.duration_minutes || 30);
     const [passing, setPassing] = useState(initialData?.passing_score || 40);
+    const [step, setStep] = useState(1);
+    const [testData, setTestData] = useState<Partial<Test>>({
+        title: initialData?.title || '',
+        description: initialData?.description || '',
+        duration_minutes: initialData?.duration_minutes || 30,
+        passing_score: initialData?.passing_score || 40,
+        allow_multiple_attempts: initialData?.allow_multiple_attempts || false,
+        assignedBatches: [],
+        assignedStudentIds: []
+    });
+    const [questions, setQuestions] = useState<Partial<Question>[]>([]);
+    const [availableBatches, setAvailableBatches] = useState<string[]>([]);
+    const [availableStudents, setAvailableStudents] = useState<User[]>([]);
+    const [studentSearch, setStudentSearch] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            if(initialData) {
-                await supabase.from('tests').update({ title, duration_minutes: duration, passing_score: passing }).eq('id', initialData.id);
-            } else {
-                await supabase.from('tests').insert({ title, duration_minutes: duration, passing_score: passing, is_active: false });
+    useEffect(() => {
+        const loadResources = async () => {
+            // Fetch batches sorted by latest
+            const { data: bData } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
+            if(bData) setAvailableBatches(bData.map(b => b.name));
+            
+            const { data: sData } = await supabase.from('profiles').select('*').eq('role', 'STUDENT');
+            if(sData) {
+                const mapped = sData.map((u: any) => ({
+                    id: u.id, name: u.full_name, role: 'STUDENT', email: u.email, avatar: u.avatar_url, batch: u.batch, rollNumber: u.student_id
+                }));
+                setAvailableStudents(mapped);
             }
-            onRefresh();
+            if(initialData) {
+                const { data: qData } = await supabase.from('questions').select('*').eq('test_id', initialData.id);
+                setQuestions(qData || []);
+                const { data: bAssign } = await supabase.from('test_batches').select('batch_name').eq('test_id', initialData.id);
+                const { data: sAssign } = await supabase.from('test_enrollments').select('student_id').eq('test_id', initialData.id);
+                setTestData({ 
+                    ...initialData, 
+                    assignedBatches: bAssign?.map(b => b.batch_name) || [], 
+                    assignedStudentIds: sAssign?.map(s => s.student_id) || [] 
+                });
+            }
+        };
+        loadResources();
+
+        // Subscribe to new batches
+        const sub = supabase.channel('modal_batches_sub')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'batches' }, (payload) => {
+                setAvailableBatches(prev => [payload.new.name, ...prev]);
+            })
+            .subscribe();
+        
+        return () => { supabase.removeChannel(sub); }
+    }, [initialData]);
+
+    const addQuestion = () => { setQuestions([...questions, { id: crypto.randomUUID(), question_text: '', options: ['', '', '', ''], correct_option_index: 0, marks: 1 }]); };
+    const updateQuestion = (idx: number, field: keyof Question, value: any) => { const updated = [...questions]; updated[idx] = { ...updated[idx], [field]: value }; setQuestions(updated); };
+    const updateOption = (qIdx: number, oIdx: number, val: string) => { const updated = [...questions]; if (updated[qIdx].options) { const newOpts = [...updated[qIdx].options!]; newOpts[oIdx] = val; updated[qIdx].options = newOpts; setQuestions(updated); } };
+    const removeQuestion = (idx: number) => { const updated = [...questions]; updated.splice(idx, 1); setQuestions(updated); };
+
+    const handleSave = async (activate: boolean) => {
+        if (!testData.title) return alert("Title is required");
+        if (questions.length === 0) return alert("Add at least one question");
+        if (activate && !confirm("Confirm Publish: This test will be immediately available.")) return;
+        setLoading(true);
+        try {
+            const payload = { 
+                title: testData.title, 
+                description: testData.description || '', 
+                duration_minutes: testData.duration_minutes || 30, 
+                passing_score: testData.passing_score || 40, 
+                is_active: activate,
+                allow_multiple_attempts: testData.allow_multiple_attempts 
+            };
+            
+            let currentTestId = initialData?.id;
+            if (currentTestId) { 
+                await supabase.from('tests').update(payload).eq('id', currentTestId); 
+            } else { 
+                const { data } = await supabase.from('tests').insert(payload).select().single(); 
+                currentTestId = data.id; 
+            }
+            
+            await supabase.from('questions').delete().eq('test_id', currentTestId);
+            if (questions.length > 0) { 
+                await supabase.from('questions').insert(questions.map(q => ({ 
+                    test_id: currentTestId, 
+                    question_text: q.question_text, 
+                    options: q.options, 
+                    correct_option_index: q.correct_option_index, 
+                    marks: q.marks 
+                }))); 
+            }
+            
+            await supabase.from('test_batches').delete().eq('test_id', currentTestId);
+            if(testData.assignedBatches?.length) { 
+                await supabase.from('test_batches').insert(testData.assignedBatches.map(b => ({ test_id: currentTestId, batch_name: b }))); 
+            }
+            
+            await supabase.from('test_enrollments').delete().eq('test_id', currentTestId);
+            if(testData.assignedStudentIds?.length) { 
+                await supabase.from('test_enrollments').insert(testData.assignedStudentIds.map(s => ({ test_id: currentTestId, student_id: s }))); 
+            }
+            
+            alert(`Test ${activate ? 'Published' : 'Saved'} Successfully!`); 
+            onRefresh(); 
             onClose();
-        } catch (error) {
-            console.error(error);
+        } catch (e: any) { 
+            console.error("Save Test Error:", e); 
+            alert(`Error saving test: ${e.message}`); 
+        } finally { 
+            setLoading(false); 
         }
-    }
+    };
+
+    const toggleBatch = (b: string) => { const current = testData.assignedBatches || []; setTestData({ ...testData, assignedBatches: current.includes(b) ? current.filter(x => x !== b) : [...current, b] }); };
+    const toggleStudent = (id: string) => { const current = testData.assignedStudentIds || []; setTestData({ ...testData, assignedStudentIds: current.includes(id) ? current.filter(x => x !== id) : [...current, id] }); };
+    const filteredStudents = availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()));
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white w-full max-w-md rounded-xl shadow-2xl p-6">
-                <h2 className="text-xl font-bold mb-4">{initialData ? 'Edit Test' : 'Create New Test'}</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+                <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <div>
-                        <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Title</label>
-                        <input className="w-full border p-2 rounded" value={title} onChange={e => setTitle(e.target.value)} required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                         <div>
-                            <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Duration (min)</label>
-                            <input type="number" className="w-full border p-2 rounded" value={duration} onChange={e => setDuration(Number(e.target.value))} required />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Pass Score (%)</label>
-                            <input type="number" className="w-full border p-2 rounded" value={passing} onChange={e => setPassing(Number(e.target.value))} required />
+                        <h2 className="text-xl font-bold text-zenro-slate flex items-center gap-2"><FileCheck className="w-6 h-6 text-zenro-red" /> {initialData ? 'Edit Assessment' : 'Create New Assessment'}</h2>
+                        <div className="flex gap-4 mt-2">
+                            {[1, 2, 3, 4].map(s => (
+                                <div key={s} className={`flex items-center gap-2 text-xs font-bold ${step === s ? 'text-zenro-red' : 'text-gray-400'}`}>
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${step === s ? 'border-zenro-red bg-red-50' : 'border-gray-300'}`}>{s}</div>
+                                    <span>{s === 1 ? 'Details' : s === 2 ? 'Questions' : s === 3 ? 'Access' : 'Review'}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                    <div className="flex justify-end gap-3 mt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 rounded border hover:bg-gray-50">Cancel</button>
-                        <button type="submit" className="px-4 py-2 rounded bg-zenro-red text-white font-bold hover:bg-red-700">Save</button>
-                    </div>
-                </form>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full text-gray-500"><X className="w-6 h-6"/></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-8 bg-white">
+                    {step === 1 && (
+                        <div className="max-w-2xl mx-auto space-y-6">
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Test Title <span className="text-red-500">*</span></label><input type="text" className="w-full bg-white border border-gray-300 rounded-lg p-3 text-slate-800 focus:border-zenro-red outline-none" placeholder="e.g. JLPT N4 Mock Exam #1" value={testData.title} onChange={e => setTestData({...testData, title: e.target.value})} /></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Instructions</label><textarea className="w-full bg-white border border-gray-300 rounded-lg p-3 text-slate-800 focus:border-zenro-red outline-none h-32 resize-none" value={testData.description || ''} onChange={e => setTestData({...testData, description: e.target.value})} /></div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Duration (Minutes)</label><input type="number" className="w-full bg-white border border-gray-300 rounded-lg p-3 text-slate-800 focus:border-zenro-red outline-none" value={testData.duration_minutes} onChange={e => setTestData({...testData, duration_minutes: parseInt(e.target.value)})} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Passing Score (%)</label><input type="number" className="w-full bg-white border border-gray-300 rounded-lg p-3 text-slate-800 focus:border-zenro-red outline-none" value={testData.passing_score} onChange={e => setTestData({...testData, passing_score: parseInt(e.target.value)})} /></div>
+                            </div>
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-5 h-5 text-zenro-red rounded focus:ring-zenro-red"
+                                        checked={testData.allow_multiple_attempts} 
+                                        onChange={e => setTestData({...testData, allow_multiple_attempts: e.target.checked})}
+                                    />
+                                    <div>
+                                        <span className="font-bold text-slate-800 text-sm">Allow Multiple Attempts</span>
+                                        <p className="text-xs text-gray-500">If checked, students can retake this test to improve their score.</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    )}
+                    {step === 2 && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-slate-800">Question Builder ({questions.length})</h3>
+                                <button onClick={addQuestion} className="text-sm bg-zenro-red hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"><Plus className="w-4 h-4" /> Add Question</button>
+                            </div>
+                            {questions.map((q, idx) => (
+                                <div key={idx} className="bg-gray-50 p-6 rounded-xl border border-gray-200 relative group">
+                                    <button onClick={() => removeQuestion(idx)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                    <div className="mb-4 pr-12"><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Question {idx + 1}</label><textarea className="w-full bg-white border border-gray-300 rounded-lg p-3 text-slate-800 focus:border-zenro-red outline-none h-24 resize-none" placeholder="Enter question text..." value={q.question_text} onChange={e => updateQuestion(idx, 'question_text', e.target.value)} /></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        {q.options?.map((opt, oIdx) => (
+                                            <div key={oIdx} className="flex items-center gap-3">
+                                                <div onClick={() => updateQuestion(idx, 'correct_option_index', oIdx)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer ${q.correct_option_index === oIdx ? 'border-zenro-red' : 'border-gray-400'}`}>{q.correct_option_index === oIdx && <div className="w-3 h-3 bg-zenro-red rounded-full"></div>}</div>
+                                                <input type="text" className="flex-1 bg-white border border-gray-300 rounded-lg p-2 text-sm text-slate-800 outline-none focus:border-zenro-red" placeholder={`Option ${oIdx + 1}`} value={opt} onChange={e => updateOption(idx, oIdx, e.target.value)} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end"><div className="flex items-center gap-2"><label className="text-xs font-bold text-gray-500 uppercase">Marks:</label><input type="number" className="w-16 bg-white border border-gray-300 rounded p-1 text-slate-800 text-sm text-center outline-none focus:border-zenro-red" value={q.marks} onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value))} /></div></div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {step === 3 && (
+                        <div className="h-full flex flex-col">
+                            <h3 className="text-lg font-bold text-slate-800 mb-2">Access Control</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Batches</div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                                        {availableBatches.map(b => (
+                                            <div key={b} onClick={() => toggleBatch(b)} className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition ${testData.assignedBatches?.includes(b) ? 'bg-red-50 border-zenro-red' : 'bg-white border-gray-200'}`}><span className="text-sm font-bold text-slate-700">{b}</span>{testData.assignedBatches?.includes(b) && <CheckCircle className="w-4 h-4 text-zenro-red" />}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center justify-between"><div className="flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Specific Students</div><input type="text" placeholder="Search..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs text-slate-800 outline-none w-32" /></div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                                        {filteredStudents.map(s => {
+                                            const inBatch = s.batch && testData.assignedBatches?.includes(s.batch);
+                                            const explicitlyAssigned = testData.assignedStudentIds?.includes(s.id);
+                                            return (
+                                                <div key={s.id} onClick={() => !inBatch && toggleStudent(s.id)} className={`p-2 rounded-lg border flex items-center justify-between transition ${inBatch ? 'opacity-60 bg-gray-100 border-transparent cursor-default' : explicitlyAssigned ? 'bg-blue-50 border-blue-500 cursor-pointer' : 'bg-white border-gray-200 hover:border-gray-400 cursor-pointer'}`}>
+                                                    <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-gray-500">{s.email}</p></div>{inBatch ? <span className="text-[10px] bg-gray-200 px-2 py-1 rounded text-gray-500">Via Batch</span> : explicitlyAssigned && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {step === 4 && (
+                        <div className="max-w-2xl mx-auto text-center py-10 space-y-8">
+                            <h2 className="text-3xl font-bold text-zenro-slate">Ready to Finalize?</h2>
+                            <div className="grid grid-cols-2 gap-4 text-left bg-gray-50 p-6 rounded-xl border border-gray-200">
+                                <div><p className="text-xs text-gray-500 uppercase font-bold">Title</p><p className="text-slate-800 font-bold">{testData.title}</p></div>
+                                <div><p className="text-xs text-gray-500 uppercase font-bold">Questions</p><p className="text-slate-800 font-bold">{questions.length}</p></div>
+                                <div><p className="text-xs text-gray-500 uppercase font-bold">Retries</p><p className="text-slate-800 font-bold">{testData.allow_multiple_attempts ? "Allowed" : "One-time only"}</p></div>
+                            </div>
+                            <div className="flex gap-4 justify-center">
+                                <button onClick={() => handleSave(false)} disabled={loading} className="px-8 py-4 bg-gray-200 hover:bg-gray-300 rounded-xl font-bold text-gray-700 flex items-center gap-2 transition">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-5 h-5" />} Save as Draft</button>
+                                <button onClick={() => handleSave(true)} disabled={loading} className="px-8 py-4 bg-zenro-red hover:bg-red-700 rounded-xl font-bold text-white flex items-center gap-2 shadow-lg transition">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-5 h-5" />} Publish Live</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-between">
+                    <button onClick={step === 1 ? onClose : () => setStep(step - 1)} className="px-6 py-3 rounded-lg text-gray-500 hover:text-slate-800 font-bold transition">{step === 1 ? 'Cancel' : 'Back'}</button>
+                    {step < 4 && <button onClick={() => setStep(step + 1)} className="bg-zenro-red hover:bg-red-700 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 transition">Next Step <ChevronRight className="w-5 h-5" /></button>}
+                </div>
             </div>
         </div>
-    )
+    );
 }
 
 export const TestResultsView = ({ test, onClose }: any) => {
