@@ -5,9 +5,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Zenro - Japanese Language Institute</title>
+    
+    <!-- Typography: Poppins (Headings) & Open Sans (Body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Razorpay SDK -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -16,77 +19,80 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"Noto Sans JP"', 'sans-serif'],
+              sans: ['"Open Sans"', '"Noto Sans JP"', 'sans-serif'],
+              heading: ['"Poppins"', 'sans-serif'],
             },
             colors: {
               brand: {
-                50: '#fff0f2',
-                100: '#ffe4e8',
-                200: '#fecdd6',
-                300: '#fda4b4',
-                400: '#fb718a',
-                500: '#f43f5e',
-                600: '#be123c', // Zenro Red (Primary)
-                700: '#be123c', 
-                800: '#9f1239',
-                900: '#881337',
+                50: '#ffe5e7',
+                100: '#ffccd0',
+                200: '#ff99a1',
+                300: '#ff6672',
+                400: '#ff3343',
+                500: '#E60012', // Zenro Red Primary
+                600: '#cc0010',
+                700: '#99000c',
+                800: '#660008',
+                900: '#330004',
               },
               zenro: {
-                red: '#BC002D',    // Japan Flag Red
-                orange: '#FF9933', // India Saffron
-                green: '#138808',  // India Green
-                white: '#F5F5F5',  // Off White
-                dark: '#0B1121',   // Deep Imperial Navy
-                card: '#151e32',   // Lighter Navy for cards
+                red: '#E60012',    // Primary Brand Color
+                blue: '#1A237E',   // Secondary Navy Blue
+                slate: '#2C3E50',  // Dark Slate for Text
+                gray: '#F8F9FA',   // Light Background
+                white: '#FFFFFF',
               },
+              // Remapping "dark" to slate for easier migration, but intending light mode
               dark: {
-                900: '#0B1121', // Main BG
-                800: '#151e32', // Card BG
-                700: '#242f47', // Border/Hover
+                900: '#FFFFFF', // Main BG becomes White
+                800: '#FFFFFF', // Card BG becomes White
+                700: '#E2E8F0', // Borders become Light Gray
+                600: '#94A3B8', // Muted Text
               }
             },
+            boxShadow: {
+              'card': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+              'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04)',
+            },
             backgroundImage: {
-              'zenro-gradient': 'linear-gradient(135deg, #BC002D 0%, #881337 100%)',
-              'india-gradient': 'linear-gradient(to right, #FF9933, #FFFFFF, #138808)',
+              'zenro-gradient': 'linear-gradient(135deg, #E60012 0%, #1A237E 100%)',
             }
           }
         }
       }
     </script>
     <style>
-      /* Custom Scrollbar for sleek look */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #0B1121; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #242f47; 
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #BC002D; 
+      body {
+        background-color: #F8F9FA;
+        color: #2C3E50;
       }
       
-      /* Seigaiha Pattern (Japanese Wave) - Subtle Background */
-      .bg-seigaiha {
-        background-color: #0B1121;
-        background-image: radial-gradient(circle at 100% 150%, #0B1121 24%, #151e32 25%, #151e32 28%, #0B1121 29%, #0B1121 36%, #151e32 36%, #151e32 40%, transparent 40%, transparent),
-        radial-gradient(circle at 0    150%, #0B1121 24%, #151e32 25%, #151e32 28%, #0B1121 29%, #0B1121 36%, #151e32 36%, #151e32 40%, transparent 40%, transparent),
-        radial-gradient(circle at 50%  100%, #151e32 10%, #0B1121 11%, #0B1121 23%, #151e32 24%, #151e32 30%, #0B1121 31%, #0B1121 43%, #151e32 44%, #151e32 50%, #0B1121 51%, #0B1121 63%, #151e32 64%, #151e32 71%, transparent 71%, transparent),
-        radial-gradient(circle at 100% 50%, #151e32 5%, #0B1121 6%, #0B1121 15%, #151e32 16%, #151e32 20%, #0B1121 21%, #0B1121 30%, #151e32 31%, #151e32 35%, #0B1121 36%, #0B1121 45%, #151e32 46%, #151e32 49%, transparent 50%, transparent),
-        radial-gradient(circle at 0    50%, #151e32 5%, #0B1121 6%, #0B1121 15%, #151e32 16%, #151e32 20%, #0B1121 21%, #0B1121 30%, #151e32 31%, #151e32 35%, #0B1121 36%, #0B1121 45%, #151e32 46%, #151e32 49%, transparent 50%, transparent);
-        background-size: 64px 32px;
-        opacity: 1;
+      /* Smooth Scrolling */
+      html {
+        scroll-behavior: smooth;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #F1F5F9; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #CBD5E1; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94A3B8; 
       }
       
       .glass-card {
-        background: rgba(21, 30, 50, 0.7);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        /* Redefined as clean white card */
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
       }
     </style>
   <script type="importmap">
@@ -107,7 +113,7 @@
 }
 </script>
 </head>
-  <body class="bg-dark-900 text-white antialiased font-sans">
+  <body class="bg-zenro-gray text-zenro-slate antialiased font-sans">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>

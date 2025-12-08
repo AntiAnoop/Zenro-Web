@@ -23,24 +23,9 @@ const CREDENTIALS: Record<string, {pass: string, role: UserRole, name: string, i
 
 const ZenroLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="indiaFlag" x1="50" y1="0" x2="50" y2="100" gradientUnits="userSpaceOnUse">
-        <stop offset="0.2" stopColor="#FF9933" />
-        <stop offset="0.5" stopColor="#FFFFFF" />
-        <stop offset="0.8" stopColor="#138808" />
-      </linearGradient>
-      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="2" result="blur" />
-        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-      </filter>
-    </defs>
-    {/* Left Arc - Japan (White background with Red Sun) */}
-    {/* Background for left arc to ensure white visibility on dark bg */}
-    <path d="M46 10 A40 40 0 0 0 46 90" stroke="#FFFFFF" strokeWidth="20" />
-    <circle cx="26" cy="50" r="8" fill="#BC002D" />
-    
-    {/* Right Arc - India (Tricolor Gradient) */}
-    <path d="M54 10 A40 40 0 0 1 54 90" stroke="url(#indiaFlag)" strokeWidth="20" />
+    <circle cx="50" cy="50" r="45" fill="white" />
+    <circle cx="50" cy="50" r="20" fill="#E60012" />
+    <path d="M50 5 A45 45 0 0 1 95 50" stroke="#1A237E" strokeWidth="5" strokeLinecap="round" />
   </svg>
 );
 
@@ -63,7 +48,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
             name: account.name,
             role: account.role,
             email: `${id}@zenro.jp`,
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=1A237E&color=fff`,
             batch: '2024-A',
             phone: 'N/A'
         });
@@ -99,7 +84,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
                 name: account.name,
                 role: account.role,
                 email: `${identifier}@zenro.jp`,
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`,
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=1A237E&color=fff`,
                 batch: '2024-A' 
             });
             setLoading(false);
@@ -156,95 +141,88 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 bg-seigaiha relative overflow-hidden">
-      {/* Background Ambience */}
-      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-zenro-red/10 to-transparent pointer-events-none"></div>
-      
-      <div className="w-full max-w-5xl bg-dark-800 rounded-3xl border border-dark-700 shadow-2xl flex flex-col md:flex-row overflow-hidden relative z-10 min-h-[600px]">
+    <div className="min-h-screen bg-zenro-gray flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-[600px]">
         
         {/* Left Side - Brand Visual */}
-        <div className="md:w-1/2 bg-dark-900 relative p-12 flex flex-col justify-between border-r border-dark-700/50">
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d?auto=format&fit=crop&q=80&w=1000')] bg-cover bg-center opacity-40 mix-blend-overlay"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-transparent to-transparent"></div>
-            
-            <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-6">
-                    <ZenroLogo className="w-12 h-12" />
-                    <h1 className="text-3xl font-black text-white tracking-tight">ZENRO</h1>
+        <div className="md:w-1/2 bg-zenro-blue relative p-12 flex flex-col justify-between">
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528360983277-13d9012356ee?auto=format&fit=crop&q=80&w=1000')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
+            <div className="relative z-10 text-white">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="bg-white p-2 rounded-full">
+                        <ZenroLogo className="w-8 h-8" />
+                    </div>
+                    <h1 className="text-2xl font-heading font-bold tracking-tight">ZENRO INSTITUTE</h1>
                 </div>
-                <h2 className="text-4xl font-bold text-white leading-tight font-serif">
-                    Bridging <span className="text-zenro-red">Japan</span> <br/>
-                    & <span className="text-zenro-orange">India</span> through <br/>
-                    Excellence.
+                <h2 className="text-4xl font-heading font-bold leading-tight mb-4">
+                    Your Gateway to <br/>
+                    <span className="text-zenro-red">Global Opportunities</span>
                 </h2>
+                <p className="text-blue-100 text-lg">Master Japanese, secure your future, and build a career without borders.</p>
             </div>
 
-            <div className="relative z-10 text-sm text-gray-400">
-                <div className="flex gap-4 mb-2">
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-zenro-red"></div> N5-N1 Training</div>
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-zenro-green"></div> Career Placement</div>
-                </div>
+            <div className="relative z-10 text-sm text-blue-200 mt-8">
                 <p>&copy; 2024 Zenro Institute Pvt Ltd.</p>
             </div>
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="md:w-1/2 p-12 flex flex-col justify-center bg-dark-800/80 backdrop-blur">
+        <div className="md:w-1/2 p-12 flex flex-col justify-center bg-white">
             <div className="max-w-sm mx-auto w-full">
-                <h3 className="text-2xl font-bold text-white mb-2">Welcome Back</h3>
-                <p className="text-gray-400 mb-8 text-sm">Please login to access your portal.</p>
+                <h3 className="text-2xl font-heading font-bold text-zenro-slate mb-2">Welcome Back</h3>
+                <p className="text-gray-500 mb-8">Please enter your credentials to access the portal.</p>
 
                 {/* Quick Login Demo Buttons */}
-                <div className="flex gap-2 mb-6 p-1 bg-dark-900 rounded-lg border border-dark-700">
-                    <button onClick={() => loginAs('8888888888')} className="flex-1 py-2 text-xs font-bold text-gray-400 hover:text-white hover:bg-dark-800 rounded transition flex items-center justify-center gap-2">
-                        <Zap className="w-3 h-3 text-zenro-red" /> Sensei
+                <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
+                    <button onClick={() => loginAs('8888888888')} className="flex-1 py-2 text-xs font-bold text-gray-500 hover:text-zenro-blue hover:bg-white shadow-sm rounded transition flex items-center justify-center gap-2">
+                        Teacher
                     </button>
-                    <button onClick={() => loginAs('9999999999')} className="flex-1 py-2 text-xs font-bold text-gray-400 hover:text-white hover:bg-dark-800 rounded transition flex items-center justify-center gap-2">
-                        <Zap className="w-3 h-3 text-zenro-orange" /> Student
+                    <button onClick={() => loginAs('9999999999')} className="flex-1 py-2 text-xs font-bold text-gray-500 hover:text-zenro-red hover:bg-white shadow-sm rounded transition flex items-center justify-center gap-2">
+                        Student
                     </button>
-                    <button onClick={() => loginAs('7777777777')} className="flex-1 py-2 text-xs font-bold text-gray-400 hover:text-white hover:bg-dark-800 rounded transition flex items-center justify-center gap-2">
-                        <Zap className="w-3 h-3 text-zenro-green" /> Admin
+                    <button onClick={() => loginAs('7777777777')} className="flex-1 py-2 text-xs font-bold text-gray-500 hover:text-green-600 hover:bg-white shadow-sm rounded transition flex items-center justify-center gap-2">
+                        Admin
                     </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Student ID / Email</label>
+                        <label className="block text-xs font-bold text-zenro-slate uppercase mb-2">Student ID / Email</label>
                         <div className="relative">
-                            <UserIcon className="absolute left-3 top-3 w-5 h-5 text-dark-600" />
+                            <UserIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                             <input 
                                 type="text" 
                                 value={identifier}
                                 onChange={handleIdentifierChange}
-                                className="w-full bg-dark-900 border border-dark-700 rounded-xl pl-10 pr-4 py-3 text-white focus:border-zenro-red focus:ring-1 focus:ring-zenro-red outline-none transition"
+                                className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-3 text-zenro-slate focus:border-zenro-red focus:ring-1 focus:ring-zenro-red outline-none transition"
                                 placeholder="ID or Email"
                             />
                         </div>
                     </div>
                     
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Password</label>
+                        <label className="block text-xs font-bold text-zenro-slate uppercase mb-2">Password</label>
                         <div className="relative">
-                            <Settings className="absolute left-3 top-3 w-5 h-5 text-dark-600" />
+                            <Settings className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                             <input 
                                 type="password"
                                 value={password}
                                 maxLength={20}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-dark-900 border border-dark-700 rounded-xl pl-10 pr-4 py-3 text-white focus:border-zenro-red focus:ring-1 focus:ring-zenro-red outline-none transition"
+                                className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-3 text-zenro-slate focus:border-zenro-red focus:ring-1 focus:ring-zenro-red outline-none transition"
                                 placeholder="••••••••"
                             />
                         </div>
                     </div>
 
-                    {error && <div className="text-zenro-red text-xs text-center bg-zenro-red/10 py-2 rounded border border-zenro-red/20">{error}</div>}
+                    {error && <div className="text-zenro-red text-xs text-center bg-red-50 py-2 rounded border border-red-100">{error}</div>}
 
                     <button 
                         type="submit" 
                         disabled={loading}
-                        className="w-full bg-gradient-to-r from-zenro-red to-brand-800 hover:from-brand-600 hover:to-brand-900 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-zenro-red/20 disabled:opacity-50 mt-4"
+                        className="w-full bg-zenro-red hover:bg-red-700 text-white font-bold py-3.5 rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 mt-4"
                     >
-                        {loading ? <div className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Authenticating...</div> : 'Login to Dashboard'}
+                        {loading ? <div className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Authenticating...</div> : 'Login'}
                     </button>
                 </form>
             </div>
@@ -254,149 +232,126 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
   );
 };
 
-// 2. Sidebar with Zenro Branding & Mobile Drawer Support
+// 2. Sidebar with Zenro Branding (Navy Blue)
 const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: () => void, isOpen: boolean, onClose: () => void }) => {
   const location = useLocation();
+  // New Active State: White background with Navy text on Navy sidebar
   const isActive = (path: string) => location.pathname === path 
-    ? "bg-brand-900/20 text-white border-r-4 border-zenro-red" 
-    : "text-gray-400 hover:text-white hover:bg-dark-800/50";
+    ? "bg-white/10 text-white border-r-4 border-zenro-red font-bold" 
+    : "text-blue-100 hover:text-white hover:bg-white/5";
 
   return (
     <>
-      {/* Mobile Backdrop Overlay - "Levitating" Effect */}
       <div 
-        className={`fixed inset-0 bg-black/80 z-40 lg:hidden transition-opacity duration-300 backdrop-blur-sm ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
         aria-hidden="true"
       />
 
       <div className={`
-        w-64 bg-dark-800/95 backdrop-blur border-r border-dark-700 flex flex-col h-screen 
-        fixed left-0 top-0 z-50 font-sans shadow-2xl transition-transform duration-300 ease-out
+        w-64 bg-zenro-blue flex flex-col h-screen 
+        fixed left-0 top-0 z-50 font-sans shadow-xl transition-transform duration-300 ease-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
       `}>
-        {/* Tricolor Border Stripe */}
-        <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-zenro-orange via-white to-zenro-green opacity-30"></div>
-
         {/* Mobile Close Button */}
         <button 
             onClick={onClose} 
-            className="absolute top-4 right-4 p-2 bg-dark-700/50 text-gray-400 hover:text-white rounded-full lg:hidden z-10"
+            className="absolute top-4 right-4 p-2 text-blue-200 hover:text-white lg:hidden z-10"
         >
             <X className="w-5 h-5" />
         </button>
 
-        <div className="p-6 flex items-center gap-3 border-b border-dark-700/50 bg-dark-900/30">
-          <div className="w-10 h-10 flex-shrink-0 bg-white/10 rounded-full p-1.5 border border-white/5">
-              <ZenroLogo className="w-full h-full" />
+        <div className="p-6 flex items-center gap-3 border-b border-blue-900/50">
+          <div className="bg-white p-1.5 rounded-full">
+              <ZenroLogo className="w-8 h-8" />
           </div>
           <div>
-              <h1 className="text-xl font-black tracking-tight text-white font-serif">ZENRO</h1>
-              <p className="text-[9px] text-gray-400 uppercase tracking-widest">Institute</p>
+              <h1 className="text-xl font-heading font-bold text-white tracking-tight">ZENRO</h1>
+              <p className="text-[10px] text-blue-200 uppercase tracking-widest">Institute</p>
           </div>
         </div>
         
         <nav className="flex-1 px-3 space-y-1 mt-6 overflow-y-auto">
-          <p className="px-4 text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
-              <span className="w-8 h-[1px] bg-gray-700"></span> MENU
-          </p>
+          <p className="px-4 text-[10px] font-bold text-blue-300 uppercase mb-3 tracking-widest">Main Menu</p>
           
           {user.role === UserRole.STUDENT && (
             <>
-              <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/dashboard')}`}>
-                <Layout className="w-4 h-4" />
-                Overview
+              <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/dashboard')}`}>
+                <Layout className="w-4 h-4" /> Overview
               </Link>
-              <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/courses')}`}>
-                <Book className="w-4 h-4" />
-                Curriculum
+              <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/courses')}`}>
+                <Book className="w-4 h-4" /> Curriculum
               </Link>
-               <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/tests')}`}>
-               <FileText className="w-4 h-4" />
-               Tests/Reports
+               <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/tests')}`}>
+               <FileText className="w-4 h-4" /> Tests/Reports
              </Link>
-              <Link to="/student/activities" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/activities')}`}>
-                <ListTodo className="w-4 h-4" />
-                Practice
+              <Link to="/student/activities" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/activities')}`}>
+                <ListTodo className="w-4 h-4" /> Practice
               </Link>
-               <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/fees')}`}>
-                <CreditCard className="w-4 h-4" />
-                Fees
+               <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/fees')}`}>
+                <CreditCard className="w-4 h-4" /> Fees
               </Link>
-               <Link to="/student/profile" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/student/profile')}`}>
-                <UserIcon className="w-4 h-4" />
-                Profile
+               <Link to="/student/profile" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/profile')}`}>
+                <UserIcon className="w-4 h-4" /> Profile
               </Link>
             </>
           )}
 
           {user.role === UserRole.TEACHER && (
              <>
-               <Link to="/teacher/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/dashboard')}`}>
-                 <Layout className="w-4 h-4" />
-                 Overview
+               <Link to="/teacher/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/dashboard')}`}>
+                 <Layout className="w-4 h-4" /> Dashboard
                </Link>
-               <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/courses')}`}>
-                 <Book className="w-4 h-4" />
-                 Classes
+               <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/courses')}`}>
+                 <Book className="w-4 h-4" /> My Classes
                </Link>
-               <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/tests')}`}>
-                 <FileCheck className="w-4 h-4" />
-                 Tests
+               <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/tests')}`}>
+                 <FileCheck className="w-4 h-4" /> Tests
                </Link>
-               <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/assignments')}`}>
-                 <FileText className="w-4 h-4" />
-                 Assignments
+               <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/assignments')}`}>
+                 <FileText className="w-4 h-4" /> Assignments
                </Link>
-               <Link to="/teacher/reports" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/reports')}`}>
-                 <BarChart2 className="w-4 h-4" />
-                 Analytics
+               <Link to="/teacher/reports" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/reports')}`}>
+                 <BarChart2 className="w-4 h-4" /> Analytics
                </Link>
-               <Link to="/teacher/live" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/teacher/live')}`}>
-                 <Video className="w-4 h-4" />
-                 Live Console
+               <Link to="/teacher/live" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/live')}`}>
+                 <Video className="w-4 h-4" /> Live Console
                </Link>
              </>
           )}
 
           {user.role === UserRole.ADMIN && (
             <>
-               <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/dashboard')}`}>
-                 <Layout className="w-4 h-4" />
-                 Overview
+               <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/dashboard')}`}>
+                 <Layout className="w-4 h-4" /> Dashboard
                </Link>
-               <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/users')}`}>
-                 <Users className="w-4 h-4" />
-                 User Mgmt
+               <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/users')}`}>
+                 <Users className="w-4 h-4" /> User Mgmt
                </Link>
-               <Link to="/admin/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/courses')}`}>
-                 <BookOpen className="w-4 h-4" />
-                 Course Mgmt
+               <Link to="/admin/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/courses')}`}>
+                 <BookOpen className="w-4 h-4" /> Course Mgmt
                </Link>
-               <Link to="/admin/reports" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/reports')}`}>
-                 <BarChart2 className="w-4 h-4" />
-                 Test Results
+               <Link to="/admin/reports" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/reports')}`}>
+                 <BarChart2 className="w-4 h-4" /> Reports
                </Link>
-               <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/finance')}`}>
-                 <DollarSign className="w-4 h-4" />
-                 Financials
+               <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/finance')}`}>
+                 <DollarSign className="w-4 h-4" /> Financials
                </Link>
-               <Link to="/admin/settings" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive('/admin/settings')}`}>
-                 <Settings className="w-4 h-4" />
-                 Settings
+               <Link to="/admin/settings" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/admin/settings')}`}>
+                 <Settings className="w-4 h-4" /> Settings
                </Link>
             </>
           )}
         </nav>
 
-        <div className="p-4 border-t border-dark-700/50 bg-dark-900/30">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-dark-800 border border-dark-700">
-              <img src={user.avatar} alt="User" className="w-8 h-8 rounded-full bg-dark-700 border border-dark-600 object-cover" />
+        <div className="p-4 border-t border-blue-900/50 bg-blue-900/20">
+          <div className="flex items-center gap-3 px-3 py-2 rounded-lg">
+              <img src={user.avatar} alt="User" className="w-8 h-8 rounded-full border border-blue-400 object-cover" />
               <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white truncate">{user.name}</p>
-                  <p className="text-[10px] text-zenro-orange truncate font-bold">{user.role}</p>
+                  <p className="text-[10px] text-blue-300 truncate font-bold">{user.role}</p>
               </div>
-              <button onClick={onLogout} className="p-1.5 hover:bg-dark-700 rounded-md transition text-gray-500 hover:text-white" title="Logout">
+              <button onClick={onLogout} className="p-1.5 hover:bg-blue-800 rounded-md transition text-blue-300 hover:text-white" title="Logout">
                   <LogOut className="w-4 h-4" />
               </button>
           </div>
@@ -412,10 +367,8 @@ interface ProtectedRouteProps {
   user: User;
 }
 
-// 3. Protected Route Wrapper
 const ProtectedRoute = ({ children, allowedRoles, user }: ProtectedRouteProps) => {
   if (!allowedRoles.includes(user.role)) {
-    // Redirect to appropriate dashboard based on actual role
     if (user.role === UserRole.STUDENT) return <Navigate to="/student/dashboard" replace />;
     if (user.role === UserRole.TEACHER) return <Navigate to="/teacher/dashboard" replace />;
     if (user.role === UserRole.ADMIN) return <Navigate to="/admin/dashboard" replace />;
@@ -424,44 +377,39 @@ const ProtectedRoute = ({ children, allowedRoles, user }: ProtectedRouteProps) =
   return <>{children}</>;
 };
 
-// 4. Main App Layout Logic
+// 4. Main App Layout Logic - Light Theme
 const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Close sidebar automatically on route change (Mobile UX)
   useEffect(() => {
     setSidebarOpen(false);
   }, [location]);
 
   return (
-    <div className="flex h-screen bg-dark-900 text-white font-sans selection:bg-zenro-red selection:text-white overflow-hidden">
-       {/* Mobile Header (Levitating Top Bar) */}
-       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-dark-900/90 backdrop-blur-md border-b border-white/10 z-40 flex items-center justify-between px-4 shadow-lg animate-fade-in-down">
-          {/* Hamburger Menu (Left) */}
+    <div className="flex h-screen bg-zenro-gray text-zenro-slate font-sans selection:bg-zenro-red selection:text-white overflow-hidden">
+       {/* Mobile Header */}
+       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-40 flex items-center justify-between px-4 shadow-sm">
           <button 
             onClick={() => setSidebarOpen(true)} 
-            className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition"
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
           >
              <Menu className="w-6 h-6" />
           </button>
           
-          {/* Branding (Center) */}
           <div className="flex items-center gap-2">
-             <ZenroLogo className="w-8 h-8" />
-             <span className="font-serif font-bold text-white tracking-tight text-lg">ZENRO</span>
+             <div className="bg-zenro-blue p-1 rounded-full"><ZenroLogo className="w-6 h-6" /></div>
+             <span className="font-heading font-bold text-zenro-blue tracking-tight text-lg">ZENRO</span>
           </div>
           
-          {/* Profile (Right) - Clicking opens profile */}
           <button 
             onClick={() => {
                 if(user.role === UserRole.STUDENT) navigate('/student/profile');
-                // Could expand for other roles if they have profiles
             }} 
-            className="w-10 h-10 rounded-full overflow-hidden border border-white/20 p-0.5 bg-gradient-to-br from-zenro-red to-zenro-orange shadow-lg active:scale-95 transition"
+            className="w-9 h-9 rounded-full overflow-hidden border border-gray-300"
           >
-             <img src={user.avatar} alt="Profile" className="w-full h-full object-cover rounded-full bg-dark-800" />
+             <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
           </button>
        </div>
 
@@ -472,10 +420,8 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
          onClose={() => setSidebarOpen(false)} 
        />
        
-       {/* Main Content Area */}
-       <main className="flex-1 overflow-auto p-4 lg:p-8 pt-20 lg:pt-8 bg-seigaiha relative scroll-smooth lg:ml-64 w-full transition-all duration-300">
-          <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-dark-800 to-transparent pointer-events-none -z-10"></div>
-          
+       {/* Main Content Area - White/Light Gray BG */}
+       <main className="flex-1 overflow-auto p-4 lg:p-8 pt-20 lg:pt-8 relative scroll-smooth lg:ml-64 w-full bg-zenro-gray">
           <div className="max-w-7xl mx-auto">
                 <Routes>
                 <Route path="/" element={
@@ -498,11 +444,11 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
                 <Route path="/exam-intro" element={
                     <ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}>
                         <div className="p-8 flex justify-center items-center h-full">
-                            <div className="bg-dark-800 p-8 rounded-xl max-w-md text-center border border-dark-700">
-                                <ShieldAlert className="w-16 h-16 text-brand-500 mx-auto mb-4" />
-                                <h1 className="text-2xl font-bold mb-2">JLPT Mock Exam</h1>
-                                <p className="text-gray-400 mb-6">Duration: 60 mins • N4 Level</p>
-                                <button onClick={() => setIsExamMode(true)} className="w-full bg-brand-600 py-3 rounded text-white font-bold hover:bg-brand-500">
+                            <div className="bg-white p-8 rounded-xl max-w-md text-center border border-gray-200 shadow-xl">
+                                <ShieldAlert className="w-16 h-16 text-zenro-red mx-auto mb-4" />
+                                <h1 className="text-2xl font-bold mb-2 text-zenro-slate">JLPT Mock Exam</h1>
+                                <p className="text-gray-500 mb-6">Duration: 60 mins • N4 Level</p>
+                                <button onClick={() => setIsExamMode(true)} className="w-full bg-zenro-red py-3 rounded-lg text-white font-bold hover:bg-red-700 shadow-md">
                                     Start Examination
                                 </button>
                             </div>
@@ -562,22 +508,19 @@ export default function App() {
   }, []);
 
   const handleLogin = (newUser: User) => {
-    // Save to local storage for persistence
     localStorage.setItem('zenro_session', JSON.stringify(newUser));
     setUser(newUser);
   };
 
   const handleLogout = () => {
-    // Explicitly clear session on logout
     localStorage.removeItem('zenro_session');
     setUser(null);
   };
 
-  // Prevent flash of login screen while checking session
   if (isSessionLoading) {
      return (
-        <div className="h-screen w-full bg-dark-900 flex flex-col items-center justify-center text-white space-y-4">
-            <ZenroLogo className="w-24 h-24 animate-pulse" />
+        <div className="h-screen w-full bg-white flex flex-col items-center justify-center text-zenro-slate space-y-4">
+            <div className="bg-zenro-blue p-3 rounded-full"><ZenroLogo className="w-16 h-16 animate-pulse" /></div>
             <div className="flex items-center gap-2 text-zenro-red">
                 <Loader2 className="w-6 h-6 animate-spin" />
                 <span className="font-bold">Loading Zenro Portal...</span>
@@ -586,12 +529,10 @@ export default function App() {
      );
   }
 
-  // If not logged in, show Login Screen
   if (!user) {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  // If in Exam Mode, hijack screen
   if (isExamMode) {
     return <ExamPortal onExit={() => setIsExamMode(false)} />;
   }
