@@ -1,8 +1,5 @@
-import Pusher from 'pusher-js';
 
-// Configuration for Pusher Client
-const PUSHER_KEY = 'fcebfa171f05d2a752b2';
-const PUSHER_CLUSTER = 'ap2';
+import { supabase } from './supabaseClient';
 
 type SignalType = 'login' | 'join' | 'offer' | 'answer' | 'candidate' | 'chat' | 'session_status' | 'get_status';
 
@@ -14,7 +11,6 @@ interface SignalMessage {
 }
 
 class SignalingService {
-  private pusher: Pusher;
   private channel: any;
   private userId: string;
   private listeners: Map<string, Function[]>;
@@ -23,35 +19,38 @@ class SignalingService {
     this.userId = Math.random().toString(36).substring(7);
     this.listeners = new Map();
 
-    // Initialize Pusher
-    this.pusher = new Pusher(PUSHER_KEY, {
-      cluster: PUSHER_CLUSTER,
-      forceTLS: true
+    // Connect to Supabase Realtime Channel
+    this.channel = supabase.channel('zenro-live-classroom', {
+      config: {
+        broadcast: { self: false }, // Don't receive our own messages
+      },
     });
 
-    // Subscribe to the global class channel
-    this.channel = this.pusher.subscribe('live-class-channel');
+    this.channel
+      .on('broadcast', { event: 'signal' }, ({ payload }: { payload: SignalMessage }) => {
+        this.handleIncomingMessage(payload);
+      })
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Connected to Signaling Server (Supabase)');
+        }
+      });
+  }
 
-    // Bind to the generic 'signal-event' that carries all our messages
-    this.channel.bind('signal-event', (data: SignalMessage) => {
-      // Filter messages meant for specific users
-      if (data.to && data.to !== this.userId) return;
-      // Filter out messages sent by ourselves
-      if (data.from === this.userId) return;
+  private handleIncomingMessage(data: SignalMessage) {
+    // Filter messages meant for specific users
+    if (data.to && data.to !== this.userId) return;
+    
+    // Safety check: Filter out messages sent by ourselves (redundant with self:false but good practice)
+    if (data.from === this.userId) return;
 
-      this.emitLocal(data.type, data.payload, data.from);
-    });
+    this.emitLocal(data.type, data.payload, data.from);
   }
 
   public getMyId() {
     return this.userId;
   }
 
-  public setUserId(id: string) {
-    this.userId = id;
-  }
-
-  // Instead of BroadcastChannel, we hit our Serverless API to trigger the event
   public async send(type: SignalType, payload: any, to?: string) {
     const msg: SignalMessage = {
       type,
@@ -61,14 +60,10 @@ class SignalingService {
     };
 
     try {
-      await fetch('/api/signal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channelName: 'live-class-channel',
-          eventName: 'signal-event',
-          data: msg
-        })
+      await this.channel.send({
+        type: 'broadcast',
+        event: 'signal',
+        payload: msg,
       });
     } catch (error) {
       console.error("Failed to send signal:", error);
