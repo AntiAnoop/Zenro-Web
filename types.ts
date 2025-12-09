@@ -86,6 +86,36 @@ export interface Test {
   assignedStudentIds?: string[];
 }
 
+// --- ASSIGNMENT TYPES (NEW) ---
+
+export interface Assignment {
+  id: string;
+  title: string;
+  description?: string;
+  due_date: string;
+  total_marks: number;
+  attachment_url?: string;
+  status: 'DRAFT' | 'PUBLISHED';
+  created_at?: string;
+  
+  // Access
+  assignedBatches?: string[];
+  assignedStudentIds?: string[];
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  student_name?: string; // Joined field
+  submission_url?: string;
+  submission_text?: string;
+  obtained_marks: number;
+  feedback?: string;
+  status: 'SUBMITTED' | 'GRADED';
+  submitted_at: string;
+}
+
 // --- LIVE & SCHEDULING TYPES ---
 
 export interface Schedule {
@@ -124,6 +154,7 @@ export interface AttendanceRecord {
   join_time: string;
   last_heartbeat: string;
   total_minutes: number;
+  status: 'PRESENT'
 }
 
 // --- ANALYTICS ---
@@ -173,17 +204,6 @@ export interface ActivityItem {
   dueDate: string;
   status: 'PENDING' | 'COMPLETED';
   courseName: string;
-}
-
-export interface Assignment {
-  id: string;
-  title: string;
-  courseId: string;
-  courseName: string;
-  dueDate: string;
-  totalSubmissions: number;
-  totalStudents: number;
-  status: 'ACTIVE' | 'CLOSED';
 }
 
 export interface StudentPerformance {
