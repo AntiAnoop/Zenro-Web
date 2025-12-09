@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, Clock, Calendar, AlertCircle, CheckCircle, 
@@ -5,7 +6,7 @@ import {
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
   Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw, Loader2,
-  FileCheck, ArrowLeft, Menu, File, Film, AlertTriangle, Monitor, WifiOff, Upload, CheckSquare, X, Eye
+  FileCheck, ArrowLeft, Menu, File, Film, AlertTriangle, Monitor, WifiOff, Upload, CheckSquare, X, Eye, ChevronDown
 } from 'lucide-react';
 import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem, CourseModule, CourseMaterial, Schedule, Assignment, AssignmentSubmission, Test } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
@@ -171,16 +172,23 @@ export const StudentActivityPage = () => {
             if (!user) return;
             setLoading(true);
             try {
-                // 1. Fetch assigned assignments (via batch)
+                // 1. Fetch Assignments for Batch
                 const { data: batchAssigns } = await supabase.from('assignment_batches').select('assignment_id').eq('batch_name', user.batch);
-                const ids = batchAssigns?.map((a: any) => a.assignment_id) || [];
+                const batchIds = batchAssigns?.map((a: any) => a.assignment_id) || [];
+
+                // 2. Fetch Assignments for Individual Student
+                const { data: directAssigns } = await supabase.from('assignment_enrollments').select('assignment_id').eq('student_id', user.id);
+                const directIds = directAssigns?.map((a: any) => a.assignment_id) || [];
+
+                // Combine IDs
+                const allIds = Array.from(new Set([...batchIds, ...directIds]));
                 
-                if (ids.length > 0) {
-                    const { data: assignData } = await supabase.from('assignments').select('*').in('id', ids).eq('status', 'PUBLISHED').order('due_date', { ascending: true });
+                if (allIds.length > 0) {
+                    const { data: assignData } = await supabase.from('assignments').select('*').in('id', allIds).eq('status', 'PUBLISHED').order('due_date', { ascending: true });
                     setAssignments(assignData || []);
 
-                    // 2. Fetch my submissions
-                    const { data: subData } = await supabase.from('assignment_submissions').select('*').eq('student_id', user.id).in('assignment_id', ids);
+                    // 3. Fetch My Submissions
+                    const { data: subData } = await supabase.from('assignment_submissions').select('*').eq('student_id', user.id).in('assignment_id', allIds);
                     const subMap = new Map();
                     subData?.forEach((s: any) => subMap.set(s.assignment_id, s));
                     setSubmissions(subMap);
@@ -389,27 +397,34 @@ export const StudentCoursesPage = () => {
 export const StudentCoursePlayer = () => {
   const { courseId } = useParams();
   const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<CourseModule[]>([]);
   const [activeModule, setActiveModule] = useState<CourseModule | null>(null);
+  const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCourse = async () => {
-      // Mock fetch for course modules - assuming JSON structure in DB or separate table
-      // In real app, we join tables. Here we fetch course and mock modules if missing.
-      const { data } = await supabase.from('courses').select('*').eq('id', courseId).single();
-      
-      if (data) {
-          // Simulate modules if not present in DB
-          if (!data.modules) {
-              data.modules = [
-                  { id: 'm1', title: 'Introduction to Hiragana', duration: '45m', materials: [], videoUrl: 'https://www.youtube.com/embed/sS5F409k_gA?si=G_2s_tX' },
-                  { id: 'm2', title: 'Basic Greetings (Aisatsu)', duration: '60m', materials: [] },
-              ];
+      setLoading(true);
+      try {
+          const { data: cData } = await supabase.from('courses').select('*').eq('id', courseId).single();
+          if (cData) setCourse(cData);
+
+          const { data: mData } = await supabase
+              .from('course_modules')
+              .select(`*, materials:course_materials(*)`)
+              .eq('course_id', courseId)
+              .order('order', { ascending: true });
+          
+          if (mData) {
+              setModules(mData);
+              if (mData.length > 0) {
+                  setActiveModule(mData[0]);
+                  if (mData[0].materials?.length > 0) {
+                      setActiveMaterial(mData[0].materials[0]);
+                  }
+              }
           }
-          setCourse(data);
-          setActiveModule(data.modules[0]);
-      }
-      setLoading(false);
+      } catch (e) { console.error(e); } finally { setLoading(false); }
     };
     fetchCourse();
   }, [courseId]);
@@ -418,18 +433,30 @@ export const StudentCoursePlayer = () => {
 
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col lg:flex-row gap-6 animate-fade-in">
-       <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-2xl relative">
-          {activeModule?.videoUrl ? (
-              <iframe 
-                src={activeModule.videoUrl} 
-                className="w-full h-full object-cover" 
-                allowFullScreen 
-                title="Lesson Video"
-              ></iframe>
+       <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-2xl relative flex items-center justify-center">
+          {activeMaterial ? (
+              activeMaterial.type === 'VIDEO' ? (
+                  activeMaterial.url.includes('youtube') || activeMaterial.url.includes('youtu.be') ? (
+                    <iframe 
+                        className="w-full h-full"
+                        src={activeMaterial.url.replace('watch?v=', 'embed/')} 
+                        title="Video Player" 
+                        allowFullScreen
+                    ></iframe>
+                  ) : (
+                    <video controls className="w-full h-full" src={activeMaterial.url}></video>
+                  )
+              ) : (
+                  <div className="text-center text-white">
+                      <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                      <h3 className="text-xl font-bold mb-4">{activeMaterial.title}</h3>
+                      <a href={activeMaterial.url} target="_blank" rel="noreferrer" className="bg-zenro-red px-6 py-3 rounded font-bold hover:bg-red-700 transition">View Document</a>
+                  </div>
+              )
           ) : (
               <div className="flex flex-col items-center justify-center h-full text-white">
-                 <Lock className="w-12 h-12 mb-4 text-gray-600" />
-                 <p>Content locked or not available.</p>
+                 <Play className="w-16 h-16 mb-4 text-gray-600 opacity-50" />
+                 <p className="text-gray-400 font-bold">Select a lesson to start learning.</p>
               </div>
           )}
        </div>
@@ -440,19 +467,30 @@ export const StudentCoursePlayer = () => {
              <p className="text-xs text-gray-500">Course Content</p>
           </div>
           <div className="flex-1 overflow-y-auto">
-             {course.modules?.map((mod, idx) => (
-                <div 
-                   key={mod.id} 
-                   onClick={() => setActiveModule(mod)}
-                   className={`p-4 border-b border-gray-100 cursor-pointer transition hover:bg-gray-50 ${activeModule?.id === mod.id ? 'bg-blue-50 border-l-4 border-l-zenro-blue' : ''}`}
-                >
-                   <div className="flex justify-between items-start mb-1">
-                      <p className={`text-sm font-bold ${activeModule?.id === mod.id ? 'text-zenro-blue' : 'text-slate-700'}`}>
-                         {idx + 1}. {mod.title}
-                      </p>
-                      {activeModule?.id === mod.id && <Play className="w-4 h-4 text-zenro-blue" />}
+             {modules.map((mod, idx) => (
+                <div key={mod.id} className="border-b border-gray-100 last:border-0">
+                   <div 
+                      className="p-4 bg-gray-50/50 font-bold text-sm text-slate-700 cursor-pointer hover:bg-gray-100 flex justify-between items-center"
+                      onClick={() => setActiveModule(activeModule?.id === mod.id ? null : mod)}
+                   >
+                      <span>{idx + 1}. {mod.title}</span>
+                      {activeModule?.id === mod.id ? <ChevronDown className="w-4 h-4"/> : <ChevronRight className="w-4 h-4 text-gray-400"/>}
                    </div>
-                   <p className="text-xs text-gray-400">{mod.duration}</p>
+                   {activeModule?.id === mod.id && (
+                       <div className="bg-white">
+                           {mod.materials?.map((mat) => (
+                               <div 
+                                  key={mat.id} 
+                                  onClick={() => setActiveMaterial(mat)}
+                                  className={`p-3 pl-8 flex items-center gap-3 text-sm cursor-pointer transition ${activeMaterial?.id === mat.id ? 'bg-blue-50 text-zenro-blue font-bold border-l-4 border-zenro-blue' : 'hover:bg-gray-50 text-gray-600'}`}
+                               >
+                                   {mat.type === 'VIDEO' ? <Play className="w-3 h-3 fill-current"/> : <File className="w-3 h-3"/>}
+                                   <span className="truncate">{mat.title}</span>
+                               </div>
+                           ))}
+                           {(!mod.materials || mod.materials.length === 0) && <div className="p-3 pl-8 text-xs text-gray-400 italic">No content.</div>}
+                       </div>
+                   )}
                 </div>
              ))}
           </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Users, BookOpen, Clock, Plus, Video, 
@@ -8,14 +9,14 @@ import {
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
   Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff,
   FileCheck, HelpCircle, CheckSquare, Target, ChevronLeft, Radio,
-  Layout, GripVertical, File, ListTodo
+  Layout, GripVertical, File, ListTodo, Send
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User, Test, Question, Schedule, LiveSessionRecord, AssignmentSubmission } from '../types';
 import { generateClassSummary } from '../services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLiveSession } from '../context/LiveContext';
 import { supabase } from '../services/supabaseClient';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 // --- UI HELPERS ---
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => (
@@ -203,6 +204,8 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [availableBatches, setAvailableBatches] = useState<string[]>([]);
+    const [availableStudents, setAvailableStudents] = useState<User[]>([]);
+    const [studentSearch, setStudentSearch] = useState('');
     
     const [formData, setFormData] = useState<Partial<Assignment>>({
         title: initialData?.title || '',
@@ -211,19 +214,36 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
         due_date: initialData?.due_date ? new Date(initialData.due_date).toISOString().split('T')[0] : '',
         attachment_url: initialData?.attachment_url || '',
         assignedBatches: [],
+        assignedStudentIds: []
     });
 
     useEffect(() => {
-        const loadBatches = async () => {
-            const { data } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
-            if(data) setAvailableBatches(data.map(b => b.name));
+        const loadResources = async () => {
+            // Fetch batches
+            const { data: bData } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
+            if(bData) setAvailableBatches(bData.map(b => b.name));
             
+            // Fetch students
+            const { data: sData } = await supabase.from('profiles').select('*').eq('role', 'STUDENT');
+            if(sData) {
+                const mapped = sData.map((u: any) => ({
+                    id: u.id, name: u.full_name, role: 'STUDENT', email: u.email, avatar: u.avatar_url, batch: u.batch, rollNumber: u.student_id
+                }));
+                setAvailableStudents(mapped);
+            }
+
             if (initialData) {
-                const { data: bData } = await supabase.from('assignment_batches').select('batch_name').eq('assignment_id', initialData.id);
-                if (bData) setFormData(prev => ({ ...prev, assignedBatches: bData.map(b => b.batch_name) }));
+                const { data: bAssign } = await supabase.from('assignment_batches').select('batch_name').eq('assignment_id', initialData.id);
+                const { data: sAssign } = await supabase.from('assignment_enrollments').select('student_id').eq('assignment_id', initialData.id);
+                
+                setFormData(prev => ({ 
+                    ...prev, 
+                    assignedBatches: bAssign?.map(b => b.batch_name) || [],
+                    assignedStudentIds: sAssign?.map(s => s.student_id) || []
+                }));
             }
         };
-        loadBatches();
+        loadResources();
     }, [initialData]);
 
     const handleSave = async (status: 'DRAFT' | 'PUBLISHED') => {
@@ -256,6 +276,14 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
                 );
             }
 
+            // Students
+            await supabase.from('assignment_enrollments').delete().eq('assignment_id', assignId);
+            if (formData.assignedStudentIds?.length) {
+                await supabase.from('assignment_enrollments').insert(
+                    formData.assignedStudentIds.map(s => ({ assignment_id: assignId, student_id: s }))
+                );
+            }
+
             onRefresh();
             onClose();
         } catch (e: any) {
@@ -271,9 +299,16 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
         setFormData({ ...formData, assignedBatches: current.includes(b) ? current.filter(x => x !== b) : [...current, b] });
     };
 
+    const toggleStudent = (id: string) => {
+        const current = formData.assignedStudentIds || [];
+        setFormData({ ...formData, assignedStudentIds: current.includes(id) ? current.filter(x => x !== id) : [...current, id] });
+    };
+
+    const filteredStudents = availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()));
+
     return (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col h-[80vh] overflow-hidden">
+            <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col h-[85vh] overflow-hidden">
                 <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                     <h2 className="text-xl font-bold text-slate-800">{initialData ? 'Edit Assignment' : 'Create Assignment'}</h2>
                     <button onClick={onClose}><X className="w-6 h-6 text-gray-400" /></button>
@@ -281,7 +316,7 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
                 
                 <div className="flex-1 overflow-y-auto p-8">
                     {step === 1 && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 max-w-2xl mx-auto">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Title *</label><input className="w-full border p-2 rounded" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Essay on Japanese Culture" /></div>
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Description</label><textarea className="w-full border p-2 rounded h-24" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
                             <div className="grid grid-cols-2 gap-6">
@@ -292,15 +327,31 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
                         </div>
                     )}
                     {step === 2 && (
-                        <div>
-                            <h3 className="text-lg font-bold mb-4">Assign to Batches</h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                {availableBatches.map(b => (
-                                    <div key={b} onClick={() => toggleBatch(b)} className={`p-4 rounded-lg border cursor-pointer flex justify-between items-center ${formData.assignedBatches?.includes(b) ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-gray-200'}`}>
-                                        <span className="font-bold">{b}</span>
-                                        {formData.assignedBatches?.includes(b) && <CheckCircle className="w-5 h-5" />}
+                        <div className="h-full flex flex-col">
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Access Control</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Batches</div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
+                                        {availableBatches.map(b => (
+                                            <div key={b} onClick={() => toggleBatch(b)} className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition ${formData.assignedBatches?.includes(b) ? 'bg-red-50 border-zenro-red' : 'bg-white border-gray-200'}`}><span className="text-sm font-bold text-slate-700">{b}</span>{formData.assignedBatches?.includes(b) && <CheckCircle className="w-4 h-4 text-zenro-red" />}</div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center justify-between"><div className="flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Specific Students</div><input type="text" placeholder="Search..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs text-slate-800 outline-none w-32" /></div>
+                                    <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
+                                        {filteredStudents.map(s => {
+                                            const inBatch = s.batch && formData.assignedBatches?.includes(s.batch);
+                                            const explicitlyAssigned = formData.assignedStudentIds?.includes(s.id);
+                                            return (
+                                                <div key={s.id} onClick={() => !inBatch && toggleStudent(s.id)} className={`p-2 rounded-lg border flex items-center justify-between transition ${inBatch ? 'opacity-60 bg-gray-100 border-transparent cursor-default' : explicitlyAssigned ? 'bg-blue-50 border-blue-500 cursor-pointer' : 'bg-white border-gray-200 hover:border-gray-400 cursor-pointer'}`}>
+                                                    <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-gray-500">{s.email}</p></div>{inBatch ? <span className="text-[10px] bg-gray-200 px-2 py-1 rounded text-gray-500">Via Batch</span> : explicitlyAssigned && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -309,7 +360,7 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
                 <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-between">
                     <button onClick={() => step === 1 ? onClose() : setStep(1)} className="px-6 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">{step === 1 ? 'Cancel' : 'Back'}</button>
                     {step === 1 ? (
-                        <button onClick={() => setStep(2)} className="px-6 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800">Next Step</button>
+                        <button onClick={() => setStep(2)} className="px-6 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800">Next: Access Control</button>
                     ) : (
                         <div className="flex gap-2">
                             <button onClick={() => handleSave('DRAFT')} disabled={loading} className="px-6 py-2 bg-gray-200 text-slate-700 font-bold rounded hover:bg-gray-300">Save Draft</button>
@@ -432,22 +483,25 @@ export const AssignmentGradingModal = ({ assignment, onClose }: { assignment: As
 export const TeacherCoursesPage = () => {
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchCourses = async () => {
-            const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
-            if (data) setCourses(data);
-            setLoading(false);
-        };
         fetchCourses();
     }, []);
+
+    const fetchCourses = async () => {
+        setLoading(true);
+        const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+        if (data) setCourses(data);
+        setLoading(false);
+    };
 
     return (
         <div className="space-y-8 animate-fade-in">
              <div className="flex justify-between items-center">
                  <h1 className="text-3xl font-heading font-bold text-zenro-slate">Course Management</h1>
-                 <button className="bg-zenro-blue text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-blue-800">
+                 <button onClick={() => setIsModalOpen(true)} className="bg-zenro-blue text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-blue-800">
                      <Plus className="w-5 h-5" /> New Course
                  </button>
              </div>
@@ -474,58 +528,298 @@ export const TeacherCoursesPage = () => {
                      ))}
                  </div>
              )}
+             {isModalOpen && <CourseCreationModal onClose={() => setIsModalOpen(false)} onRefresh={fetchCourses} />}
         </div>
     );
 };
 
 export const CourseContentManager = () => {
     const { courseId } = useParams();
+    const navigate = useNavigate();
+    const [course, setCourse] = useState<Course | null>(null);
     const [modules, setModules] = useState<CourseModule[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+    const [isAddModuleOpen, setIsAddModuleOpen] = useState(false);
+    const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
+    const [newModuleTitle, setNewModuleTitle] = useState('');
+    const [newMaterial, setNewMaterial] = useState({ title: '', type: 'VIDEO' as 'VIDEO'|'PDF', url: '' });
 
     useEffect(() => {
-        // Mock fetch for demonstration since `modules` column is often JSONB or separate table
-        setTimeout(() => {
-            setModules([
-                { id: '1', title: 'Chapter 1: Basics', duration: '2h', materials: [] },
-                { id: '2', title: 'Chapter 2: Particles', duration: '1.5h', materials: [] }
-            ]);
-            setLoading(false);
-        }, 1000);
-    }, []);
+        fetchCourseData();
+    }, [courseId]);
+
+    const fetchCourseData = async () => {
+        setLoading(true);
+        try {
+            const { data: cData } = await supabase.from('courses').select('*').eq('id', courseId).single();
+            setCourse(cData);
+
+            const { data: mData } = await supabase
+                .from('course_modules')
+                .select(`*, materials:course_materials(*)`)
+                .eq('course_id', courseId)
+                .order('order', { ascending: true });
+            
+            if (mData) {
+                setModules(mData);
+                if (!selectedModuleId && mData.length > 0) {
+                    setSelectedModuleId(mData[0].id);
+                }
+            }
+        } catch (e) { console.error(e); } finally { setLoading(false); }
+    };
+
+    const handleAddModule = async () => {
+        if (!newModuleTitle.trim()) return;
+        const newOrder = modules.length + 1;
+        const { error } = await supabase.from('course_modules').insert({
+            course_id: courseId,
+            title: newModuleTitle,
+            order: newOrder
+        });
+        if (!error) {
+            setNewModuleTitle('');
+            setIsAddModuleOpen(false);
+            fetchCourseData();
+        }
+    };
+
+    const handleAddMaterial = async () => {
+        if (!newMaterial.title || !newMaterial.url || !selectedModuleId) return;
+        const { error } = await supabase.from('course_materials').insert({
+            module_id: selectedModuleId,
+            title: newMaterial.title,
+            type: newMaterial.type,
+            url: newMaterial.url
+        });
+        if (!error) {
+            setNewMaterial({ title: '', type: 'VIDEO', url: '' });
+            setIsAddMaterialOpen(false);
+            fetchCourseData();
+        }
+    };
+
+    const deleteModule = async (id: string) => {
+        if(!confirm("Delete this module and all its content?")) return;
+        await supabase.from('course_modules').delete().eq('id', id);
+        if(selectedModuleId === id) setSelectedModuleId(null);
+        fetchCourseData();
+    };
+
+    const deleteMaterial = async (id: string) => {
+        if(!confirm("Remove this material?")) return;
+        await supabase.from('course_materials').delete().eq('id', id);
+        fetchCourseData();
+    };
+
+    const activeModule = modules.find(m => m.id === selectedModuleId);
+
+    if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
+    if (!course) return <div className="p-8 text-center">Course not found.</div>;
 
     return (
-        <div className="space-y-8 animate-fade-in">
-             <div className="flex items-center gap-4">
-                 <Link to="/teacher/courses" className="text-gray-500 hover:text-zenro-blue"><ChevronLeft className="w-6 h-6" /></Link>
-                 <h1 className="text-3xl font-heading font-bold text-zenro-slate">Course Content</h1>
+        <div className="h-[calc(100vh-6rem)] flex flex-col animate-fade-in">
+             <div className="flex items-center justify-between mb-6">
+                 <div className="flex items-center gap-4">
+                     <button onClick={() => navigate('/teacher/courses')} className="p-2 hover:bg-gray-200 rounded-full transition"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
+                     <div>
+                         <h1 className="text-2xl font-heading font-bold text-zenro-slate">{course.title}</h1>
+                         <p className="text-sm text-gray-500">Content Management</p>
+                     </div>
+                 </div>
+                 <button onClick={() => window.open(`#/student/course/${courseId}`, '_blank')} className="bg-white border border-gray-300 text-slate-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm shadow-sm transition">
+                    <Eye className="w-4 h-4" /> Preview as Student
+                 </button>
              </div>
-             
-             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                 {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto text-zenro-blue" /> : (
-                     <div className="space-y-4">
-                         {modules.map((mod, idx) => (
-                             <div key={mod.id} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center bg-gray-50">
-                                 <div>
-                                     <h4 className="font-bold text-slate-800">Module {idx + 1}: {mod.title}</h4>
-                                     <p className="text-xs text-gray-500">{mod.duration}</p>
+
+             <div className="flex-1 flex gap-6 overflow-hidden bg-white rounded-xl border border-gray-200 shadow-sm">
+                 <div className="w-80 border-r border-gray-200 flex flex-col bg-gray-50">
+                     <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white">
+                         <h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Modules</h3>
+                         <button onClick={() => setIsAddModuleOpen(true)} className="p-1 hover:bg-gray-100 rounded text-zenro-blue"><Plus className="w-5 h-5" /></button>
+                     </div>
+                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                         {modules.length === 0 && <p className="text-center text-xs text-gray-400 mt-4 italic">No modules yet.</p>}
+                         {modules.map((m, idx) => (
+                             <div 
+                                key={m.id} 
+                                onClick={() => setSelectedModuleId(m.id)}
+                                className={`p-3 rounded-lg cursor-pointer flex items-center justify-between group transition ${selectedModuleId === m.id ? 'bg-white border border-zenro-blue shadow-sm' : 'hover:bg-gray-200 border border-transparent'}`}
+                             >
+                                 <div className="flex items-center gap-3 overflow-hidden">
+                                     <span className="text-xs font-bold text-gray-400 w-5 text-center">{idx + 1}</span>
+                                     <span className={`text-sm font-bold truncate ${selectedModuleId === m.id ? 'text-zenro-blue' : 'text-slate-700'}`}>{m.title}</span>
                                  </div>
-                                 <div className="flex gap-2">
-                                     <button className="p-2 bg-white border rounded hover:bg-gray-100"><Edit3 className="w-4 h-4 text-gray-600" /></button>
-                                     <button className="p-2 bg-white border rounded hover:bg-gray-100"><Trash2 className="w-4 h-4 text-red-500" /></button>
-                                 </div>
+                                 <button onClick={(e) => { e.stopPropagation(); deleteModule(m.id); }} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 p-1"><Trash2 className="w-3 h-3" /></button>
                              </div>
                          ))}
-                         <button className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 font-bold hover:border-zenro-blue hover:text-zenro-blue transition flex items-center justify-center gap-2">
-                             <Plus className="w-5 h-5" /> Add New Module
-                         </button>
                      </div>
-                 )}
+                 </div>
+
+                 <div className="flex-1 flex flex-col bg-white">
+                     {activeModule ? (
+                         <>
+                             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                                 <div>
+                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Selected Module</span>
+                                     <h2 className="text-xl font-bold text-slate-800">{activeModule.title}</h2>
+                                 </div>
+                                 <button onClick={() => setIsAddMaterialOpen(true)} className="bg-zenro-blue hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm shadow-sm transition">
+                                     <Plus className="w-4 h-4" /> Add Material
+                                 </button>
+                             </div>
+                             <div className="flex-1 overflow-y-auto p-6">
+                                 {(!activeModule.materials || activeModule.materials.length === 0) ? (
+                                     <div className="h-full flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">
+                                         <FileText className="w-12 h-12 mb-2 opacity-50" />
+                                         <p className="text-sm font-bold">This module is empty.</p>
+                                         <p className="text-xs">Add videos or documents to get started.</p>
+                                     </div>
+                                 ) : (
+                                     <div className="grid grid-cols-1 gap-4">
+                                         {activeModule.materials.map(mat => (
+                                             <div key={mat.id} className="p-4 rounded-xl border border-gray-200 hover:shadow-md transition flex items-center justify-between group bg-white">
+                                                 <div className="flex items-center gap-4">
+                                                     <div className={`p-3 rounded-lg ${mat.type === 'VIDEO' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                         {mat.type === 'VIDEO' ? <Video className="w-6 h-6" /> : <File className="w-6 h-6" />}
+                                                     </div>
+                                                     <div>
+                                                         <h4 className="font-bold text-slate-800">{mat.title}</h4>
+                                                         <a href={mat.url} target="_blank" rel="noreferrer" className="text-xs text-gray-500 hover:text-zenro-blue hover:underline truncate max-w-xs block">{mat.url}</a>
+                                                     </div>
+                                                 </div>
+                                                 <button onClick={() => deleteMaterial(mat.id)} className="text-gray-400 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition"><Trash2 className="w-5 h-5" /></button>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 )}
+                             </div>
+                         </>
+                     ) : (
+                         <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                             <Layers className="w-16 h-16 mb-4 opacity-20" />
+                             <p className="text-lg font-bold">Select a module to manage content</p>
+                         </div>
+                     )}
+                 </div>
              </div>
+
+             {isAddModuleOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                     <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                         <h3 className="font-bold text-lg mb-4">Add New Module</h3>
+                         <input autoFocus className="w-full border p-2 rounded mb-4" placeholder="Module Title (e.g. Chapter 1)" value={newModuleTitle} onChange={e => setNewModuleTitle(e.target.value)} />
+                         <div className="flex justify-end gap-2">
+                             <button onClick={() => setIsAddModuleOpen(false)} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button>
+                             <button onClick={handleAddModule} className="px-4 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800">Add</button>
+                         </div>
+                     </div>
+                 </div>
+             )}
+
+             {isAddMaterialOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                     <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md space-y-4">
+                         <h3 className="font-bold text-lg">Add Material to {activeModule?.title}</h3>
+                         <div><label className="text-xs font-bold text-gray-500 uppercase">Title</label><input className="w-full border p-2 rounded" placeholder="Lesson Title" value={newMaterial.title} onChange={e => setNewMaterial({...newMaterial, title: e.target.value})} /></div>
+                         <div className="grid grid-cols-2 gap-4">
+                             <div><label className="text-xs font-bold text-gray-500 uppercase">Type</label><select className="w-full border p-2 rounded" value={newMaterial.type} onChange={e => setNewMaterial({...newMaterial, type: e.target.value as any})}><option value="VIDEO">Video URL</option><option value="PDF">PDF/Doc Link</option></select></div>
+                             <div><label className="text-xs font-bold text-gray-500 uppercase">URL</label><input className="w-full border p-2 rounded" placeholder="https://..." value={newMaterial.url} onChange={e => setNewMaterial({...newMaterial, url: e.target.value})} /></div>
+                         </div>
+                         <div className="flex justify-end gap-2 pt-2">
+                             <button onClick={() => setIsAddMaterialOpen(false)} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button>
+                             <button onClick={handleAddMaterial} className="px-4 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800">Add Material</button>
+                         </div>
+                     </div>
+                 </div>
+             )}
         </div>
     );
 };
 
+export const CourseCreationModal = ({ onClose, onRefresh }: { onClose: () => void, onRefresh: () => void }) => {
+    const [title, setTitle] = useState('');
+    const [desc, setDesc] = useState('');
+    const [level, setLevel] = useState('N5');
+    const [thumbnail, setThumbnail] = useState('');
+    const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
+    const [availableBatches, setAvailableBatches] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const loadBatches = async () => {
+            const { data } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
+            if(data) setAvailableBatches(data.map(b => b.name));
+        };
+        loadBatches();
+    }, []);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const session = localStorage.getItem('zenro_session');
+            const teacherName = session ? JSON.parse(session).name : 'Instructor';
+
+            const { data, error } = await supabase.from('courses').insert({
+                title, description: desc, level, thumbnail, status: 'PUBLISHED', instructor_name: teacherName
+            }).select().single();
+            
+            if(error) throw error;
+
+            if(selectedBatches.length > 0) {
+                await supabase.from('course_batches').insert(selectedBatches.map(b => ({ course_id: data.id, batch_name: b })));
+            }
+            onRefresh();
+            onClose();
+        } catch (e: any) {
+            console.error("Course Create Error", e);
+            alert("Failed to create course: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleBatch = (b: string) => {
+        setSelectedBatches(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden">
+                <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-slate-800">Create New Course</h2>
+                    <button onClick={onClose}><X className="w-5 h-5 text-gray-500" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Title</label><input required className="w-full border p-2 rounded" value={title} onChange={e => setTitle(e.target.value)} /></div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label><textarea className="w-full border p-2 rounded h-20" value={desc} onChange={e => setDesc(e.target.value)} /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Level</label><select className="w-full border p-2 rounded" value={level} onChange={e => setLevel(e.target.value)}><option value="N5">N5</option><option value="N4">N4</option><option value="N3">N3</option><option value="N2">N2</option><option value="N1">N1</option></select></div>
+                        <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Thumbnail URL</label><input className="w-full border p-2 rounded" placeholder="https://..." value={thumbnail} onChange={e => setThumbnail(e.target.value)} /></div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Assign Batches</label>
+                        <div className="border border-gray-200 rounded p-2 max-h-32 overflow-y-auto grid grid-cols-2 gap-2">
+                            {availableBatches.map(b => (
+                                <div key={b} onClick={() => toggleBatch(b)} className={`p-2 rounded text-xs font-bold cursor-pointer border flex justify-between items-center ${selectedBatches.includes(b) ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-gray-200 text-gray-600'}`}>
+                                    {b} {selectedBatches.includes(b) && <Check className="w-3 h-3" />}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="pt-4 flex justify-end gap-3">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button>
+                        <button type="submit" disabled={loading} className="px-6 py-2 bg-zenro-red text-white font-bold rounded shadow-md hover:bg-red-700 disabled:opacity-50">{loading ? 'Creating...' : 'Create Course'}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+// ... [Exports for TeacherTestsPage, TeacherSchedulePage, TeacherReportsPage, LiveClassConsole stay same, omitted for brevity but included in compilation] ...
 export const TeacherTestsPage = () => {
     const [tests, setTests] = useState<Test[]>([]);
     const [loading, setLoading] = useState(true);
