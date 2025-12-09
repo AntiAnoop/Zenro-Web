@@ -1,6 +1,6 @@
 
 -- ----------------------------------------------------------------
--- ZENRO DATABASE SETUP SCRIPT
+-- ZENRO DATABASE SETUP SCRIPT (RLS FIXED)
 -- ----------------------------------------------------------------
 
 -- 1. CLEANUP
@@ -229,7 +229,59 @@ CREATE TABLE attendance (
   status text DEFAULT 'PRESENT'
 );
 
--- 3. SEED DATA
+-- ----------------------------------------------------------------
+-- 3. ENABLE ROW LEVEL SECURITY & POLICIES
+-- ----------------------------------------------------------------
+
+-- Enable RLS on all tables
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE course_modules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE course_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE course_batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE course_enrollments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE test_batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE test_enrollments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assignment_batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assignment_enrollments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assignment_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
+
+-- Create POLICY to allow ALL operations for anon/authenticated users
+-- Note: In production, you would restrict this. For this app, we open it up.
+
+CREATE POLICY "Enable all access for all users" ON profiles FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON batches FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON courses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON course_modules FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON course_materials FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON course_batches FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON course_enrollments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON tests FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON questions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON test_batches FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON test_enrollments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON submissions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON assignments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON assignment_batches FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON assignment_enrollments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON assignment_submissions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON fees FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON payments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON schedules FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON live_sessions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON attendance FOR ALL USING (true) WITH CHECK (true);
+
+-- 4. SEED DATA
 
 INSERT INTO batches (name) VALUES ('2024-A'), ('2024-B');
 
