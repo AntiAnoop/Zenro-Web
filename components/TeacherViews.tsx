@@ -8,14 +8,15 @@ import {
   ChevronRight, Filter, Search, Download, Trash2, Upload,
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
   Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff,
-  FileCheck, HelpCircle, CheckSquare, Target, ChevronLeft, Radio
+  FileCheck, HelpCircle, CheckSquare, Target, ChevronLeft, Radio,
+  Layout, GripVertical, File
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User, Test, Question, Schedule, LiveSessionRecord } from '../types';
 import { generateClassSummary } from '../services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLiveSession } from '../context/LiveContext';
 import { supabase } from '../services/supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 // --- UI HELPERS ---
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => (
@@ -601,6 +602,7 @@ export const TeacherCoursesPage = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
       fetchCourses();
@@ -635,17 +637,22 @@ export const TeacherCoursesPage = () => {
          ) : (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  {courses.map(course => (
-                     <div key={course.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition group">
+                     <div key={course.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition group flex flex-col">
                          <div className="relative aspect-video bg-gray-100">
                              <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
                              <span className="absolute top-2 right-2 bg-white/90 px-2 py-1 text-xs font-bold rounded uppercase">{course.level}</span>
                          </div>
-                         <div className="p-5">
+                         <div className="p-5 flex-1 flex flex-col">
                              <h4 className="font-bold text-zenro-slate mb-1">{course.title}</h4>
-                             <p className="text-xs text-gray-500 line-clamp-2 mb-4">{course.description}</p>
-                             <div className="flex justify-between items-center">
+                             <p className="text-xs text-gray-500 line-clamp-2 mb-4 flex-1">{course.description}</p>
+                             <div className="flex justify-between items-center mt-auto pt-4 border-t border-gray-100">
                                  <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${course.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{course.status}</span>
-                                 <button className="text-zenro-blue text-xs font-bold hover:underline">Edit</button>
+                                 <button 
+                                    onClick={() => navigate(`/teacher/course/${course.id}/manage`)}
+                                    className="text-white bg-zenro-blue hover:bg-blue-800 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                                 >
+                                     <Layout className="w-3 h-3" /> Manage Content
+                                 </button>
                              </div>
                          </div>
                      </div>
@@ -658,6 +665,220 @@ export const TeacherCoursesPage = () => {
     </div>
   );
 };
+
+export const CourseContentManager = () => {
+    const { courseId } = useParams();
+    const navigate = useNavigate();
+    const [course, setCourse] = useState<Course | null>(null);
+    const [modules, setModules] = useState<CourseModule[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+    const [isAddModuleOpen, setIsAddModuleOpen] = useState(false);
+    const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
+    const [newModuleTitle, setNewModuleTitle] = useState('');
+    const [newMaterial, setNewMaterial] = useState({ title: '', type: 'VIDEO' as 'VIDEO'|'PDF', url: '' });
+
+    useEffect(() => {
+        fetchCourseData();
+    }, [courseId]);
+
+    const fetchCourseData = async () => {
+        setLoading(true);
+        try {
+            const { data: cData } = await supabase.from('courses').select('*').eq('id', courseId).single();
+            setCourse(cData);
+
+            // Fetch modules with materials
+            const { data: mData } = await supabase
+                .from('course_modules')
+                .select(`
+                    *,
+                    materials:course_materials(*)
+                `)
+                .eq('course_id', courseId)
+                .order('order', { ascending: true });
+            
+            if (mData) {
+                // Sort materials if needed, though they come array
+                setModules(mData);
+                if (!selectedModuleId && mData.length > 0) {
+                    setSelectedModuleId(mData[0].id);
+                }
+            }
+        } catch (e) { console.error(e); } finally { setLoading(false); }
+    };
+
+    const handleAddModule = async () => {
+        if (!newModuleTitle.trim()) return;
+        const newOrder = modules.length + 1;
+        const { error } = await supabase.from('course_modules').insert({
+            course_id: courseId,
+            title: newModuleTitle,
+            order: newOrder
+        });
+        if (!error) {
+            setNewModuleTitle('');
+            setIsAddModuleOpen(false);
+            fetchCourseData();
+        }
+    };
+
+    const handleAddMaterial = async () => {
+        if (!newMaterial.title || !newMaterial.url || !selectedModuleId) return;
+        const { error } = await supabase.from('course_materials').insert({
+            module_id: selectedModuleId,
+            title: newMaterial.title,
+            type: newMaterial.type,
+            url: newMaterial.url
+        });
+        if (!error) {
+            setNewMaterial({ title: '', type: 'VIDEO', url: '' });
+            setIsAddMaterialOpen(false);
+            fetchCourseData();
+        }
+    };
+
+    const deleteModule = async (id: string) => {
+        if(!confirm("Delete this module and all its content?")) return;
+        await supabase.from('course_modules').delete().eq('id', id);
+        if(selectedModuleId === id) setSelectedModuleId(null);
+        fetchCourseData();
+    };
+
+    const deleteMaterial = async (id: string) => {
+        if(!confirm("Remove this material?")) return;
+        await supabase.from('course_materials').delete().eq('id', id);
+        fetchCourseData();
+    };
+
+    const activeModule = modules.find(m => m.id === selectedModuleId);
+
+    if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
+    if (!course) return <div className="p-8 text-center">Course not found.</div>;
+
+    return (
+        <div className="h-[calc(100vh-6rem)] flex flex-col animate-fade-in">
+             {/* Header */}
+             <div className="flex items-center justify-between mb-6">
+                 <div className="flex items-center gap-4">
+                     <button onClick={() => navigate('/teacher/courses')} className="p-2 hover:bg-gray-200 rounded-full transition"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
+                     <div>
+                         <h1 className="text-2xl font-heading font-bold text-zenro-slate">{course.title}</h1>
+                         <p className="text-sm text-gray-500">Content Management</p>
+                     </div>
+                 </div>
+                 <button onClick={() => window.open(`#/student/course/${courseId}`, '_blank')} className="bg-white border border-gray-300 text-slate-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm shadow-sm transition">
+                    <Eye className="w-4 h-4" /> Preview as Student
+                 </button>
+             </div>
+
+             <div className="flex-1 flex gap-6 overflow-hidden bg-white rounded-xl border border-gray-200 shadow-sm">
+                 {/* Sidebar: Modules */}
+                 <div className="w-80 border-r border-gray-200 flex flex-col bg-gray-50">
+                     <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white">
+                         <h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Modules</h3>
+                         <button onClick={() => setIsAddModuleOpen(true)} className="p-1 hover:bg-gray-100 rounded text-zenro-blue"><Plus className="w-5 h-5" /></button>
+                     </div>
+                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                         {modules.length === 0 && <p className="text-center text-xs text-gray-400 mt-4 italic">No modules yet.</p>}
+                         {modules.map((m, idx) => (
+                             <div 
+                                key={m.id} 
+                                onClick={() => setSelectedModuleId(m.id)}
+                                className={`p-3 rounded-lg cursor-pointer flex items-center justify-between group transition ${selectedModuleId === m.id ? 'bg-white border border-zenro-blue shadow-sm' : 'hover:bg-gray-200 border border-transparent'}`}
+                             >
+                                 <div className="flex items-center gap-3 overflow-hidden">
+                                     <span className="text-xs font-bold text-gray-400 w-5 text-center">{idx + 1}</span>
+                                     <span className={`text-sm font-bold truncate ${selectedModuleId === m.id ? 'text-zenro-blue' : 'text-slate-700'}`}>{m.title}</span>
+                                 </div>
+                                 <button onClick={(e) => { e.stopPropagation(); deleteModule(m.id); }} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 p-1"><Trash2 className="w-3 h-3" /></button>
+                             </div>
+                         ))}
+                     </div>
+                 </div>
+
+                 {/* Main Content: Materials */}
+                 <div className="flex-1 flex flex-col bg-white">
+                     {activeModule ? (
+                         <>
+                             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                                 <div>
+                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Selected Module</span>
+                                     <h2 className="text-xl font-bold text-slate-800">{activeModule.title}</h2>
+                                 </div>
+                                 <button onClick={() => setIsAddMaterialOpen(true)} className="bg-zenro-blue hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm shadow-sm transition">
+                                     <Plus className="w-4 h-4" /> Add Material
+                                 </button>
+                             </div>
+                             <div className="flex-1 overflow-y-auto p-6">
+                                 {(!activeModule.materials || activeModule.materials.length === 0) ? (
+                                     <div className="h-full flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">
+                                         <FileText className="w-12 h-12 mb-2 opacity-50" />
+                                         <p className="text-sm font-bold">This module is empty.</p>
+                                         <p className="text-xs">Add videos or documents to get started.</p>
+                                     </div>
+                                 ) : (
+                                     <div className="grid grid-cols-1 gap-4">
+                                         {activeModule.materials.map(mat => (
+                                             <div key={mat.id} className="p-4 rounded-xl border border-gray-200 hover:shadow-md transition flex items-center justify-between group bg-white">
+                                                 <div className="flex items-center gap-4">
+                                                     <div className={`p-3 rounded-lg ${mat.type === 'VIDEO' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                         {mat.type === 'VIDEO' ? <Video className="w-6 h-6" /> : <File className="w-6 h-6" />}
+                                                     </div>
+                                                     <div>
+                                                         <h4 className="font-bold text-slate-800">{mat.title}</h4>
+                                                         <a href={mat.url} target="_blank" rel="noreferrer" className="text-xs text-gray-500 hover:text-zenro-blue hover:underline truncate max-w-xs block">{mat.url}</a>
+                                                     </div>
+                                                 </div>
+                                                 <button onClick={() => deleteMaterial(mat.id)} className="text-gray-400 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition"><Trash2 className="w-5 h-5" /></button>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 )}
+                             </div>
+                         </>
+                     ) : (
+                         <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                             <Layers className="w-16 h-16 mb-4 opacity-20" />
+                             <p className="text-lg font-bold">Select a module to manage content</p>
+                         </div>
+                     )}
+                 </div>
+             </div>
+
+             {/* Modals */}
+             {isAddModuleOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                     <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                         <h3 className="font-bold text-lg mb-4">Add New Module</h3>
+                         <input autoFocus className="w-full border p-2 rounded mb-4" placeholder="Module Title (e.g. Chapter 1)" value={newModuleTitle} onChange={e => setNewModuleTitle(e.target.value)} />
+                         <div className="flex justify-end gap-2">
+                             <button onClick={() => setIsAddModuleOpen(false)} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button>
+                             <button onClick={handleAddModule} className="px-4 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800">Add</button>
+                         </div>
+                     </div>
+                 </div>
+             )}
+
+             {isAddMaterialOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                     <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md space-y-4">
+                         <h3 className="font-bold text-lg">Add Material to {activeModule?.title}</h3>
+                         <div><label className="text-xs font-bold text-gray-500 uppercase">Title</label><input className="w-full border p-2 rounded" placeholder="Lesson Title" value={newMaterial.title} onChange={e => setNewMaterial({...newMaterial, title: e.target.value})} /></div>
+                         <div className="grid grid-cols-2 gap-4">
+                             <div><label className="text-xs font-bold text-gray-500 uppercase">Type</label><select className="w-full border p-2 rounded" value={newMaterial.type} onChange={e => setNewMaterial({...newMaterial, type: e.target.value as any})}><option value="VIDEO">Video URL</option><option value="PDF">PDF/Doc Link</option></select></div>
+                             <div><label className="text-xs font-bold text-gray-500 uppercase">URL</label><input className="w-full border p-2 rounded" placeholder="https://..." value={newMaterial.url} onChange={e => setNewMaterial({...newMaterial, url: e.target.value})} /></div>
+                         </div>
+                         <div className="flex justify-end gap-2 pt-2">
+                             <button onClick={() => setIsAddMaterialOpen(false)} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button>
+                             <button onClick={handleAddMaterial} className="px-4 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800">Add Material</button>
+                         </div>
+                     </div>
+                 </div>
+             )}
+        </div>
+    );
+}
 
 export const CourseCreationModal = ({ onClose, onRefresh }: { onClose: () => void, onRefresh: () => void }) => {
     const [title, setTitle] = useState('');

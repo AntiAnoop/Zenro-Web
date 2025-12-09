@@ -732,21 +732,44 @@ export const StudentCoursePlayer = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
     const [course, setCourse] = useState<Course | null>(null);
+    const [modules, setModules] = useState<CourseModule[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+    const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
 
     useEffect(() => {
         const fetchCourse = async () => {
             setLoading(true);
             try {
-                const { data } = await supabase.from('courses').select('*').eq('id', courseId).single();
-                if (data) {
-                    setCourse({ id: data.id, title: data.title, description: data.description, instructor: data.instructor_name || 'Tanaka Sensei', progress: 0, thumbnail: data.thumbnail, totalDuration: '10h', level: data.level, modules: [{ id: 'm1', title: 'Introduction', materials: [] }, { id: 'm2', title: 'Chapter 1: Basics', materials: [] }] });
+                // 1. Fetch Course Info
+                const { data: cData } = await supabase.from('courses').select('*').eq('id', courseId).single();
+                if (cData) setCourse(cData);
+
+                // 2. Fetch Modules & Materials
+                const { data: mData } = await supabase
+                    .from('course_modules')
+                    .select(`*, materials:course_materials(*)`)
+                    .eq('course_id', courseId)
+                    .order('order', { ascending: true });
+                
+                if (mData) {
+                    setModules(mData);
+                    if (mData.length > 0) {
+                        setActiveModuleId(mData[0].id);
+                        if (mData[0].materials && mData[0].materials.length > 0) {
+                            setActiveMaterial(mData[0].materials[0]);
+                        }
+                    }
                 }
             } catch (e) { console.error(e); } 
             finally { setLoading(false); }
         };
         fetchCourse();
     }, [courseId]);
+
+    const handleSelectMaterial = (mat: CourseMaterial) => {
+        setActiveMaterial(mat);
+    };
 
     if(loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-12 h-12 text-zenro-red animate-spin" /></div>;
     if(!course) return <div className="p-8 text-center">Course not found.</div>;
@@ -758,8 +781,69 @@ export const StudentCoursePlayer = () => {
                  <h1 className="text-2xl font-heading font-bold text-slate-800">{course.title}</h1>
              </div>
              <div className="flex-1 flex gap-6 overflow-hidden">
-                 <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-lg flex items-center justify-center relative group"><div className="text-center"><Play className="w-16 h-16 text-white/50 mx-auto mb-4" /><p className="text-white/70 font-bold">Select a lesson to start</p></div></div>
-                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm overflow-hidden"><div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-slate-800">Course Content</div><div className="flex-1 overflow-y-auto">{course.modules?.map((module, i) => (<div key={module.id} className="border-b border-gray-100 last:border-0"><div className="p-4 bg-gray-50/50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer hover:bg-gray-100">{module.title}</div><div className="bg-white">{[1,2,3].map(lesson => (<div key={lesson} className="p-3 pl-8 hover:bg-blue-50 cursor-pointer flex items-center gap-3 text-sm text-gray-600 transition"><div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">{lesson}</div><span>Lesson {lesson}</span><span className="ml-auto text-xs text-gray-400">10:00</span></div>))}</div></div>))}</div></div>
+                 <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-lg flex items-center justify-center relative group">
+                     {activeMaterial ? (
+                         activeMaterial.type === 'VIDEO' ? (
+                             // Simple Video Embed for Demo (assuming direct MP4 or YouTube embed link provided)
+                             // In production, robust player handling needed
+                             activeMaterial.url.includes('youtube') || activeMaterial.url.includes('youtu.be') ? (
+                                <iframe 
+                                    className="w-full h-full"
+                                    src={activeMaterial.url.replace('watch?v=', 'embed/')} 
+                                    title="Video Player" 
+                                    allowFullScreen
+                                ></iframe>
+                             ) : (
+                                <video controls className="w-full h-full" src={activeMaterial.url}></video>
+                             )
+                         ) : (
+                             <div className="text-center text-white">
+                                 <FileText className="w-16 h-16 mx-auto mb-4" />
+                                 <h3 className="text-xl font-bold mb-2">{activeMaterial.title}</h3>
+                                 <a href={activeMaterial.url} target="_blank" rel="noreferrer" className="inline-block bg-zenro-red px-6 py-2 rounded font-bold hover:bg-red-700 transition">Open Document</a>
+                             </div>
+                         )
+                     ) : (
+                         <div className="text-center">
+                             <Play className="w-16 h-16 text-white/50 mx-auto mb-4" />
+                             <p className="text-white/70 font-bold">Select a lesson to start</p>
+                         </div>
+                     )}
+                 </div>
+                 
+                 <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm overflow-hidden">
+                     <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-slate-800">Course Content</div>
+                     <div className="flex-1 overflow-y-auto">
+                         {modules.length === 0 && <div className="p-8 text-center text-sm text-gray-400">No content uploaded yet.</div>}
+                         {modules.map((module) => (
+                             <div key={module.id} className="border-b border-gray-100 last:border-0">
+                                 <div 
+                                    className="p-4 bg-gray-50/50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setActiveModuleId(activeModuleId === module.id ? null : module.id)}
+                                 >
+                                     {module.title}
+                                 </div>
+                                 {(activeModuleId === module.id || true) && ( // Keeping all expanded for simplicity or logic check
+                                     <div className="bg-white">
+                                         {module.materials.map((mat, idx) => (
+                                             <div 
+                                                key={mat.id} 
+                                                onClick={() => handleSelectMaterial(mat)}
+                                                className={`p-3 pl-8 cursor-pointer flex items-center gap-3 text-sm transition ${activeMaterial?.id === mat.id ? 'bg-blue-50 text-zenro-blue font-bold border-l-4 border-zenro-blue' : 'hover:bg-gray-50 text-gray-600'}`}
+                                             >
+                                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${activeMaterial?.id === mat.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                     {mat.type === 'VIDEO' ? <Play className="w-3 h-3 fill-current" /> : <File className="w-3 h-3" />}
+                                                 </div>
+                                                 <span className="truncate">{mat.title}</span>
+                                             </div>
+                                         ))}
+                                         {module.materials.length === 0 && <div className="p-3 pl-8 text-xs text-gray-400 italic">No materials</div>}
+                                     </div>
+                                 )}
+                             </div>
+                         ))}
+                     </div>
+                 </div>
              </div>
         </div>
     );
