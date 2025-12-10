@@ -4,33 +4,21 @@ import {
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
   CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff, Loader2,
-  Layers, Check, Eye, CreditCard, FileText, Calendar, Clock, ArrowLeft, Briefcase, GraduationCap, MapPin, Phone, Mail, Radio
+  Layers, Check, Eye, CreditCard, FileText, Calendar, Clock, ArrowLeft, Briefcase, GraduationCap, MapPin, Phone, Mail, Radio, Activity
 } from 'lucide-react';
 import { User, UserRole, Schedule, LiveSessionRecord } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { supabase } from '../services/supabaseClient';
-
-// --- MOCK DATA FOR CHARTS ---
-const REVENUE_DATA = [
-  { month: 'Jan', phase1: 4000, phase2: 2400 },
-  { month: 'Feb', phase1: 3000, phase2: 1398 },
-  { month: 'Mar', phase1: 2000, phase2: 9800 },
-  { month: 'Apr', phase1: 2780, phase2: 3908 },
-  { month: 'May', phase1: 1890, phase2: 4800 },
-  { month: 'Jun', phase1: 2390, phase2: 3800 },
-];
-
-// --- TYPES ---
-interface Batch {
-  id: string;
-  name: string;
-}
 
 // --- HELPER FUNCTIONS ---
 const generateUUID = () => {
     return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
         (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> (+c / 4)).toString(16)
     );
+};
+
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(amount);
 };
 
 const AdminHeader = ({ title, action }: { title: string, action?: React.ReactNode }) => (
@@ -58,7 +46,6 @@ const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: 
 
 // --- COMPONENT: USER PROFILE DETAIL MODAL ---
 const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void }) => {
-    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'FEES' | 'TESTS' | 'COURSES'>('OVERVIEW');
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ totalFees: 0, paidFees: 0, pendingFees: 0, avgScore: 0, testsTaken: 0, attendance: 88 });
 
@@ -113,8 +100,8 @@ const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void 
                 <div className="p-8 space-y-6">
                     {loading ? <div className="text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-zenro-blue"/></div> : (
                         <div className="grid grid-cols-2 gap-4">
-                            <InfoRow label="Total Fees" value={`¥${stats.totalFees}`} icon={DollarSign} />
-                            <InfoRow label="Pending" value={`¥${stats.pendingFees}`} icon={AlertTriangle} />
+                            <InfoRow label="Total Fees" value={formatCurrency(stats.totalFees)} icon={DollarSign} />
+                            <InfoRow label="Pending" value={formatCurrency(stats.pendingFees)} icon={AlertTriangle} />
                             <InfoRow label="Tests Taken" value={stats.testsTaken} icon={FileText} />
                             <InfoRow label="Avg Score" value={`${stats.avgScore}%`} icon={TrendingUp} />
                         </div>
@@ -303,7 +290,7 @@ export const AdminUserManagement = () => {
   const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [availableBatches, setAvailableBatches] = useState<Batch[]>([]);
+  const [availableBatches, setAvailableBatches] = useState<{id: string, name: string}[]>([]);
   const [showBatchDropdown, setShowBatchDropdown] = useState(false);
   const batchDropdownRef = useRef<HTMLDivElement>(null);
   
@@ -380,7 +367,6 @@ export const AdminUserManagement = () => {
 
   const fetchBatches = async () => {
       try {
-          // Always order by newest first to meet requirements
           const { data, error } = await supabase.from('batches').select('*').order('created_at', { ascending: false });
           if (!error && data) {
               setAvailableBatches(data);
@@ -398,7 +384,6 @@ export const AdminUserManagement = () => {
               setErrorMsg(`Failed to create batch: ${error.message}`);
               return false;
           } else {
-              // Successfully created - add to local state immediately
               setAvailableBatches(prev => [data, ...prev]);
               setSuccessMsg(`Batch "${batchName}" created successfully!`);
               return true;
@@ -412,7 +397,6 @@ export const AdminUserManagement = () => {
     setIsSubmitting(true);
     setErrorMsg('');
     
-    // --- VALIDATION ---
     if (!formData.full_name.trim() || !formData.email.trim()) {
         setErrorMsg("Name and Email are mandatory.");
         setIsSubmitting(false); return;
@@ -433,7 +417,6 @@ export const AdminUserManagement = () => {
     }
 
     try {
-      // 2. SAVE USER
       if (editingUser) {
         const { error } = await supabase.from('profiles').update(payload).eq('id', editingUser.id);
         if (error) throw error;
@@ -443,10 +426,8 @@ export const AdminUserManagement = () => {
         if (error) throw error;
         setSuccessMsg("New user created.");
       }
-
       setIsModalOpen(false);
       fetchUsers();
-
     } catch (err: any) {
       console.error("DB Write Failed:", err);
       setErrorMsg(`Error: ${err.message || 'Database error'}`);
@@ -456,12 +437,10 @@ export const AdminUserManagement = () => {
   };
 
   const handleBatchSelect = async (batchName: string) => {
-      // Check if batch exists
       const exists = availableBatches.some(b => b.name.toLowerCase() === batchName.toLowerCase());
       if (exists) {
           setFormData({ ...formData, batch: batchName });
       } else {
-          // If creation succeeds, set it
           const created = await createBatch(batchName);
           if (created) {
               setFormData({ ...formData, batch: batchName });
@@ -470,7 +449,6 @@ export const AdminUserManagement = () => {
       setShowBatchDropdown(false);
   };
 
-  // ... (Delete handlers remain same)
   const initiateDelete = (user: User) => {
       setUserToDelete(user);
       setIsDeleteConfirmed(false);
@@ -521,13 +499,6 @@ export const AdminUserManagement = () => {
       });
     }
     setIsModalOpen(true);
-  };
-
-  const generatePassword = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-    let pass = "";
-    for(let i=0; i<8; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-    setFormData(prev => ({...prev, password: pass}));
   };
 
   const filteredUsers = useMemo(() => {
@@ -630,7 +601,6 @@ export const AdminUserManagement = () => {
                                 </div>
                                 {showBatchDropdown && (
                                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                                        {/* Sort local availableBatches ensuring latest is first (though DB fetch handles this, safety check) */}
                                         {filteredBatches.map(b => (
                                             <div key={b.id} onClick={() => handleBatchSelect(b.name)} className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-slate-700 flex justify-between items-center">{b.name} {formData.batch === b.name && <Check className="w-3 h-3 text-zenro-blue" />}</div>
                                         ))}
@@ -652,7 +622,6 @@ export const AdminUserManagement = () => {
         </div>
       )}
 
-      {/* DANGER: DELETE CONFIRMATION MODAL */}
       {userToDelete && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white w-full max-w-md rounded-2xl border border-red-200 shadow-2xl overflow-hidden relative">
@@ -678,73 +647,178 @@ export const AdminUserManagement = () => {
 };
 
 export const AdminFinancials = () => {
+    const [transactions, setTransactions] = useState<any[]>([]);
+    const [summary, setSummary] = useState({ totalRevenue: 0, outstanding: 0, pendingCount: 0 });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch Payments for Revenue & Transactions
+                const { data: payData } = await supabase
+                    .from('payments')
+                    .select('*, fees(title, profiles(full_name))')
+                    .order('payment_date', { ascending: false });
+                
+                // Fetch Fees for Outstanding
+                const { data: feeData } = await supabase
+                    .from('fees')
+                    .select('amount, status');
+
+                if (payData && feeData) {
+                    const totalRev = payData.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+                    const outst = feeData.filter(f => f.status !== 'PAID').reduce((acc, curr) => acc + (curr.amount || 0), 0);
+                    const pending = feeData.filter(f => f.status === 'PENDING').length;
+
+                    setSummary({ totalRevenue: totalRev, outstanding: outst, pendingCount: pending });
+                    setTransactions(payData.map(p => ({
+                        id: p.id,
+                        student_name: p.fees?.profiles?.full_name || 'Unknown',
+                        title: p.fees?.title || 'Fee Payment',
+                        amount: p.amount,
+                        date: p.payment_date,
+                        status: 'SUCCESS'
+                    })));
+                }
+            } catch (e) { console.error(e); } finally { setLoading(false); }
+        };
+        fetchData();
+    }, []);
+
     return (
         <div className="space-y-8 animate-fade-in">
              <AdminHeader title="Financial Overview" />
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                      <p className="text-xs font-bold text-gray-500 uppercase">Total Revenue</p>
-                     <h3 className="text-3xl font-bold text-slate-800">¥12,500,000</h3>
+                     <h3 className="text-3xl font-bold text-slate-800">{formatCurrency(summary.totalRevenue)}</h3>
                  </div>
                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                      <p className="text-xs font-bold text-gray-500 uppercase">Outstanding Fees</p>
-                     <h3 className="text-3xl font-bold text-red-600">¥1,200,000</h3>
+                     <h3 className="text-3xl font-bold text-red-600">{formatCurrency(summary.outstanding)}</h3>
                  </div>
                   <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                     <p className="text-xs font-bold text-gray-500 uppercase">Pending Transactions</p>
-                     <h3 className="text-3xl font-bold text-yellow-600">14</h3>
+                     <p className="text-xs font-bold text-gray-500 uppercase">Pending Invoices</p>
+                     <h3 className="text-3xl font-bold text-yellow-600">{summary.pendingCount}</h3>
                  </div>
              </div>
              
-             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center text-gray-500">
-                 <DollarSign className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                 <p>Detailed financial transaction history and export tools coming soon.</p>
+             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                 <div className="p-6 border-b border-gray-200 bg-gray-50">
+                     <h3 className="font-bold text-slate-800">Recent Transactions</h3>
+                 </div>
+                 <table className="w-full text-left text-sm text-gray-600">
+                     <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs">
+                         <tr>
+                             <th className="p-4">Date</th>
+                             <th className="p-4">Student</th>
+                             <th className="p-4">Description</th>
+                             <th className="p-4">Amount</th>
+                             <th className="p-4">Status</th>
+                         </tr>
+                     </thead>
+                     <tbody className="divide-y divide-gray-100">
+                         {loading ? <tr><td colSpan={5} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto"/></td></tr> : transactions.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-gray-500">No transactions found.</td></tr> : transactions.map(t => (
+                             <tr key={t.id} className="hover:bg-gray-50">
+                                 <td className="p-4 font-mono text-xs">{new Date(t.date).toLocaleDateString()}</td>
+                                 <td className="p-4 font-bold text-slate-800">{t.student_name}</td>
+                                 <td className="p-4">{t.title}</td>
+                                 <td className="p-4 font-mono font-bold">{formatCurrency(t.amount)}</td>
+                                 <td className="p-4"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{t.status}</span></td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </table>
              </div>
         </div>
     );
 };
 
 export const AdminDashboard = () => {
+    const [stats, setStats] = useState({ totalUsers: 0, totalRevenue: 0, activeCourses: 0 });
+    const [recentActivity, setRecentActivity] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            setLoading(true);
+            try {
+                // 1. Parallel Fetch for Stats
+                const [usersRes, coursesRes, paymentsRes] = await Promise.all([
+                    supabase.from('profiles').select('*', { count: 'exact', head: true }),
+                    supabase.from('courses').select('*', { count: 'exact', head: true }).eq('status', 'PUBLISHED'),
+                    supabase.from('payments').select('amount')
+                ]);
+
+                const totalRev = paymentsRes.data?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
+
+                setStats({
+                    totalUsers: usersRes.count || 0,
+                    activeCourses: coursesRes.count || 0,
+                    totalRevenue: totalRev
+                });
+
+                // 2. Fetch Recent Activity Feed (Aggregated)
+                // New Users
+                const { data: newUsers } = await supabase.from('profiles').select('full_name, created_at').order('created_at', { ascending: false }).limit(3);
+                // New Payments
+                const { data: newPay } = await supabase.from('payments').select('amount, payment_date').order('payment_date', { ascending: false }).limit(3);
+                // New Courses
+                const { data: newCourses } = await supabase.from('courses').select('title, created_at').order('created_at', { ascending: false }).limit(2);
+
+                const activity = [
+                    ...(newUsers || []).map((u:any) => ({ type: 'USER', text: `New user registration: ${u.full_name}`, date: u.created_at })),
+                    ...(newPay || []).map((p:any) => ({ type: 'PAYMENT', text: `Payment received: ${formatCurrency(p.amount)}`, date: p.payment_date })),
+                    ...(newCourses || []).map((c:any) => ({ type: 'COURSE', text: `New course created: ${c.title}`, date: c.created_at }))
+                ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+
+                setRecentActivity(activity);
+
+            } catch (e) { console.error(e); } finally { setLoading(false); }
+        };
+        fetchDashboardData();
+    }, []);
+
     return (
         <div className="space-y-8 animate-fade-in">
              <AdminHeader title="Admin Dashboard" />
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
                      <div className="p-4 bg-blue-100 rounded-lg text-blue-600"><Users className="w-8 h-8" /></div>
-                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Users</p><h3 className="text-2xl font-bold text-slate-800">142</h3></div>
+                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Users</p><h3 className="text-2xl font-bold text-slate-800">{loading ? '...' : stats.totalUsers}</h3></div>
                  </div>
                   <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
                      <div className="p-4 bg-green-100 rounded-lg text-green-600"><DollarSign className="w-8 h-8" /></div>
-                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Revenue</p><h3 className="text-2xl font-bold text-slate-800">¥12.5M</h3></div>
+                     <div><p className="text-gray-500 text-xs font-bold uppercase">Total Revenue</p><h3 className="text-2xl font-bold text-slate-800">{loading ? '...' : formatCurrency(stats.totalRevenue)}</h3></div>
                  </div>
                   <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
                      <div className="p-4 bg-purple-100 rounded-lg text-purple-600"><BookOpen className="w-8 h-8" /></div>
-                     <div><p className="text-gray-500 text-xs font-bold uppercase">Active Courses</p><h3 className="text-2xl font-bold text-slate-800">4</h3></div>
+                     <div><p className="text-gray-500 text-xs font-bold uppercase">Active Courses</p><h3 className="text-2xl font-bold text-slate-800">{loading ? '...' : stats.activeCourses}</h3></div>
                  </div>
              </div>
              
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-zenro-blue"/> Recent Activity</h3>
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-zenro-blue"/> Live Activity Feed</h3>
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                            <span>New user registration: <strong>Kenji Tanaka</strong></span>
-                            <span className="text-xs text-gray-500">2m ago</span>
-                        </div>
-                         <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                            <span>Payment received: <strong>¥45,000</strong></span>
-                            <span className="text-xs text-gray-500">15m ago</span>
-                        </div>
-                         <div className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                            <span>New course created: <strong>JLPT N3 Grammar</strong></span>
-                            <span className="text-xs text-gray-500">1h ago</span>
-                        </div>
+                        {loading ? <div className="text-center p-4"><Loader2 className="w-6 h-6 animate-spin mx-auto"/></div> : recentActivity.length === 0 ? <p className="text-gray-500 text-sm">No recent activity.</p> : recentActivity.map((act, i) => (
+                            <div key={i} className="flex items-center justify-between text-sm p-3 bg-gray-50 rounded border border-gray-100">
+                                <span className="flex items-center gap-2">
+                                    {act.type === 'USER' && <Users className="w-4 h-4 text-blue-500"/>}
+                                    {act.type === 'PAYMENT' && <DollarSign className="w-4 h-4 text-green-500"/>}
+                                    {act.type === 'COURSE' && <BookOpen className="w-4 h-4 text-purple-500"/>}
+                                    <strong>{act.text.split(':')[0]}:</strong> {act.text.split(':')[1]}
+                                </span>
+                                <span className="text-xs text-gray-500 font-mono">{new Date(act.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                            </div>
+                        ))}
                     </div>
                  </div>
                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-green-600"/> System Health</h3>
                     <div className="flex items-center gap-2 text-green-600 font-bold mb-2"><CheckCircle className="w-5 h-5" /> All Systems Operational</div>
-                    <p className="text-sm text-gray-500">Database connection is stable. API latency is normal (45ms). Backup completed successfully at 03:00 AM.</p>
+                    <p className="text-sm text-gray-500">Database connection is stable. RLS Policies active. Real-time subscriptions enabled.</p>
                  </div>
              </div>
         </div>
