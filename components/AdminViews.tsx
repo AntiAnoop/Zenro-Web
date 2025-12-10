@@ -4,7 +4,7 @@ import {
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
   CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff, Loader2,
-  Layers, Check, Eye, CreditCard, FileText, Calendar, Clock, ArrowLeft, Briefcase, GraduationCap, MapPin, Phone, Mail, Radio, Activity
+  Layers, Check, Eye, CreditCard, FileText, Calendar, Clock, ArrowLeft, Briefcase, GraduationCap, MapPin, Phone, Mail, Radio, Activity, Camera
 } from 'lucide-react';
 import { User, UserRole, Schedule, LiveSessionRecord } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -294,6 +294,9 @@ export const AdminUserManagement = () => {
   const [showBatchDropdown, setShowBatchDropdown] = useState(false);
   const batchDropdownRef = useRef<HTMLDivElement>(null);
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -301,7 +304,8 @@ export const AdminUserManagement = () => {
     student_id: '',
     batch: '',
     password: '',
-    phone: ''
+    phone: '',
+    avatar_url: ''
   });
 
   useEffect(() => {
@@ -392,6 +396,22 @@ export const AdminUserManagement = () => {
       return false;
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) return alert("Only images allowed");
+      if (file.size > 200 * 1024) return alert("Max size 200KB");
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+          const base64 = ev.target?.result as string;
+          setAvatarPreview(base64);
+          setFormData({ ...formData, avatar_url: base64 });
+      };
+      reader.readAsDataURL(file);
+  };
+
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -414,6 +434,10 @@ export const AdminUserManagement = () => {
 
     if (formData.password) {
       payload.password = formData.password;
+    }
+    
+    if (formData.avatar_url) {
+        payload.avatar_url = formData.avatar_url;
     }
 
     try {
@@ -477,6 +501,7 @@ export const AdminUserManagement = () => {
     setSuccessMsg('');
     if (user) {
       setEditingUser(user);
+      setAvatarPreview(user.avatar);
       setFormData({
         full_name: user.name,
         email: user.email,
@@ -484,10 +509,12 @@ export const AdminUserManagement = () => {
         student_id: user.rollNumber || '',
         batch: user.batch || '',
         password: '',
-        phone: user.phone || ''
+        phone: user.phone || '',
+        avatar_url: user.avatar
       });
     } else {
       setEditingUser(null);
+      setAvatarPreview(null);
       setFormData({
         full_name: '',
         email: '',
@@ -495,7 +522,8 @@ export const AdminUserManagement = () => {
         student_id: '',
         batch: '',
         password: '',
-        phone: ''
+        phone: '',
+        avatar_url: ''
       });
     }
     setIsModalOpen(true);
@@ -574,13 +602,24 @@ export const AdminUserManagement = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white w-full max-w-lg rounded-2xl border border-gray-200 shadow-2xl overflow-visible">
+            <div className="bg-white w-full max-w-2xl rounded-2xl border border-gray-200 shadow-2xl overflow-visible max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">{editingUser ? <Edit2 className="w-5 h-5 text-zenro-blue" /> : <Plus className="w-5 h-5 text-green-600" />}{editingUser ? 'Edit User Profile' : 'Create New Profile'}</h2>
                     <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
                 </div>
-                <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+                <form onSubmit={handleSaveUser} className="p-6 space-y-4 overflow-y-auto">
                     {errorMsg && <div className="bg-red-50 border border-red-100 p-3 rounded text-red-600 text-xs mb-4 font-bold">{errorMsg}</div>}
+                    
+                    <div className="flex items-center justify-center mb-6">
+                        <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                            <img src={avatarPreview || `https://ui-avatars.com/api/?name=${formData.full_name || 'New User'}&background=random`} className="w-24 h-24 rounded-full border-4 border-gray-100 object-cover shadow-sm" alt="Avatar" />
+                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
+                                <Camera className="w-8 h-8" />
+                            </div>
+                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name *</label><input required type="text" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm" placeholder="John Doe" /></div>
                         <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role *</label><select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm"><option value="STUDENT">Student</option><option value="TEACHER">Teacher</option><option value="ADMIN">Admin</option></select></div>

@@ -7,7 +7,7 @@ import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer } from './components/StudentViews';
 import { StudentTestPlayer } from './components/StudentTestPlayer';
 import { TestReport } from './components/TestReport';
-import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage, TeacherSchedulePage, CourseContentManager } from './components/TeacherViews';
+import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage, TeacherSchedulePage, CourseContentManager, TeacherProfilePage } from './components/TeacherViews';
 import { AdminDashboard, AdminUserManagement, AdminFinancials, AdminTeacherAnalytics, AdminScheduleView } from './components/AdminViews';
 import { LiveProvider } from './context/LiveContext';
 import { supabase } from './services/supabaseClient';
@@ -320,6 +320,9 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
                <Link to="/teacher/live" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/live')}`}>
                  <Video className="w-4 h-4" /> Live Console
                </Link>
+               <Link to="/teacher/profile" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/teacher/profile')}`}>
+                 <UserIcon className="w-4 h-4" /> My Profile
+               </Link>
              </>
           )}
 
@@ -384,7 +387,7 @@ const ProtectedRoute = ({ children, allowedRoles, user }: ProtectedRouteProps) =
 };
 
 // 4. Main App Layout Logic - Light Theme
-const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
+const AppContent = ({ user, handleLogout, setIsExamMode, onUpdateUser }: any) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -412,6 +415,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
           <button 
             onClick={() => {
                 if(user.role === UserRole.STUDENT) navigate('/student/profile');
+                if(user.role === UserRole.TEACHER) navigate('/teacher/profile');
             }} 
             className="w-9 h-9 rounded-full overflow-hidden border border-gray-300"
           >
@@ -445,7 +449,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
                 <Route path="/student/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><TestReport role="STUDENT" /></ProtectedRoute>} />
                 <Route path="/student/activities" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentActivityPage /></ProtectedRoute>} />
                 <Route path="/student/fees" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentFeesPage user={user} /></ProtectedRoute>} />
-                <Route path="/student/profile" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentProfilePage user={user} /></ProtectedRoute>} />
+                <Route path="/student/profile" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentProfilePage user={user} onUpdateUser={onUpdateUser} /></ProtectedRoute>} />
                 
                 <Route path="/exam-intro" element={
                     <ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}>
@@ -472,6 +476,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode }: any) => {
                 <Route path="/teacher/reports" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherReportsPage /></ProtectedRoute>} />
                 <Route path="/teacher/report/:submissionId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TestReport role="TEACHER" /></ProtectedRoute>} />
                 <Route path="/teacher/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><LiveClassConsole /></ProtectedRoute>} />
+                <Route path="/teacher/profile" element={<ProtectedRoute user={user} allowedRoles={[UserRole.TEACHER]}><TeacherProfilePage user={user} onUpdateUser={onUpdateUser} /></ProtectedRoute>} />
 
                 {/* Admin Routes */}
                 <Route path="/admin/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.ADMIN]}><AdminDashboard /></ProtectedRoute>} />
@@ -522,6 +527,13 @@ export default function App() {
     setUser(newUser);
   };
 
+  const handleUpdateUser = (updates: Partial<User>) => {
+      if(!user) return;
+      const updatedUser = { ...user, ...updates };
+      localStorage.setItem('zenro_session', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('zenro_session');
     setUser(null);
@@ -550,7 +562,12 @@ export default function App() {
   return (
     <LiveProvider user={user}>
       <Router>
-         <AppContent user={user} handleLogout={handleLogout} setIsExamMode={setIsExamMode} />
+         <AppContent 
+            user={user} 
+            handleLogout={handleLogout} 
+            setIsExamMode={setIsExamMode}
+            onUpdateUser={handleUpdateUser} 
+         />
       </Router>
     </LiveProvider>
   );

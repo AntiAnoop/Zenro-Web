@@ -6,7 +6,8 @@ import {
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
   Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw, Loader2,
-  FileCheck, ArrowLeft, Menu, File, Film, AlertTriangle, Monitor, WifiOff, Upload, CheckSquare, X, Eye, ChevronDown
+  FileCheck, ArrowLeft, Menu, File, Film, AlertTriangle, Monitor, WifiOff, Upload, CheckSquare, X, Eye, ChevronDown,
+  Camera, Edit2
 } from 'lucide-react';
 import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem, CourseModule, CourseMaterial, Schedule, Assignment, AssignmentSubmission, Test } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
@@ -690,14 +691,57 @@ export const StudentFeesPage = ({ user }: { user: User }) => {
     );
 };
 
-export const StudentProfilePage = ({ user }: { user: User }) => {
+export const StudentProfilePage = ({ user, onUpdateUser }: { user: User, onUpdateUser?: (u: Partial<User>) => void }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validation
+        if (!file.type.startsWith('image/')) return alert("Only image files are allowed.");
+        if (file.size > 200 * 1024) return alert("Image must be smaller than 200KB.");
+
+        setUploading(true);
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const base64 = ev.target?.result as string;
+            
+            try {
+                // Update Supabase
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({ avatar_url: base64 })
+                    .eq('id', user.id);
+                
+                if (error) throw error;
+
+                // Update Local State via App callback
+                if (onUpdateUser) onUpdateUser({ avatar: base64 });
+                
+                alert("Profile picture updated!");
+            } catch (err: any) {
+                console.error(err);
+                alert("Update failed: " + err.message);
+            } finally {
+                setUploading(false);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
     return (
         <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
              <div className="relative bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                  <div className="h-32 bg-zenro-blue"></div>
                  <div className="px-8 pb-8">
-                     <div className="relative -top-12 mb-[-30px]">
-                         <img src={user.avatar} className="w-24 h-24 rounded-full border-4 border-white bg-white shadow-md" alt="" />
+                     <div className="relative -top-12 mb-[-30px] inline-block group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                         <img src={user.avatar} className="w-24 h-24 rounded-full border-4 border-white bg-white shadow-md object-cover transition group-hover:opacity-75" alt="" />
+                         <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition text-white">
+                             {uploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <Camera className="w-8 h-8" />}
+                         </div>
+                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                      </div>
                      <div className="flex justify-between items-end mt-4">
                          <div>

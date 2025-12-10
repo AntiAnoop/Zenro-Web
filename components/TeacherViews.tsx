@@ -9,7 +9,7 @@ import {
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
   Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff,
   FileCheck, HelpCircle, CheckSquare, Target, ChevronLeft, Radio,
-  Layout, GripVertical, File, ListTodo, Send, Flag
+  Layout, GripVertical, File, ListTodo, Send, Flag, User as UserIcon, Shield
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User, Test, Question, Schedule, LiveSessionRecord, AssignmentSubmission } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -1023,6 +1023,92 @@ export const LiveClassConsole = () => {
                     <input className="flex-1 border p-2 rounded text-sm" value={msgText} onChange={e => setMsgText(e.target.value)} placeholder="Type..." />
                     <button onClick={() => { sendMessage('Sensei', msgText); setMsgText(''); }} className="p-2 bg-zenro-blue text-white rounded"><Send className="w-4 h-4" /></button>
                 </div>
+             </div>
+        </div>
+    );
+};
+
+export const TeacherProfilePage = ({ user, onUpdateUser }: { user: User, onUpdateUser?: (u: Partial<User>) => void }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validation
+        if (!file.type.startsWith('image/')) return alert("Only image files are allowed.");
+        if (file.size > 200 * 1024) return alert("Image must be smaller than 200KB.");
+
+        setUploading(true);
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const base64 = ev.target?.result as string;
+            
+            try {
+                // Update Supabase
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({ avatar_url: base64 })
+                    .eq('id', user.id);
+                
+                if (error) throw error;
+
+                // Update Local State via App callback
+                if (onUpdateUser) onUpdateUser({ avatar: base64 });
+                
+                alert("Profile picture updated!");
+            } catch (err: any) {
+                console.error(err);
+                alert("Update failed: " + err.message);
+            } finally {
+                setUploading(false);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    return (
+        <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
+             <div className="relative bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                 <div className="h-32 bg-zenro-blue"></div>
+                 <div className="px-8 pb-8">
+                     <div className="relative -top-12 mb-[-30px] inline-block group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                         <img src={user.avatar} className="w-24 h-24 rounded-full border-4 border-white bg-white shadow-md object-cover transition group-hover:opacity-75" alt="" />
+                         <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition text-white">
+                             {uploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <Camera className="w-8 h-8" />}
+                         </div>
+                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                     </div>
+                     <div className="flex justify-between items-end mt-4">
+                         <div>
+                             <h1 className="text-2xl font-bold text-slate-800">{user.name}</h1>
+                             <p className="text-gray-500 font-mono text-sm">{user.email}</p>
+                         </div>
+                         <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold hover:bg-gray-50">Edit Profile</button>
+                     </div>
+                 </div>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                     <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><UserIcon className="w-4 h-4"/> Personal Details</h3>
+                     <div className="space-y-3 text-sm">
+                         <div className="flex justify-between border-b border-gray-50 pb-2"><span className="text-gray-500">Teacher ID</span><span className="font-mono">{user.rollNumber || user.id.substring(0,8)}</span></div>
+                         <div className="flex justify-between border-b border-gray-50 pb-2"><span className="text-gray-500">Phone</span><span>{user.phone || 'N/A'}</span></div>
+                         <div className="flex justify-between border-b border-gray-50 pb-2"><span className="text-gray-500">Department</span><span className="font-bold text-zenro-blue">Japanese Language</span></div>
+                     </div>
+                 </div>
+                 
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Shield className="w-4 h-4"/> Account Security</h3>
+                      <button className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-medium mb-2 flex justify-between items-center transition">
+                          Change Password <ChevronRight className="w-4 h-4 text-gray-400" />
+                      </button>
+                      <button className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-medium flex justify-between items-center transition">
+                          Two-Factor Auth <span className="text-xs text-red-500 font-bold">Disabled</span>
+                      </button>
+                 </div>
              </div>
         </div>
     );
