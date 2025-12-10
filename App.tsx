@@ -503,14 +503,37 @@ export default function App() {
   const [isExamMode, setIsExamMode] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
 
-  // SESSION PERSISTENCE LOGIC
+  // SESSION PERSISTENCE LOGIC WITH ROBUST SYNC
   useEffect(() => {
     const restoreSession = async () => {
       try {
         const storedSession = localStorage.getItem('zenro_session');
         if (storedSession) {
           const parsedUser = JSON.parse(storedSession);
-          setUser(parsedUser);
+          
+          // ROBUST SYNC: Fetch latest profile from DB to ensure Admin changes (like avatar) are reflected instantly
+          try {
+              const { data, error } = await supabase.from('profiles').select('*').eq('id', parsedUser.id).single();
+              if (data && !error) {
+                  const refreshedUser = {
+                      ...parsedUser,
+                      name: data.full_name,
+                      email: data.email,
+                      role: data.role,
+                      avatar: data.avatar_url || parsedUser.avatar,
+                      batch: data.batch || parsedUser.batch,
+                      phone: data.phone || parsedUser.phone
+                  };
+                  setUser(refreshedUser);
+                  localStorage.setItem('zenro_session', JSON.stringify(refreshedUser));
+              } else {
+                  // Fallback to local if DB fetch fails (e.g. offline), but user exists
+                  setUser(parsedUser);
+              }
+          } catch (dbErr) {
+              console.warn("DB Sync failed, using local session:", dbErr);
+              setUser(parsedUser);
+          }
         }
       } catch (error) {
         console.error("Failed to restore session:", error);

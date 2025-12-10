@@ -9,7 +9,7 @@ import {
   Layers, ChevronDown, Save, Eye, Paperclip, Film, PlayCircle,
   Briefcase, GraduationCap, Loader2, Edit3, Globe, Lock, AlertCircle, Check, WifiOff,
   FileCheck, HelpCircle, CheckSquare, Target, ChevronLeft, Radio,
-  Layout, GripVertical, File, ListTodo, Send, Flag, User as UserIcon, Shield
+  Layout, GripVertical, File, ListTodo, Send, Flag, User as UserIcon, Shield, Edit2
 } from 'lucide-react';
 import { Course, Assignment, StudentPerformance, CourseModule, CourseMaterial, User, Test, Question, Schedule, LiveSessionRecord, AssignmentSubmission } from '../types';
 import { generateClassSummary } from '../services/geminiService';
@@ -915,8 +915,7 @@ export const TestCreationModal = ({ initialData, onClose, onRefresh }: { initial
                 {/* Footer */}
                 <div className="p-6 border-t border-gray-200 bg-white flex justify-between">
                     <button onClick={() => step > 1 ? setStep(step - 1) : onClose()} className="px-6 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded transition">
-                        {step === 1 ? 'Cancel' : 'Back'}
-                    </button>
+                        {step === 1 ? 'Cancel' : 'Back'}</button>
                     {step < 3 ? (
                         <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800 transition">
                             Next Step
@@ -1036,9 +1035,9 @@ export const TeacherProfilePage = ({ user, onUpdateUser }: { user: User, onUpdat
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validation
+        // Validation - Upgraded to 5MB
         if (!file.type.startsWith('image/')) return alert("Only image files are allowed.");
-        if (file.size > 200 * 1024) return alert("Image must be smaller than 200KB.");
+        if (file.size > 5 * 1024 * 1024) return alert("Image must be smaller than 5MB.");
 
         setUploading(true);
         const reader = new FileReader();
@@ -1068,6 +1067,25 @@ export const TeacherProfilePage = ({ user, onUpdateUser }: { user: User, onUpdat
         reader.readAsDataURL(file);
     };
 
+    const handleRemovePicture = async () => {
+        if(!confirm("Remove your profile picture?")) return;
+        setUploading(true);
+        try {
+            const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id);
+            if (error) throw error;
+            
+            // Revert to generated UI avatar locally
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
+            if (onUpdateUser) onUpdateUser({ avatar: defaultAvatar });
+            alert("Profile picture removed.");
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to remove picture: " + err.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
     return (
         <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
              <div className="relative bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -1085,7 +1103,16 @@ export const TeacherProfilePage = ({ user, onUpdateUser }: { user: User, onUpdat
                              <h1 className="text-2xl font-bold text-slate-800">{user.name}</h1>
                              <p className="text-gray-500 font-mono text-sm">{user.email}</p>
                          </div>
-                         <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold hover:bg-gray-50">Edit Profile</button>
+                         <div className="flex gap-2">
+                             {!user.avatar.includes('ui-avatars') && (
+                                 <button onClick={handleRemovePicture} className="px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-sm font-bold flex items-center gap-2">
+                                     <Trash2 className="w-4 h-4"/> Remove Pic
+                                 </button>
+                             )}
+                             <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold hover:bg-gray-50 flex items-center gap-2">
+                                 <Edit2 className="w-4 h-4"/> Edit Profile
+                             </button>
+                         </div>
                      </div>
                  </div>
              </div>

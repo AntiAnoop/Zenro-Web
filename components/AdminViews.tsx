@@ -401,7 +401,7 @@ export const AdminUserManagement = () => {
       if (!file) return;
 
       if (!file.type.startsWith('image/')) return alert("Only images allowed");
-      if (file.size > 200 * 1024) return alert("Max size 200KB");
+      if (file.size > 5 * 1024 * 1024) return alert("Max size 5MB");
 
       const reader = new FileReader();
       reader.onload = (ev) => {
@@ -410,6 +410,12 @@ export const AdminUserManagement = () => {
           setFormData({ ...formData, avatar_url: base64 });
       };
       reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+      if(!confirm("Remove custom profile picture? This cannot be undone.")) return;
+      setAvatarPreview(null);
+      setFormData({ ...formData, avatar_url: '' }); 
   };
 
   const handleSaveUser = async (e: React.FormEvent) => {
@@ -429,28 +435,27 @@ export const AdminUserManagement = () => {
       student_id: formData.student_id.trim() || null, 
       batch: formData.batch.trim(),
       phone: formData.phone.trim(),
-      id: editingUser ? editingUser.id : generateUUID() 
+      id: editingUser ? editingUser.id : generateUUID(),
+      // Robust handling: send NULL if empty string to clear the DB field, or send base64
+      avatar_url: formData.avatar_url || null 
     };
 
     if (formData.password) {
       payload.password = formData.password;
-    }
-    
-    if (formData.avatar_url) {
-        payload.avatar_url = formData.avatar_url;
     }
 
     try {
       if (editingUser) {
         const { error } = await supabase.from('profiles').update(payload).eq('id', editingUser.id);
         if (error) throw error;
-        setSuccessMsg("User updated successfully.");
+        setSuccessMsg("User updated successfully. Changes are now live.");
       } else {
         const { error } = await supabase.from('profiles').insert([payload]);
         if (error) throw error;
-        setSuccessMsg("New user created.");
+        setSuccessMsg("New user created successfully.");
       }
       setIsModalOpen(false);
+      // Immediate fetch ensures the table shows the new avatar instantly
       fetchUsers();
     } catch (err: any) {
       console.error("DB Write Failed:", err);
@@ -510,7 +515,7 @@ export const AdminUserManagement = () => {
         batch: user.batch || '',
         password: '',
         phone: user.phone || '',
-        avatar_url: user.avatar
+        avatar_url: user.avatar // Keep current to show if not changed
       });
     } else {
       setEditingUser(null);
@@ -588,7 +593,7 @@ export const AdminUserManagement = () => {
              <tbody className="divide-y divide-gray-100">
                {loading ? <tr><td colSpan={5} className="p-12 text-center"><Loader2 className="w-8 h-8 text-zenro-blue animate-spin mx-auto mb-2" /><p>Connecting to Database...</p></td></tr> : filteredUsers.length === 0 ? <tr><td colSpan={5} className="p-12 text-center text-gray-500">No users found. Click "Add New User" to get started.</td></tr> : filteredUsers.map(user => (
                  <tr key={user.id} className="hover:bg-gray-50 transition group">
-                   <td className="px-6 py-4"><div className="flex items-center gap-3"><img src={user.avatar} alt="" className="w-10 h-10 rounded-full bg-white border border-gray-200" /><div><p className="text-slate-800 font-bold">{user.name}</p><p className="text-xs text-gray-500">{user.email}</p></div></div></td>
+                   <td className="px-6 py-4"><div className="flex items-center gap-3"><img src={user.avatar} alt="" className="w-10 h-10 rounded-full bg-white border border-gray-200 object-cover" /><div><p className="text-slate-800 font-bold">{user.name}</p><p className="text-xs text-gray-500">{user.email}</p></div></div></td>
                    <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${user.role === UserRole.ADMIN ? 'bg-red-100 text-red-700 border border-red-200' : user.role === UserRole.TEACHER ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>{user.role}</span></td>
                    <td className="px-6 py-4 font-mono text-xs font-medium">{user.phone || 'N/A'}</td>
                    <td className="px-6 py-4">{user.batch ? <div className="flex flex-col gap-1 items-start"><span className="bg-gray-100 px-2 py-1 rounded border border-gray-200 text-xs text-slate-600 font-bold">{user.batch}</span><span className="text-[10px] text-gray-400 font-mono">{user.rollNumber}</span></div> : <span className="text-gray-400">-</span>}</td>
@@ -610,14 +615,24 @@ export const AdminUserManagement = () => {
                 <form onSubmit={handleSaveUser} className="p-6 space-y-4 overflow-y-auto">
                     {errorMsg && <div className="bg-red-50 border border-red-100 p-3 rounded text-red-600 text-xs mb-4 font-bold">{errorMsg}</div>}
                     
-                    <div className="flex items-center justify-center mb-6">
+                    <div className="flex flex-col items-center justify-center mb-6">
                         <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                            <img src={avatarPreview || `https://ui-avatars.com/api/?name=${formData.full_name || 'New User'}&background=random`} className="w-24 h-24 rounded-full border-4 border-gray-100 object-cover shadow-sm" alt="Avatar" />
+                            <img src={avatarPreview || `https://ui-avatars.com/api/?name=${formData.full_name || 'New User'}&background=random`} className="w-24 h-24 rounded-full border-4 border-gray-100 object-cover shadow-sm bg-white" alt="Avatar" />
                             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
                                 <Camera className="w-8 h-8" />
                             </div>
                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                         </div>
+                        {avatarPreview && !avatarPreview.includes('ui-avatars') && (
+                            <button 
+                                type="button" 
+                                onClick={handleRemoveImage}
+                                className="mt-2 text-xs text-red-500 font-bold hover:underline flex items-center gap-1"
+                            >
+                                <Trash2 className="w-3 h-3" /> Remove Picture
+                            </button>
+                        )}
+                        <p className="text-xs text-gray-400 mt-2">Max 5MB. Formats: JPG, PNG.</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -654,7 +669,7 @@ export const AdminUserManagement = () => {
                     )}
                     <div className="pt-6 flex justify-end gap-3">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100">Cancel</button>
-                        <button type="submit" disabled={isSubmitting} className="bg-zenro-red text-white px-6 py-2 rounded font-bold">{isSubmitting ? 'Saving...' : 'Save'}</button>
+                        <button type="submit" disabled={isSubmitting} className="bg-zenro-red text-white px-6 py-2 rounded font-bold">{isSubmitting ? 'Saving...' : 'Save & Update'}</button>
                     </div>
                 </form>
             </div>
