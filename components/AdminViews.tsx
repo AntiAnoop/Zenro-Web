@@ -24,22 +24,22 @@ const formatCurrency = (amount: number) => {
 const AdminHeader = ({ title, action }: { title: string, action?: React.ReactNode }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
     <div>
-      <h1 className="text-3xl font-heading font-bold text-slate-800">{title}</h1>
+      <h1 className="text-2xl md:text-3xl font-heading font-bold text-slate-800">{title}</h1>
       <p className="text-gray-500 text-sm mt-1">Super User Control Panel</p>
     </div>
-    {action}
+    <div className="w-full md:w-auto">{action}</div>
   </div>
 );
 
 const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: (s: string) => void, placeholder: string }) => (
-  <div className="relative">
+  <div className="relative w-full md:w-auto">
     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
     <input 
       type="text" 
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="bg-white border border-gray-300 text-slate-800 pl-10 pr-4 py-2 rounded-lg text-sm focus:ring-2 focus:ring-zenro-blue focus:outline-none w-64 transition shadow-sm"
+      className="bg-white border border-gray-300 text-slate-800 pl-10 pr-4 py-2 rounded-lg text-sm focus:ring-2 focus:ring-zenro-blue focus:outline-none w-full md:w-64 transition shadow-sm"
     />
   </div>
 );
@@ -81,25 +81,25 @@ const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void 
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex justify-end animate-fade-in">
-            <div className="w-full max-w-4xl bg-white h-full border-l border-gray-200 shadow-2xl overflow-y-auto flex flex-col">
+            <div className="w-full md:max-w-4xl bg-white h-full border-l border-gray-200 shadow-2xl overflow-y-auto flex flex-col">
                 <div className="p-6 bg-gradient-to-r from-zenro-blue to-slate-900 border-b border-gray-200 flex justify-between items-start sticky top-0 z-10">
                     <div className="flex items-center gap-4">
                          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-white"><ArrowLeft className="w-6 h-6" /></button>
                          <div className="flex items-center gap-4">
-                             <img src={user.avatar} alt="" className="w-16 h-16 rounded-full border-4 border-white shadow-lg bg-white" />
+                             <img src={user.avatar} alt="" className="w-12 h-12 md:w-16 md:h-16 rounded-full border-4 border-white shadow-lg bg-white object-cover" />
                              <div>
-                                 <h2 className="text-2xl font-bold text-white">{user.name}</h2>
-                                 <p className="text-blue-200 text-sm flex items-center gap-2">
-                                     <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold border border-white/30 uppercase text-white">{user.role}</span>
-                                     <span>•</span><span>{user.email}</span>
+                                 <h2 className="text-xl md:text-2xl font-bold text-white">{user.name}</h2>
+                                 <p className="text-blue-200 text-sm flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                                     <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold border border-white/30 uppercase text-white w-fit">{user.role}</span>
+                                     <span className="hidden md:inline">•</span><span>{user.email}</span>
                                  </p>
                              </div>
                          </div>
                     </div>
                 </div>
-                <div className="p-8 space-y-6">
+                <div className="p-4 md:p-8 space-y-6">
                     {loading ? <div className="text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-zenro-blue"/></div> : (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <InfoRow label="Total Fees" value={formatCurrency(stats.totalFees)} icon={DollarSign} />
                             <InfoRow label="Pending" value={formatCurrency(stats.pendingFees)} icon={AlertTriangle} />
                             <InfoRow label="Tests Taken" value={stats.testsTaken} icon={FileText} />
@@ -185,7 +185,7 @@ export const AdminTeacherAnalytics = () => {
                                 <tr>
                                     <th className="p-4">Teacher</th>
                                     <th className="p-4">Batch</th>
-                                    <th className="p-4">Date</th>
+                                    <th className="hidden md:table-cell p-4">Date</th>
                                     <th className="p-4">Duration</th>
                                 </tr>
                             </thead>
@@ -198,7 +198,7 @@ export const AdminTeacherAnalytics = () => {
                                         <tr key={log.id} className="hover:bg-gray-50">
                                             <td className="p-4 font-bold text-slate-800">{log.teacher_name}</td>
                                             <td className="p-4">{log.batch_name}</td>
-                                            <td className="p-4">{new Date(log.start_time).toLocaleDateString()}</td>
+                                            <td className="hidden md:table-cell p-4">{new Date(log.start_time).toLocaleDateString()}</td>
                                             <td className="p-4 font-mono">{duration}</td>
                                         </tr>
                                     );
@@ -244,29 +244,50 @@ export const AdminScheduleView = () => {
                     <h3 className="font-bold text-slate-800">Global Class Schedule</h3>
                     <span className="text-xs text-gray-500 font-bold bg-white border px-2 py-1 rounded">Next 30 Days</span>
                 </div>
-                <table className="w-full text-left text-sm text-gray-600">
-                    <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs">
-                        <tr>
-                            <th className="p-4">Date & Time</th>
-                            <th className="p-4">Class / Topic</th>
-                            <th className="p-4">Batch</th>
-                            <th className="p-4">Instructor</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {schedules.map(sched => (
-                            <tr key={sched.id} className="hover:bg-gray-50">
-                                <td className="p-4">
-                                    <div className="font-bold text-slate-800">{new Date(sched.start_time).toLocaleDateString()}</div>
-                                    <div className="text-xs text-gray-500">{new Date(sched.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
-                                </td>
-                                <td className="p-4 font-medium">{sched.title}</td>
-                                <td className="p-4"><span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold">{sched.batch_name}</span></td>
-                                <td className="p-4">{sched.teacher_name}</td>
+                
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                    <table className="w-full text-left text-sm text-gray-600">
+                        <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs">
+                            <tr>
+                                <th className="p-4">Date & Time</th>
+                                <th className="p-4">Class / Topic</th>
+                                <th className="p-4">Batch</th>
+                                <th className="p-4">Instructor</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {schedules.map(sched => (
+                                <tr key={sched.id} className="hover:bg-gray-50">
+                                    <td className="p-4">
+                                        <div className="font-bold text-slate-800">{new Date(sched.start_time).toLocaleDateString()}</div>
+                                        <div className="text-xs text-gray-500">{new Date(sched.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+                                    </td>
+                                    <td className="p-4 font-medium">{sched.title}</td>
+                                    <td className="p-4"><span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold">{sched.batch_name}</span></td>
+                                    <td className="p-4">{sched.teacher_name}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Mobile View - Cards */}
+                <div className="md:hidden">
+                    {schedules.map(sched => (
+                        <div key={sched.id} className="p-4 border-b border-gray-100">
+                            <div className="flex justify-between mb-2">
+                                <div className="font-bold text-slate-800">{sched.title}</div>
+                                <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold h-fit">{sched.batch_name}</span>
+                            </div>
+                            <div className="text-sm text-gray-500 flex items-center gap-4 mb-1">
+                                <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/> {new Date(sched.start_time).toLocaleDateString()}</span>
+                                <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(sched.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            <div className="text-xs text-gray-400 font-bold">Instructor: {sched.teacher_name}</div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -436,7 +457,6 @@ export const AdminUserManagement = () => {
       batch: formData.batch.trim(),
       phone: formData.phone.trim(),
       id: editingUser ? editingUser.id : generateUUID(),
-      // Robust handling: send NULL if empty string to clear the DB field, or send base64
       avatar_url: formData.avatar_url || null 
     };
 
@@ -455,7 +475,6 @@ export const AdminUserManagement = () => {
         setSuccessMsg("New user created successfully.");
       }
       setIsModalOpen(false);
-      // Immediate fetch ensures the table shows the new avatar instantly
       fetchUsers();
     } catch (err: any) {
       console.error("DB Write Failed:", err);
@@ -552,7 +571,7 @@ export const AdminUserManagement = () => {
         action={
           <button 
             onClick={() => handleOpenModal()}
-            className="bg-zenro-red hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition"
+            className="w-full md:w-auto bg-zenro-red hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg transition"
           >
             <Plus className="w-5 h-5" /> Add New User
           </button>
@@ -563,10 +582,10 @@ export const AdminUserManagement = () => {
       {errorMsg && <div className="bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in-up shadow-sm"><XCircle className="w-5 h-5" /> {errorMsg}</div>}
 
       <div className="bg-white p-4 rounded-xl border border-gray-200 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-         <div className="flex items-center gap-4 w-full md:w-auto">
+         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
              <SearchBar value={filter} onChange={setFilter} placeholder="Search users..." />
-             <div className="relative">
-                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as UserRole | 'ALL')} className="appearance-none bg-white border border-gray-300 text-slate-800 pl-4 pr-10 py-2 rounded-lg text-sm focus:ring-2 focus:ring-zenro-blue outline-none cursor-pointer">
+             <div className="relative w-full md:w-auto">
+                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as UserRole | 'ALL')} className="appearance-none w-full bg-white border border-gray-300 text-slate-800 pl-4 pr-10 py-2 rounded-lg text-sm focus:ring-2 focus:ring-zenro-blue outline-none cursor-pointer">
                   <option value="ALL">All Roles</option>
                   <option value={UserRole.STUDENT}>Students</option>
                   <option value={UserRole.TEACHER}>Teachers</option>
@@ -579,7 +598,35 @@ export const AdminUserManagement = () => {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-md min-h-[400px]">
-         <div className="overflow-x-auto">
+         {/* MOBILE CARD VIEW */}
+         <div className="md:hidden">
+             {loading ? <div className="p-12 text-center"><Loader2 className="w-8 h-8 text-zenro-blue animate-spin mx-auto mb-2" /><p>Connecting to Database...</p></div> : filteredUsers.length === 0 ? <div className="p-12 text-center text-gray-500">No users found.</div> : filteredUsers.map(user => (
+                 <div key={user.id} className="p-4 border-b border-gray-100 flex items-start gap-4">
+                     <img src={user.avatar} alt="" className="w-12 h-12 rounded-full border border-gray-200 object-cover" />
+                     <div className="flex-1">
+                         <div className="flex justify-between items-start">
+                             <div>
+                                 <p className="font-bold text-slate-800">{user.name}</p>
+                                 <p className="text-xs text-gray-500">{user.email}</p>
+                             </div>
+                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === UserRole.ADMIN ? 'bg-red-100 text-red-700' : user.role === UserRole.TEACHER ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{user.role}</span>
+                         </div>
+                         <div className="mt-2 flex gap-4 text-xs text-gray-600">
+                             {user.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" /> {user.phone}</div>}
+                             {user.batch && <div className="bg-gray-100 px-2 rounded font-bold">{user.batch}</div>}
+                         </div>
+                         <div className="mt-3 flex justify-end gap-2">
+                             <button onClick={() => setViewingUser(user)} className="p-2 bg-gray-50 rounded border border-gray-200 text-zenro-blue"><Eye className="w-4 h-4" /></button>
+                             <button onClick={() => handleOpenModal(user)} className="p-2 bg-gray-50 rounded border border-gray-200 text-slate-600"><Edit2 className="w-4 h-4" /></button>
+                             <button onClick={() => initiateDelete(user)} className="p-2 bg-red-50 rounded border border-red-100 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                         </div>
+                     </div>
+                 </div>
+             ))}
+         </div>
+
+         {/* DESKTOP TABLE VIEW */}
+         <div className="hidden md:block overflow-x-auto">
            <table className="w-full text-left text-sm text-gray-600">
              <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs">
                <tr>
@@ -606,9 +653,9 @@ export const AdminUserManagement = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white w-full max-w-2xl rounded-2xl border border-gray-200 shadow-2xl overflow-visible max-h-[90vh] flex flex-col">
-                <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4 animate-fade-in">
+            <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-2xl border border-gray-200 shadow-2xl overflow-visible max-h-none md:max-h-[90vh] flex flex-col">
+                <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50 md:rounded-t-2xl">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">{editingUser ? <Edit2 className="w-5 h-5 text-zenro-blue" /> : <Plus className="w-5 h-5 text-green-600" />}{editingUser ? 'Edit User Profile' : 'Create New Profile'}</h2>
                     <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
                 </div>
@@ -635,17 +682,17 @@ export const AdminUserManagement = () => {
                         <p className="text-xs text-gray-400 mt-2">Max 5MB. Formats: JPG, PNG.</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name *</label><input required type="text" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm" placeholder="John Doe" /></div>
                         <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role *</label><select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm"><option value="STUDENT">Student</option><option value="TEACHER">Teacher</option><option value="ADMIN">Admin</option></select></div>
                     </div>
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email *</label><input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm" placeholder="email@example.com" /></div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone *</label><input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm" /></div>
                         <div><label className="block text-xs font-bold text-zenro-blue uppercase mb-1">Password *</label><input type="text" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm font-mono" placeholder="Min 8 chars" /></div>
                     </div>
                     {formData.role === 'STUDENT' && (
-                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200 mt-4">
                             <div className="relative" ref={batchDropdownRef}>
                                 <label className="block text-xs font-bold text-zenro-blue uppercase mb-1">Batch Assignment</label>
                                 <div className="relative">
@@ -667,7 +714,7 @@ export const AdminUserManagement = () => {
                             <div><label className="block text-xs font-bold text-zenro-blue uppercase mb-1">Student ID *</label><input type="text" value={formData.student_id} onChange={e => setFormData({...formData, student_id: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm" /></div>
                         </div>
                     )}
-                    <div className="pt-6 flex justify-end gap-3">
+                    <div className="pt-6 flex justify-end gap-3 pb-safe">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100">Cancel</button>
                         <button type="submit" disabled={isSubmitting} className="bg-zenro-red text-white px-6 py-2 rounded font-bold">{isSubmitting ? 'Saving...' : 'Save & Update'}</button>
                     </div>
@@ -762,28 +809,47 @@ export const AdminFinancials = () => {
                  <div className="p-6 border-b border-gray-200 bg-gray-50">
                      <h3 className="font-bold text-slate-800">Recent Transactions</h3>
                  </div>
-                 <table className="w-full text-left text-sm text-gray-600">
-                     <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs">
-                         <tr>
-                             <th className="p-4">Date</th>
-                             <th className="p-4">Student</th>
-                             <th className="p-4">Description</th>
-                             <th className="p-4">Amount</th>
-                             <th className="p-4">Status</th>
-                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                         {loading ? <tr><td colSpan={5} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto"/></td></tr> : transactions.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-gray-500">No transactions found.</td></tr> : transactions.map(t => (
-                             <tr key={t.id} className="hover:bg-gray-50">
-                                 <td className="p-4 font-mono text-xs">{new Date(t.date).toLocaleDateString()}</td>
-                                 <td className="p-4 font-bold text-slate-800">{t.student_name}</td>
-                                 <td className="p-4">{t.title}</td>
-                                 <td className="p-4 font-mono font-bold">{formatCurrency(t.amount)}</td>
-                                 <td className="p-4"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{t.status}</span></td>
-                             </tr>
-                         ))}
-                     </tbody>
-                 </table>
+                 {/* Desktop Table */}
+                 <div className="hidden md:block">
+                    <table className="w-full text-left text-sm text-gray-600">
+                        <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs">
+                            <tr>
+                                <th className="p-4">Date</th>
+                                <th className="p-4">Student</th>
+                                <th className="p-4">Description</th>
+                                <th className="p-4">Amount</th>
+                                <th className="p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {loading ? <tr><td colSpan={5} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto"/></td></tr> : transactions.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-gray-500">No transactions found.</td></tr> : transactions.map(t => (
+                                <tr key={t.id} className="hover:bg-gray-50">
+                                    <td className="p-4 font-mono text-xs">{new Date(t.date).toLocaleDateString()}</td>
+                                    <td className="p-4 font-bold text-slate-800">{t.student_name}</td>
+                                    <td className="p-4">{t.title}</td>
+                                    <td className="p-4 font-mono font-bold">{formatCurrency(t.amount)}</td>
+                                    <td className="p-4"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{t.status}</span></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                 </div>
+                 {/* Mobile Cards */}
+                 <div className="md:hidden">
+                     {transactions.map(t => (
+                         <div key={t.id} className="p-4 border-b border-gray-100">
+                             <div className="flex justify-between items-start mb-1">
+                                 <div className="font-bold text-slate-800">{t.student_name}</div>
+                                 <div className="font-mono font-bold text-slate-800">{formatCurrency(t.amount)}</div>
+                             </div>
+                             <div className="text-sm text-gray-500 mb-2">{t.title}</div>
+                             <div className="flex justify-between items-center text-xs">
+                                 <span className="text-gray-400">{new Date(t.date).toLocaleDateString()}</span>
+                                 <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-bold">{t.status}</span>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
              </div>
         </div>
     );

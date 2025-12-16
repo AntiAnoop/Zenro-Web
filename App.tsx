@@ -145,7 +145,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-[600px]">
         
         {/* Left Side - Brand Visual */}
-        <div className="md:w-1/2 bg-zenro-blue relative p-12 flex flex-col justify-between">
+        <div className="hidden md:flex md:w-1/2 bg-zenro-blue relative p-12 flex-col justify-between">
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528360983277-13d9012356ee?auto=format&fit=crop&q=80&w=1000')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
             <div className="relative z-10 text-white">
                 <div className="flex items-center gap-3 mb-8">
@@ -167,13 +167,16 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="md:w-1/2 p-12 flex flex-col justify-center bg-white">
+        <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white relative">
+            <div className="md:hidden flex justify-center mb-8">
+                 <ZenroLogo className="w-16 h-16" />
+            </div>
             <div className="max-w-sm mx-auto w-full">
-                <h3 className="text-2xl font-heading font-bold text-zenro-slate mb-2">Welcome Back</h3>
-                <p className="text-gray-500 mb-8">Please enter your credentials to access the portal.</p>
+                <h3 className="text-2xl font-heading font-bold text-zenro-slate mb-2 text-center md:text-left">Welcome Back</h3>
+                <p className="text-gray-500 mb-8 text-center md:text-left">Please enter your credentials.</p>
 
                 {/* Quick Login Demo Buttons */}
-                <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
+                <div className="flex flex-col sm:flex-row gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
                     <button onClick={() => loginAs('8888888888')} className="flex-1 py-2 text-xs font-bold text-gray-500 hover:text-zenro-blue hover:bg-white shadow-sm rounded transition flex items-center justify-center gap-2">
                         Teacher
                     </button>
@@ -243,20 +246,20 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
   return (
     <>
       <div 
-        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300 backdrop-blur-sm ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
         aria-hidden="true"
       />
 
       <div className={`
         w-64 bg-zenro-blue flex flex-col h-screen 
-        fixed left-0 top-0 z-50 font-sans shadow-xl transition-transform duration-300 ease-out
+        fixed left-0 top-0 z-50 font-sans shadow-2xl transition-transform duration-300 ease-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
       `}>
         {/* Mobile Close Button */}
         <button 
             onClick={onClose} 
-            className="absolute top-4 right-4 p-2 text-blue-200 hover:text-white lg:hidden z-10"
+            className="absolute top-4 right-4 p-2 text-blue-200 hover:text-white lg:hidden z-10 hover:bg-white/10 rounded-full"
         >
             <X className="w-5 h-5" />
         </button>
@@ -398,7 +401,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode, onUpdateUser }: any) =>
 
   return (
     <div className="flex h-screen bg-zenro-gray text-zenro-slate font-sans selection:bg-zenro-red selection:text-white overflow-hidden">
-       {/* Mobile Header */}
+       {/* Mobile Header - Sticky */}
        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-40 flex items-center justify-between px-4 shadow-sm">
           <button 
             onClick={() => setSidebarOpen(true)} 
@@ -430,7 +433,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode, onUpdateUser }: any) =>
          onClose={() => setSidebarOpen(false)} 
        />
        
-       {/* Main Content Area - White/Light Gray BG */}
+       {/* Main Content Area - Optimized Padding for Mobile */}
        <main className="flex-1 overflow-auto p-4 lg:p-8 pt-20 lg:pt-8 relative scroll-smooth lg:ml-64 w-full bg-zenro-gray">
           <div className="max-w-7xl mx-auto">
                 <Routes>
