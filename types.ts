@@ -126,6 +126,8 @@ export interface Schedule {
   title: string;
   start_time: string;
   end_time: string;
+  series_id?: string; // Links recurring events
+  recurrence_rule?: any; // JSON config for recurrence
 }
 
 export interface LiveSessionRecord {

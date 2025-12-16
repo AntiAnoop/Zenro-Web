@@ -212,6 +212,8 @@ CREATE TABLE schedules (
   title text NOT NULL,
   start_time timestamptz NOT NULL,
   end_time timestamptz NOT NULL,
+  series_id text, -- Groups recurring events together
+  recurrence_rule jsonb, -- Stores the rule config {freq: 'WEEKLY', days: [1,3], end: '2024-12-31'}
   created_at timestamptz DEFAULT now()
 );
 

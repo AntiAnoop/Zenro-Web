@@ -4,7 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation, useNa
 import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2, Menu, X, FileCheck, Calendar } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
-import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer } from './components/StudentViews';
+import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer, StudentSchedulePage } from './components/StudentViews';
 import { StudentTestPlayer } from './components/StudentTestPlayer';
 import { TestReport } from './components/TestReport';
 import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage, TeacherSchedulePage, CourseContentManager, TeacherProfilePage } from './components/TeacherViews';
@@ -282,6 +282,9 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
               <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/dashboard')}`}>
                 <Layout className="w-4 h-4" /> Overview
               </Link>
+              <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/schedule')}`}>
+                <Calendar className="w-4 h-4" /> Class Schedule
+              </Link>
               <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm ${isActive('/student/courses')}`}>
                 <Book className="w-4 h-4" /> Curriculum
               </Link>
@@ -444,6 +447,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode, onUpdateUser }: any) =>
                 
                 {/* Student Routes */}
                 <Route path="/student/dashboard" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentDashboardHome /></ProtectedRoute>} />
+                <Route path="/student/schedule" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentSchedulePage /></ProtectedRoute>} />
                 <Route path="/student/courses" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursesPage /></ProtectedRoute>} />
                 <Route path="/student/course/:courseId" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursePlayer /></ProtectedRoute>} />
                 <Route path="/student/live" element={<ProtectedRoute user={user} allowedRoles={[UserRole.STUDENT]}><StudentLiveRoom user={user} /></ProtectedRoute>} />
