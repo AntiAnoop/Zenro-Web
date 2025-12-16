@@ -4,7 +4,7 @@ import {
   Users, BookOpen, DollarSign, TrendingUp, Search, 
   Filter, MoreVertical, Edit2, Trash2, Plus, Download, 
   CheckCircle, XCircle, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Save, RefreshCw, Key, WifiOff, Loader2,
-  Layers, Check, Eye, CreditCard, FileText, Calendar, Clock, ArrowLeft, Briefcase, GraduationCap, MapPin, Phone, Mail, Radio, Activity, Camera
+  Layers, Check, Eye, CreditCard, FileText, Calendar, Clock, ArrowLeft, Briefcase, GraduationCap, MapPin, Phone, Mail, Radio, Activity, Camera, ChevronLeft, ChevronRight, Repeat
 } from 'lucide-react';
 import { User, UserRole, Schedule, LiveSessionRecord } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -114,7 +114,6 @@ const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void 
 
 // --- ADMIN TEACHER ANALYTICS & MONITOR ---
 export const AdminTeacherAnalytics = () => {
-    // ... (Keep existing logic unchanged)
     const [stats, setStats] = useState<any[]>([]);
     const [logs, setLogs] = useState<LiveSessionRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -215,80 +214,270 @@ export const AdminTeacherAnalytics = () => {
 
 // --- ADMIN SCHEDULE VIEW ---
 export const AdminScheduleView = () => {
-    // ... (Keep existing logic unchanged)
-    const [schedules, setSchedules] = useState<Schedule[]>([]);
+    const [events, setEvents] = useState<Schedule[]>([]);
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingEvent, setEditingEvent] = useState<Schedule | null>(null);
     const [loading, setLoading] = useState(true);
+    const [filterTeacher, setFilterTeacher] = useState('ALL');
+    const [teachers, setTeachers] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetch = async () => {
-            const { data } = await supabase
-                .from('schedules')
-                .select('*, profiles(full_name)')
-                .order('start_time', { ascending: true });
-            
-            if (data) {
-                const mapped: Schedule[] = data.map((s:any) => ({
-                    ...s,
-                    teacher_name: s.profiles?.full_name
-                }));
-                setSchedules(mapped);
-            }
-            setLoading(false);
-        };
-        fetch();
+        fetchTeachers();
     }, []);
 
+    useEffect(() => {
+        fetchSchedule();
+    }, [currentMonth, filterTeacher]);
+
+    const fetchTeachers = async () => {
+        const { data } = await supabase.from('profiles').select('id, full_name').eq('role', 'TEACHER');
+        if (data) setTeachers(data);
+    };
+
+    const fetchSchedule = async () => {
+        setLoading(true);
+        const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+        const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+        
+        let query = supabase.from('schedules')
+            .select('*, profiles(full_name)')
+            .gte('start_time', startOfMonth.toISOString())
+            .lte('start_time', endOfMonth.toISOString());
+        
+        if (filterTeacher !== 'ALL') {
+            query = query.eq('teacher_id', filterTeacher);
+        }
+
+        const { data } = await query;
+        if (data) setEvents(data.map((s:any) => ({...s, teacher_name: s.profiles?.full_name})));
+        setLoading(false);
+    };
+
+    const handleDelete = async (id: string) => {
+        if(!confirm("Cancel this live class?")) return;
+        await supabase.from('schedules').delete().eq('id', id);
+        fetchSchedule();
+        setIsModalOpen(false);
+    };
+
+    const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+
+    // Calendar Grid Logic
+    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay(); // 0 = Sun
+    const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const paddingDays = Array.from({ length: firstDay }, (_, i) => i);
+
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-6 animate-fade-in">
             <AdminHeader title="Master Schedule" />
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800">Global Class Schedule</h3>
-                    <span className="text-xs text-gray-500 font-bold bg-white border px-2 py-1 rounded">Next 30 Days</span>
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg border border-gray-200 px-2 py-1">
+                        <button onClick={prevMonth} className="p-2 hover:bg-gray-200 rounded text-gray-600"><ChevronLeft className="w-5 h-5"/></button>
+                        <span className="font-bold text-slate-800 w-32 text-center">{currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
+                        <button onClick={nextMonth} className="p-2 hover:bg-gray-200 rounded text-gray-600"><ChevronRight className="w-5 h-5"/></button>
+                    </div>
+                    <select value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)} className="bg-white border border-gray-300 text-slate-800 rounded px-3 py-2 text-sm outline-none">
+                        <option value="ALL">All Teachers</option>
+                        {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                    </select>
+                </div>
+                <button onClick={() => { setEditingEvent(null); setIsModalOpen(true); }} className="bg-zenro-blue text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-blue-800">
+                    <Plus className="w-5 h-5" /> Schedule Class
+                </button>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="p-4 text-center font-bold text-gray-500 text-xs uppercase tracking-widest">{day}</div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-7 auto-rows-[120px]">
+                    {paddingDays.map(i => <div key={`pad-${i}`} className="bg-gray-50/30 border-b border-r border-gray-100"></div>)}
+                    {daysArray.map(day => {
+                        const dateStr = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toDateString();
+                        const dayEvents = events.filter(e => new Date(e.start_time).toDateString() === dateStr);
+                        return (
+                            <div key={day} className="border-b border-r border-gray-100 p-2 relative group hover:bg-gray-50 transition">
+                                <span className={`text-sm font-bold ${new Date().toDateString() === dateStr ? 'bg-zenro-red text-white w-6 h-6 flex items-center justify-center rounded-full' : 'text-gray-700'}`}>{day}</span>
+                                <div className="mt-2 space-y-1 overflow-y-auto max-h-[80px]">
+                                    {dayEvents.map(ev => (
+                                        <div 
+                                            key={ev.id}
+                                            onClick={() => { setEditingEvent(ev); setIsModalOpen(true); }}
+                                            className="bg-blue-50 border-l-2 border-zenro-blue p-1 rounded text-[10px] cursor-pointer hover:bg-blue-100 truncate"
+                                            title={`${ev.teacher_name} - ${ev.batch_name}`}
+                                        >
+                                            <span className="font-bold text-blue-800">{new Date(ev.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span> {ev.teacher_name?.split(' ')[0]}: {ev.title}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {isModalOpen && <AdminScheduleModal 
+                initialData={editingEvent} 
+                onClose={() => setIsModalOpen(false)} 
+                onRefresh={fetchSchedule}
+                teachers={teachers}
+            />}
+        </div>
+    );
+};
+
+const AdminScheduleModal = ({ initialData, onClose, onRefresh, teachers }: any) => {
+    const [title, setTitle] = useState(initialData?.title || '');
+    const [batch, setBatch] = useState(initialData?.batch_name || '');
+    const [teacherId, setTeacherId] = useState(initialData?.teacher_id || '');
+    const [date, setDate] = useState(initialData ? new Date(initialData.start_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    const [time, setTime] = useState(initialData ? new Date(initialData.start_time).toTimeString().substring(0,5) : '10:00');
+    const [duration, setDuration] = useState(60);
+    
+    // Recurring Options
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [recurrenceType, setRecurrenceType] = useState<'DAILY' | 'WEEKLY'>('DAILY');
+    const [recurrenceCount, setRecurrenceCount] = useState(5);
+
+    const [batches, setBatches] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchBatches = async () => {
+            const { data } = await supabase.from('batches').select('name');
+            if (data) setBatches(data.map(b => b.name));
+        };
+        fetchBatches();
+    }, []);
+
+    const handleSave = async () => {
+        if (!title || !batch || !date || !time || !teacherId) return alert("All fields required");
+        setLoading(true);
+
+        const baseStart = new Date(`${date}T${time}`);
+        const baseEnd = new Date(baseStart.getTime() + duration * 60000);
+
+        try {
+            if (initialData) {
+                // Single Update
+                await supabase.from('schedules').update({
+                    title, batch_name: batch, teacher_id: teacherId, start_time: baseStart.toISOString(), end_time: baseEnd.toISOString()
+                }).eq('id', initialData.id);
+            } else {
+                // New Creation (Potential Recurrence)
+                const newEvents = [];
+                const count = isRecurring ? recurrenceCount : 1;
+
+                for (let i = 0; i < count; i++) {
+                    const s = new Date(baseStart);
+                    const e = new Date(baseEnd);
+                    
+                    if (recurrenceType === 'DAILY') {
+                        s.setDate(s.getDate() + i);
+                        e.setDate(e.getDate() + i);
+                    } else if (recurrenceType === 'WEEKLY') {
+                        s.setDate(s.getDate() + (i * 7));
+                        e.setDate(e.getDate() + (i * 7));
+                    }
+
+                    newEvents.push({
+                        title, 
+                        batch_name: batch, 
+                        teacher_id: teacherId, 
+                        start_time: s.toISOString(),
+                        end_time: e.toISOString()
+                    });
+                }
+                
+                await supabase.from('schedules').insert(newEvents);
+            }
+            onRefresh();
+            onClose();
+        } catch (e) { console.error(e); alert("Error saving schedule"); }
+        finally { setLoading(false); }
+    };
+
+    const deleteEvent = async () => {
+        if(!confirm("Delete this event?")) return;
+        await supabase.from('schedules').delete().eq('id', initialData.id);
+        onRefresh();
+        onClose();
+    }
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold text-slate-800">{initialData ? 'Edit Class (Admin)' : 'Schedule Class (Admin)'}</h2>
+                    <button onClick={onClose}><X className="w-6 h-6 text-gray-400" /></button>
                 </div>
                 
-                {/* Desktop View */}
-                <div className="hidden md:block">
-                    <table className="w-full text-left text-sm text-gray-600">
-                        <thead className="bg-gray-100 text-slate-700 uppercase font-bold text-xs">
-                            <tr>
-                                <th className="p-4">Date & Time</th>
-                                <th className="p-4">Class / Topic</th>
-                                <th className="p-4">Batch</th>
-                                <th className="p-4">Instructor</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {schedules.map(sched => (
-                                <tr key={sched.id} className="hover:bg-gray-50">
-                                    <td className="p-4">
-                                        <div className="font-bold text-slate-800">{new Date(sched.start_time).toLocaleDateString()}</div>
-                                        <div className="text-xs text-gray-500">{new Date(sched.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
-                                    </td>
-                                    <td className="p-4 font-medium">{sched.title}</td>
-                                    <td className="p-4"><span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold">{sched.batch_name}</span></td>
-                                    <td className="p-4">{sched.teacher_name}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Teacher</label>
+                        <select className="w-full border p-2 rounded" value={teacherId} onChange={e => setTeacherId(e.target.value)}>
+                            <option value="">Select Instructor</option>
+                            {teachers.map((t:any) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Class Title</label>
+                        <input className="w-full border p-2 rounded" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Kanji Chapter 5" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Target Batch</label>
+                        <select className="w-full border p-2 rounded" value={batch} onChange={e => setBatch(e.target.value)}>
+                            <option value="">Select Batch</option>
+                            {batches.map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+                            <input type="date" className="w-full border p-2 rounded" value={date} onChange={e => setDate(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Time</label>
+                            <input type="time" className="w-full border p-2 rounded" value={time} onChange={e => setTime(e.target.value)} />
+                        </div>
+                    </div>
+                    
+                    {!initialData && (
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div className="flex items-center gap-2 mb-3">
+                                <input type="checkbox" id="recur" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} className="w-4 h-4 text-zenro-blue" />
+                                <label htmlFor="recur" className="text-sm font-bold text-slate-700 flex items-center gap-2"><Repeat className="w-4 h-4" /> Recurring Event?</label>
+                            </div>
+                            
+                            {isRecurring && (
+                                <div className="grid grid-cols-2 gap-3 pl-6">
+                                    <select className="border p-2 rounded text-sm" value={recurrenceType} onChange={e => setRecurrenceType(e.target.value as any)}>
+                                        <option value="DAILY">Daily (Consecutive)</option>
+                                        <option value="WEEKLY">Weekly (Same Day)</option>
+                                    </select>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">For</span>
+                                        <input type="number" min="2" max="30" className="w-16 border p-2 rounded text-sm" value={recurrenceCount} onChange={e => setRecurrenceCount(parseInt(e.target.value))} />
+                                        <span className="text-xs text-gray-500">Times</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
-                {/* Mobile View - Cards */}
-                <div className="md:hidden">
-                    {schedules.map(sched => (
-                        <div key={sched.id} className="p-4 border-b border-gray-100">
-                            <div className="flex justify-between mb-2">
-                                <div className="font-bold text-slate-800">{sched.title}</div>
-                                <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold h-fit">{sched.batch_name}</span>
-                            </div>
-                            <div className="text-sm text-gray-500 flex items-center gap-4 mb-1">
-                                <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/> {new Date(sched.start_time).toLocaleDateString()}</span>
-                                <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(sched.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                            </div>
-                            <div className="text-xs text-gray-400 font-bold">Instructor: {sched.teacher_name}</div>
-                        </div>
-                    ))}
+                <div className="pt-6 flex justify-end gap-2">
+                    {initialData && <button onClick={deleteEvent} className="px-4 py-2 text-red-500 font-bold hover:bg-red-50 rounded border border-transparent hover:border-red-100 mr-auto">Delete</button>}
+                    <button onClick={onClose} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button>
+                    <button onClick={handleSave} disabled={loading} className="px-6 py-2 bg-zenro-blue text-white font-bold rounded hover:bg-blue-800 disabled:opacity-50">
+                        {loading ? 'Saving...' : 'Save Schedule'}
+                    </button>
                 </div>
             </div>
         </div>
@@ -338,6 +527,7 @@ export const AdminUserManagement = () => {
     fetchUsers();
     fetchBatches();
     
+    // Subscribe to batch changes to keep dropdown fresh
     const batchSubscription = supabase
       .channel('admin_user_batches')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
