@@ -219,17 +219,36 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
 
     useEffect(() => {
         const loadResources = async () => {
-            // Fetch batches - Always fresh
-            const { data: bData } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
-            if(bData) setAvailableBatches(bData.map(b => b.name));
+            const userData = localStorage.getItem('zenro_session');
+            const user = userData ? JSON.parse(userData) : null;
+            if(!user) return;
+
+            // Fetch ONLY Assigned Batches for this Teacher
+            const { data: bData } = await supabase
+                .from('teacher_batches')
+                .select('batch_name')
+                .eq('teacher_id', user.id);
             
-            // Fetch students
-            const { data: sData } = await supabase.from('profiles').select('*').eq('role', 'STUDENT').order('full_name');
-            if(sData) {
-                const mapped = sData.map((u: any) => ({
-                    id: u.id, name: u.full_name, role: 'STUDENT', email: u.email, avatar: u.avatar_url, batch: u.batch, rollNumber: u.student_id
-                }));
-                setAvailableStudents(mapped);
+            const teacherBatches = bData ? bData.map((b:any) => b.batch_name) : [];
+            setAvailableBatches(teacherBatches);
+            
+            // Fetch students ONLY in those batches
+            if(teacherBatches.length > 0) {
+                const { data: sData } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('role', 'STUDENT')
+                    .in('batch', teacherBatches) // Filter students by assigned batches
+                    .order('full_name');
+                
+                if(sData) {
+                    const mapped = sData.map((u: any) => ({
+                        id: u.id, name: u.full_name, role: 'STUDENT', email: u.email, avatar: u.avatar_url, batch: u.batch, rollNumber: u.student_id
+                    }));
+                    setAvailableStudents(mapped);
+                }
+            } else {
+                setAvailableStudents([]);
             }
 
             if (initialData) {
@@ -328,30 +347,36 @@ export const AssignmentCreationModal = ({ initialData, onClose, onRefresh }: any
                     {step === 2 && (
                         <div className="h-full flex flex-col">
                             <h3 className="text-lg font-bold text-slate-800 mb-4">Access Control</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Batches</div>
-                                    <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
-                                        {availableBatches.map(b => (
-                                            <div key={b} onClick={() => toggleBatch(b)} className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition ${formData.assignedBatches?.includes(b) ? 'bg-red-50 border-zenro-red' : 'bg-white border-gray-200'}`}><span className="text-sm font-bold text-slate-700">{b}</span>{formData.assignedBatches?.includes(b) && <CheckCircle className="w-4 h-4 text-zenro-red" />}</div>
-                                        ))}
+                            {availableBatches.length === 0 ? (
+                                <div className="p-8 text-center text-gray-500 bg-gray-50 rounded border border-gray-200">
+                                    You are not assigned to any batches. Contact Admin.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                        <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Your Batches</div>
+                                        <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
+                                            {availableBatches.map(b => (
+                                                <div key={b} onClick={() => toggleBatch(b)} className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition ${formData.assignedBatches?.includes(b) ? 'bg-red-50 border-zenro-red' : 'bg-white border-gray-200'}`}><span className="text-sm font-bold text-slate-700">{b}</span>{formData.assignedBatches?.includes(b) && <CheckCircle className="w-4 h-4 text-zenro-red" />}</div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                        <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center justify-between"><div className="flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Students in Your Batches</div><input type="text" placeholder="Search..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs text-slate-800 outline-none w-32" /></div>
+                                        <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
+                                            {filteredStudents.map(s => {
+                                                const inBatch = s.batch && formData.assignedBatches?.includes(s.batch);
+                                                const explicitlyAssigned = formData.assignedStudentIds?.includes(s.id);
+                                                return (
+                                                    <div key={s.id} onClick={() => !inBatch && toggleStudent(s.id)} className={`p-2 rounded-lg border flex items-center justify-between transition ${inBatch ? 'opacity-60 bg-gray-100 border-transparent cursor-default' : explicitlyAssigned ? 'bg-blue-50 border-blue-500 cursor-pointer' : 'bg-white border-gray-200 hover:border-gray-400 cursor-pointer'}`}>
+                                                        <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-gray-500">{s.email}</p></div>{inBatch ? <span className="text-[10px] bg-gray-200 px-2 py-1 rounded text-gray-500">Via Batch</span> : explicitlyAssigned && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center justify-between"><div className="flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Specific Students</div><input type="text" placeholder="Search..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs text-slate-800 outline-none w-32" /></div>
-                                    <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
-                                        {filteredStudents.map(s => {
-                                            const inBatch = s.batch && formData.assignedBatches?.includes(s.batch);
-                                            const explicitlyAssigned = formData.assignedStudentIds?.includes(s.id);
-                                            return (
-                                                <div key={s.id} onClick={() => !inBatch && toggleStudent(s.id)} className={`p-2 rounded-lg border flex items-center justify-between transition ${inBatch ? 'opacity-60 bg-gray-100 border-transparent cursor-default' : explicitlyAssigned ? 'bg-blue-50 border-blue-500 cursor-pointer' : 'bg-white border-gray-200 hover:border-gray-400 cursor-pointer'}`}>
-                                                    <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-gray-500">{s.email}</p></div>{inBatch ? <span className="text-[10px] bg-gray-200 px-2 py-1 rounded text-gray-500">Via Batch</span> : explicitlyAssigned && <CheckCircle className="w-4 h-4 text-blue-500" />}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -562,7 +587,6 @@ export const CourseContentManager = () => {
 };
 
 export const CourseCreationModal = ({ onClose, onRefresh }: { onClose: () => void, onRefresh: () => void }) => {
-    // ... [Robust Batch Fetching included] ...
     const [title, setTitle] = useState('');
     const [desc, setDesc] = useState('');
     const [level, setLevel] = useState('N5');
@@ -573,8 +597,17 @@ export const CourseCreationModal = ({ onClose, onRefresh }: { onClose: () => voi
 
     useEffect(() => {
         const loadBatches = async () => {
-            const { data } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
-            if(data) setAvailableBatches(data.map(b => b.name));
+            const userData = localStorage.getItem('zenro_session');
+            const user = userData ? JSON.parse(userData) : null;
+            if(!user) return;
+
+            // FETCH ONLY TEACHER'S ASSIGNED BATCHES
+            const { data } = await supabase
+                .from('teacher_batches')
+                .select('batch_name')
+                .eq('teacher_id', user.id);
+            
+            if(data) setAvailableBatches(data.map(b => b.batch_name));
         };
         loadBatches();
     }, []);
@@ -595,7 +628,18 @@ export const CourseCreationModal = ({ onClose, onRefresh }: { onClose: () => voi
     const toggleBatch = (b: string) => { setSelectedBatches(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]); };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"><div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden"><div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center"><h2 className="text-xl font-bold text-slate-800">Create New Course</h2><button onClick={onClose}><X className="w-5 h-5 text-gray-500" /></button></div><form onSubmit={handleSubmit} className="p-6 space-y-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Title</label><input required className="w-full border p-2 rounded" value={title} onChange={e => setTitle(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label><textarea className="w-full border p-2 rounded h-20" value={desc} onChange={e => setDesc(e.target.value)} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Level</label><select className="w-full border p-2 rounded" value={level} onChange={e => setLevel(e.target.value)}><option value="N5">N5</option><option value="N4">N4</option><option value="N3">N3</option><option value="N2">N2</option><option value="N1">N1</option></select></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Thumbnail URL</label><input className="w-full border p-2 rounded" placeholder="https://..." value={thumbnail} onChange={e => setThumbnail(e.target.value)} /></div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Assign Batches</label><div className="border border-gray-200 rounded p-2 max-h-32 overflow-y-auto grid grid-cols-2 gap-2">{availableBatches.map(b => ( <div key={b} onClick={() => toggleBatch(b)} className={`p-2 rounded text-xs font-bold cursor-pointer border flex justify-between items-center ${selectedBatches.includes(b) ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-gray-200 text-gray-600'}`}>{b} {selectedBatches.includes(b) && <Check className="w-3 h-3" />}</div> ))}</div></div><div className="pt-4 flex justify-end gap-3"><button type="button" onClick={onClose} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button><button type="submit" disabled={loading} className="px-6 py-2 bg-zenro-red text-white font-bold rounded shadow-md hover:bg-red-700 disabled:opacity-50">{loading ? 'Creating...' : 'Create Course'}</button></div></form></div></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"><div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden"><div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center"><h2 className="text-xl font-bold text-slate-800">Create New Course</h2><button onClick={onClose}><X className="w-5 h-5 text-gray-500" /></button></div><form onSubmit={handleSubmit} className="p-6 space-y-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Title</label><input required className="w-full border p-2 rounded" value={title} onChange={e => setTitle(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label><textarea className="w-full border p-2 rounded h-20" value={desc} onChange={e => setDesc(e.target.value)} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Level</label><select className="w-full border p-2 rounded" value={level} onChange={e => setLevel(e.target.value)}><option value="N5">N5</option><option value="N4">N4</option><option value="N3">N3</option><option value="N2">N2</option><option value="N1">N1</option></select></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Thumbnail URL</label><input className="w-full border p-2 rounded" placeholder="https://..." value={thumbnail} onChange={e => setThumbnail(e.target.value)} /></div></div>
+        
+        <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Assign Batches (Your Classes)</label>
+            {availableBatches.length === 0 ? <p className="text-sm text-red-500 bg-red-50 p-2 rounded border border-red-100">You are not assigned to any batches. Contact Admin.</p> : (
+                <div className="border border-gray-200 rounded p-2 max-h-32 overflow-y-auto grid grid-cols-2 gap-2">
+                    {availableBatches.map(b => ( <div key={b} onClick={() => toggleBatch(b)} className={`p-2 rounded text-xs font-bold cursor-pointer border flex justify-between items-center ${selectedBatches.includes(b) ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-gray-200 text-gray-600'}`}>{b} {selectedBatches.includes(b) && <Check className="w-3 h-3" />}</div> ))}
+                </div>
+            )}
+        </div>
+        
+        <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={onClose} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancel</button><button type="submit" disabled={loading} className="px-6 py-2 bg-zenro-red text-white font-bold rounded shadow-md hover:bg-red-700 disabled:opacity-50">{loading ? 'Creating...' : 'Create Course'}</button></div></form></div></div>
     );
 }
 
@@ -691,17 +735,34 @@ export const TestCreationModal = ({ initialData, onClose, onRefresh }: { initial
 
     useEffect(() => {
         const load = async () => {
-            // 1. Always fetch fresh batch list
-            const { data: bData } = await supabase.from('batches').select('name').order('created_at', { ascending: false });
-            if(bData) setAvailableBatches(bData.map(b => b.name));
+            const userData = localStorage.getItem('zenro_session');
+            const user = userData ? JSON.parse(userData) : null;
+            if(!user) return;
 
-            // 2. Fetch students
-            const { data: sData } = await supabase.from('profiles').select('*').eq('role', 'STUDENT').order('full_name');
-            if(sData) {
-                const mapped = sData.map((u: any) => ({
-                    id: u.id, name: u.full_name, role: 'STUDENT', email: u.email, avatar: u.avatar_url, batch: u.batch, rollNumber: u.student_id
-                }));
-                setAvailableStudents(mapped);
+            // 1. Fetch Teacher's Batches ONLY
+            const { data: bData } = await supabase
+                .from('teacher_batches')
+                .select('batch_name')
+                .eq('teacher_id', user.id);
+            
+            const teacherBatches = bData ? bData.map((b:any) => b.batch_name) : [];
+            setAvailableBatches(teacherBatches);
+
+            // 2. Fetch students ONLY in those batches
+            if(teacherBatches.length > 0) {
+                const { data: sData } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('role', 'STUDENT')
+                    .in('batch', teacherBatches)
+                    .order('full_name');
+                
+                if(sData) {
+                    const mapped = sData.map((u: any) => ({
+                        id: u.id, name: u.full_name, role: 'STUDENT', email: u.email, avatar: u.avatar_url, batch: u.batch, rollNumber: u.student_id
+                    }));
+                    setAvailableStudents(mapped);
+                }
             }
 
             // 3. If Editing, fetch existing data
@@ -884,30 +945,36 @@ export const TestCreationModal = ({ initialData, onClose, onRefresh }: { initial
                     {step === 3 && (
                         <div className="h-full flex flex-col">
                             <h3 className="text-lg font-bold text-slate-800 mb-4">Access Control</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Batches</div>
-                                    <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
-                                        {availableBatches.map(b => (
-                                            <div key={b} onClick={() => setSelectedBatches(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])} className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition ${selectedBatches.includes(b) ? 'bg-red-50 border-zenro-red' : 'bg-white border-gray-200'}`}><span className="text-sm font-bold text-slate-700">{b}</span>{selectedBatches.includes(b) && <CheckCircle className="w-4 h-4 text-zenro-red" />}</div>
-                                        ))}
+                            {availableBatches.length === 0 ? (
+                                <div className="p-8 text-center text-gray-500 bg-gray-50 rounded border border-gray-200">
+                                    You are not assigned to any batches. Contact Admin.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                        <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center gap-2"><Layers className="w-4 h-4 text-zenro-red" /> Your Batches</div>
+                                        <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
+                                            {availableBatches.map(b => (
+                                                <div key={b} onClick={() => setSelectedBatches(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])} className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition ${selectedBatches.includes(b) ? 'bg-red-50 border-zenro-red' : 'bg-white border-gray-200'}`}><span className="text-sm font-bold text-slate-700">{b}</span>{selectedBatches.includes(b) && <CheckCircle className="w-4 h-4 text-zenro-red" />}</div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                                        <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center justify-between"><div className="flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Students in Your Batches</div><input type="text" placeholder="Search..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs text-slate-800 outline-none w-32" /></div>
+                                        <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
+                                            {filteredStudents.map(s => {
+                                                const inBatch = s.batch && selectedBatches.includes(s.batch);
+                                                const explicitlyAssigned = selectedStudents.includes(s.id);
+                                                return (
+                                                    <div key={s.id} onClick={() => !inBatch && setSelectedStudents(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])} className={`p-2 rounded-lg border flex items-center justify-between transition ${inBatch ? 'opacity-60 bg-gray-100 border-transparent cursor-default' : explicitlyAssigned ? 'bg-blue-50 border-blue-500 cursor-pointer' : 'bg-white border-gray-200 hover:border-gray-400 cursor-pointer'}`}>
+                                                        <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-gray-500">{s.email}</p></div>{inBatch ? <span className="text-[10px] bg-gray-200 px-2 py-1 rounded text-gray-500">Via Batch</span> : explicitlyAssigned && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                                    <div className="p-4 bg-white border-b border-gray-200 font-bold text-slate-700 flex items-center justify-between"><div className="flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Specific Students</div><input type="text" placeholder="Search..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs text-slate-800 outline-none w-32" /></div>
-                                    <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-96">
-                                        {filteredStudents.map(s => {
-                                            const inBatch = s.batch && selectedBatches.includes(s.batch);
-                                            const explicitlyAssigned = selectedStudents.includes(s.id);
-                                            return (
-                                                <div key={s.id} onClick={() => !inBatch && setSelectedStudents(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])} className={`p-2 rounded-lg border flex items-center justify-between transition ${inBatch ? 'opacity-60 bg-gray-100 border-transparent cursor-default' : explicitlyAssigned ? 'bg-blue-50 border-blue-500 cursor-pointer' : 'bg-white border-gray-200 hover:border-gray-400 cursor-pointer'}`}>
-                                                    <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-gray-500">{s.email}</p></div>{inBatch ? <span className="text-[10px] bg-gray-200 px-2 py-1 rounded text-gray-500">Via Batch</span> : explicitlyAssigned && <CheckCircle className="w-4 h-4 text-blue-500" />}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>

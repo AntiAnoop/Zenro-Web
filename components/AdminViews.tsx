@@ -114,6 +114,7 @@ const UserProfileDetail = ({ user, onClose }: { user: User, onClose: () => void 
 
 // --- ADMIN TEACHER ANALYTICS & MONITOR ---
 export const AdminTeacherAnalytics = () => {
+    // ... (Keep existing logic unchanged)
     const [stats, setStats] = useState<any[]>([]);
     const [logs, setLogs] = useState<LiveSessionRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -214,6 +215,7 @@ export const AdminTeacherAnalytics = () => {
 
 // --- ADMIN SCHEDULE VIEW ---
 export const AdminScheduleView = () => {
+    // ... (Keep existing logic unchanged)
     const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -318,12 +320,15 @@ export const AdminUserManagement = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
+  // New State for Multi-Batch assignment
+  const [teacherBatches, setTeacherBatches] = useState<string[]>([]);
+
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
     role: 'STUDENT',
     student_id: '',
-    batch: '',
+    batch: '', // For Student
     password: '',
     phone: '',
     avatar_url: ''
@@ -333,7 +338,6 @@ export const AdminUserManagement = () => {
     fetchUsers();
     fetchBatches();
     
-    // Subscribe to batch changes to keep dropdown fresh
     const batchSubscription = supabase
       .channel('admin_user_batches')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
@@ -454,7 +458,7 @@ export const AdminUserManagement = () => {
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
       student_id: formData.student_id.trim() || null, 
-      batch: formData.batch.trim(),
+      batch: formData.role === 'STUDENT' ? formData.batch.trim() : null, // Explicitly NULL if not student
       phone: formData.phone.trim(),
       id: editingUser ? editingUser.id : generateUUID(),
       avatar_url: formData.avatar_url || null 
@@ -465,15 +469,29 @@ export const AdminUserManagement = () => {
     }
 
     try {
+      let userId = payload.id;
+      
+      // 1. Update/Create Profile
       if (editingUser) {
         const { error } = await supabase.from('profiles').update(payload).eq('id', editingUser.id);
         if (error) throw error;
-        setSuccessMsg("User updated successfully. Changes are now live.");
       } else {
         const { error } = await supabase.from('profiles').insert([payload]);
         if (error) throw error;
-        setSuccessMsg("New user created successfully.");
       }
+
+      // 2. Handle Teacher Batch Assignments
+      if (formData.role === 'TEACHER') {
+          // Wipe old
+          await supabase.from('teacher_batches').delete().eq('teacher_id', userId);
+          // Insert new
+          if (teacherBatches.length > 0) {
+              const batchPayload = teacherBatches.map(b => ({ teacher_id: userId, batch_name: b }));
+              await supabase.from('teacher_batches').insert(batchPayload);
+          }
+      }
+
+      setSuccessMsg("User profile updated successfully.");
       setIsModalOpen(false);
       fetchUsers();
     } catch (err: any) {
@@ -495,6 +513,12 @@ export const AdminUserManagement = () => {
           }
       }
       setShowBatchDropdown(false);
+  };
+
+  const toggleTeacherBatch = (batchName: string) => {
+      setTeacherBatches(prev => 
+          prev.includes(batchName) ? prev.filter(b => b !== batchName) : [...prev, batchName]
+      );
   };
 
   const initiateDelete = (user: User) => {
@@ -520,9 +544,11 @@ export const AdminUserManagement = () => {
     }
   };
 
-  const handleOpenModal = (user: any = null) => {
+  const handleOpenModal = async (user: any = null) => {
     setErrorMsg('');
     setSuccessMsg('');
+    setTeacherBatches([]);
+
     if (user) {
       setEditingUser(user);
       setAvatarPreview(user.avatar);
@@ -534,8 +560,15 @@ export const AdminUserManagement = () => {
         batch: user.batch || '',
         password: '',
         phone: user.phone || '',
-        avatar_url: user.avatar // Keep current to show if not changed
+        avatar_url: user.avatar
       });
+
+      // Fetch teacher batches if needed
+      if (user.role === 'TEACHER') {
+          const { data } = await supabase.from('teacher_batches').select('batch_name').eq('teacher_id', user.id);
+          if (data) setTeacherBatches(data.map(r => r.batch_name));
+      }
+
     } else {
       setEditingUser(null);
       setAvatarPreview(null);
@@ -691,6 +724,8 @@ export const AdminUserManagement = () => {
                         <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone *</label><input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm" /></div>
                         <div><label className="block text-xs font-bold text-zenro-blue uppercase mb-1">Password *</label><input type="text" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm font-mono" placeholder="Min 8 chars" /></div>
                     </div>
+                    
+                    {/* STUDENT: SINGLE BATCH */}
                     {formData.role === 'STUDENT' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200 mt-4">
                             <div className="relative" ref={batchDropdownRef}>
@@ -714,6 +749,27 @@ export const AdminUserManagement = () => {
                             <div><label className="block text-xs font-bold text-zenro-blue uppercase mb-1">Student ID *</label><input type="text" value={formData.student_id} onChange={e => setFormData({...formData, student_id: e.target.value})} className="w-full bg-white border border-gray-300 rounded p-2 text-sm" /></div>
                         </div>
                     )}
+
+                    {/* TEACHER: MULTI BATCH */}
+                    {formData.role === 'TEACHER' && (
+                        <div className="pt-4 border-t border-gray-200 mt-4">
+                            <label className="block text-xs font-bold text-zenro-blue uppercase mb-2">Assigned Batches (Multi-Select)</label>
+                            <div className="border border-gray-200 rounded-lg p-2 max-h-40 overflow-y-auto grid grid-cols-2 gap-2 bg-gray-50">
+                                {availableBatches.length === 0 ? <p className="text-xs text-gray-400 p-2">No batches created yet.</p> : availableBatches.map(b => (
+                                    <div 
+                                        key={b.id} 
+                                        onClick={() => toggleTeacherBatch(b.name)} 
+                                        className={`p-2 rounded text-xs font-bold cursor-pointer border flex justify-between items-center transition ${teacherBatches.includes(b.name) ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'}`}
+                                    >
+                                        {b.name}
+                                        {teacherBatches.includes(b.name) && <CheckCircle className="w-3 h-3 text-blue-600" />}
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-2">Selected batches will appear on the teacher's profile.</p>
+                        </div>
+                    )}
+
                     <div className="pt-6 flex justify-end gap-3 pb-safe">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100">Cancel</button>
                         <button type="submit" disabled={isSubmitting} className="bg-zenro-red text-white px-6 py-2 rounded font-bold">{isSubmitting ? 'Saving...' : 'Save & Update'}</button>
@@ -748,6 +804,7 @@ export const AdminUserManagement = () => {
 };
 
 export const AdminFinancials = () => {
+    // ... (Keep existing logic unchanged)
     const [transactions, setTransactions] = useState<any[]>([]);
     const [summary, setSummary] = useState({ totalRevenue: 0, outstanding: 0, pendingCount: 0 });
     const [loading, setLoading] = useState(true);
@@ -856,6 +913,7 @@ export const AdminFinancials = () => {
 };
 
 export const AdminDashboard = () => {
+    // ... (Keep existing logic unchanged)
     const [stats, setStats] = useState({ totalUsers: 0, totalRevenue: 0, activeCourses: 0 });
     const [recentActivity, setRecentActivity] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);

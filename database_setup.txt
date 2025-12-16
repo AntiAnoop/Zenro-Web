@@ -1,6 +1,6 @@
 
 -- ----------------------------------------------------------------
--- ZENRO DATABASE SETUP SCRIPT (RLS FIXED)
+-- ZENRO DATABASE SETUP SCRIPT (ARCHITECTURAL UPDATE)
 -- ----------------------------------------------------------------
 
 -- 1. CLEANUP
@@ -25,6 +25,7 @@ DROP TABLE IF EXISTS course_batches CASCADE;
 DROP TABLE IF EXISTS course_materials CASCADE;
 DROP TABLE IF EXISTS course_modules CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
+DROP TABLE IF EXISTS teacher_batches CASCADE; -- NEW
 DROP TABLE IF EXISTS batches CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
 
@@ -36,7 +37,7 @@ CREATE TABLE profiles (
   password text NOT NULL,
   full_name text NOT NULL,
   role text CHECK (role IN ('STUDENT', 'TEACHER', 'ADMIN')),
-  batch text,
+  batch text, -- Only for STUDENTS (Single batch)
   phone text,
   student_id text,
   avatar_url text,
@@ -47,6 +48,13 @@ CREATE TABLE batches (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name text UNIQUE NOT NULL,
   created_at timestamptz DEFAULT now()
+);
+
+-- NEW: Link Teachers to Multiple Batches
+CREATE TABLE teacher_batches (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  teacher_id text REFERENCES profiles(id) ON DELETE CASCADE,
+  batch_name text NOT NULL
 );
 
 CREATE TABLE courses (
@@ -139,7 +147,7 @@ CREATE TABLE submissions (
   completed_at timestamptz DEFAULT now()
 );
 
--- [NEW CODE START] - ASSIGNMENTS SYSTEM
+-- ASSIGNMENTS SYSTEM
 CREATE TABLE assignments (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title text NOT NULL,
@@ -147,7 +155,7 @@ CREATE TABLE assignments (
   due_date timestamptz NOT NULL,
   total_marks int DEFAULT 100,
   attachment_url text,
-  status text DEFAULT 'DRAFT', -- DRAFT, PUBLISHED
+  status text DEFAULT 'DRAFT', 
   created_at timestamptz DEFAULT now()
 );
 
@@ -171,10 +179,9 @@ CREATE TABLE assignment_submissions (
   submission_text text,
   obtained_marks int DEFAULT 0,
   feedback text,
-  status text DEFAULT 'SUBMITTED', -- SUBMITTED, GRADED
+  status text DEFAULT 'SUBMITTED', 
   submitted_at timestamptz DEFAULT now()
 );
--- [NEW CODE END]
 
 CREATE TABLE fees (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -233,9 +240,9 @@ CREATE TABLE attendance (
 -- 3. ENABLE ROW LEVEL SECURITY & POLICIES
 -- ----------------------------------------------------------------
 
--- Enable RLS on all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teacher_batches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE course_modules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE course_materials ENABLE ROW LEVEL SECURITY;
@@ -256,11 +263,9 @@ ALTER TABLE schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE live_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 
--- Create POLICY to allow ALL operations for anon/authenticated users
--- Note: In production, you would restrict this. For this app, we open it up.
-
 CREATE POLICY "Enable all access for all users" ON profiles FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all access for all users" ON batches FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all access for all users" ON teacher_batches FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all access for all users" ON courses FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all access for all users" ON course_modules FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all access for all users" ON course_materials FOR ALL USING (true) WITH CHECK (true);
@@ -290,6 +295,8 @@ VALUES
 ('s1', 'student@zenro.jp', '9999999999', 'Alex Student', 'STUDENT', '2024-A', '9999999999', '9999999999'),
 ('t1', 'teacher@zenro.jp', '8888888888', 'Tanaka Sensei', 'TEACHER', NULL, '8888888888', '8888888888'),
 ('a1', 'admin@zenro.jp', '7777777777', 'Admin User', 'ADMIN', NULL, '7777777777', '7777777777');
+
+INSERT INTO teacher_batches (teacher_id, batch_name) VALUES ('t1', '2024-A'), ('t1', '2024-B');
 
 INSERT INTO courses (id, title, description, level, thumbnail, status, instructor_name) 
 VALUES ('c1', 'JLPT N4 Grammar Mastery', 'Comprehensive guide to N4 grammar structures.', 'N4', 'https://images.unsplash.com/photo-1528164344705-47542687000d', 'PUBLISHED', 'Tanaka Sensei');
