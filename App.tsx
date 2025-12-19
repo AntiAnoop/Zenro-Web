@@ -21,11 +21,37 @@ const CREDENTIALS: Record<string, {pass: string, role: UserRole, name: string, i
 
 // --- BRAND ASSETS ---
 
+// Replaced with the Real Japan-India Fusion Logo (Vectorized for quality & transparent background)
 const ZenroLogo = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="50" cy="50" r="45" fill="white" />
-    <circle cx="50" cy="50" r="20" fill="#E60012" />
-    <path d="M50 5 A45 45 0 0 1 95 50" stroke="#1A237E" strokeWidth="5" strokeLinecap="round" />
+  <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg" filter="drop-shadow(0px 2px 2px rgba(0,0,0,0.1))">
+    <defs>
+      <clipPath id="circleMask">
+        <circle cx="50" cy="50" r="50" />
+      </clipPath>
+    </defs>
+    
+    <g clipPath="url(#circleMask)">
+        {/* Left Half: Japan (White BG + Red Dot) */}
+        <rect x="0" y="0" width="50" height="100" fill="#FFFFFF" />
+        <circle cx="25" cy="50" r="18" fill="#BC002D" />
+
+        {/* Right Half: India (Tricolor) */}
+        <rect x="50" y="0" width="50" height="33.33" fill="#FF9933" /> {/* Saffron */}
+        <rect x="50" y="33.33" width="50" height="33.33" fill="#FFFFFF" /> {/* White */}
+        <rect x="50" y="66.66" width="50" height="33.33" fill="#138808" /> {/* Green */}
+        
+        {/* Ashoka Chakra - Centered bridging the two nations */}
+        <circle cx="50" cy="50" r="10" stroke="#000080" strokeWidth="1.5" fill="white" fillOpacity="0.1" />
+        <circle cx="50" cy="50" r="1.5" fill="#000080" />
+        <g stroke="#000080" strokeWidth="0.5">
+            {[...Array(24)].map((_, i) => (
+                <line key={i} x1="50" y1="50" x2="50" y2="40" transform={`rotate(${i * 15} 50 50)`} />
+            ))}
+        </g>
+    </g>
+    
+    {/* Optional: Subtle Border ring for contrast on dark backgrounds */}
+    <circle cx="50" cy="50" r="49" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="1" />
   </svg>
 );
 
@@ -149,8 +175,8 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528360983277-13d9012356ee?auto=format&fit=crop&q=80&w=1000')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
             <div className="relative z-10 text-white">
                 <div className="flex items-center gap-3 mb-8">
-                    <div className="bg-white p-2 rounded-full">
-                        <ZenroLogo className="w-8 h-8" />
+                    <div className="bg-white p-2 rounded-full shadow-lg">
+                        <ZenroLogo className="w-10 h-10" />
                     </div>
                     <h1 className="text-2xl font-heading font-bold tracking-tight">ZENRO INSTITUTE</h1>
                 </div>
@@ -169,7 +195,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         {/* Right Side - Login Form */}
         <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white relative">
             <div className="md:hidden flex justify-center mb-8">
-                 <ZenroLogo className="w-16 h-16" />
+                 <ZenroLogo className="w-20 h-20" />
             </div>
             <div className="max-w-sm mx-auto w-full">
                 <h3 className="text-2xl font-heading font-bold text-zenro-slate mb-2 text-center md:text-left">Welcome Back</h3>
@@ -265,8 +291,8 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: ()
         </button>
 
         <div className="p-6 flex items-center gap-3 border-b border-blue-900/50">
-          <div className="bg-white p-1.5 rounded-full">
-              <ZenroLogo className="w-8 h-8" />
+          <div className="bg-white p-1.5 rounded-full shadow-md">
+              <ZenroLogo className="w-10 h-10" />
           </div>
           <div>
               <h1 className="text-xl font-heading font-bold text-white tracking-tight">ZENRO</h1>
@@ -414,7 +440,7 @@ const AppContent = ({ user, handleLogout, setIsExamMode, onUpdateUser }: any) =>
           </button>
           
           <div className="flex items-center gap-2">
-             <div className="bg-zenro-blue p-1 rounded-full"><ZenroLogo className="w-6 h-6" /></div>
+             <div className="bg-zenro-blue p-1 rounded-full"><ZenroLogo className="w-8 h-8" /></div>
              <span className="font-heading font-bold text-zenro-blue tracking-tight text-lg">ZENRO</span>
           </div>
           
