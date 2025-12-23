@@ -13,14 +13,9 @@ import { LiveProvider } from './context/LiveContext';
 import { supabase } from './services/supabaseClient';
 
 // --- BRAND ASSETS ---
-
 const ZenroLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <clipPath id="circleClip">
-        <circle cx="50" cy="50" r="50" />
-      </clipPath>
-    </defs>
+    <defs><clipPath id="circleClip"><circle cx="50" cy="50" r="50" /></clipPath></defs>
     <g clipPath="url(#circleClip)">
       <rect x="0" y="0" width="50" height="100" fill="#FFFFFF" />
       <circle cx="28" cy="50" r="15" fill="#BC002D" />
@@ -38,8 +33,6 @@ const ZenroLogo = ({ className }: { className?: string }) => (
     <circle cx="50" cy="50" r="49.5" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="1" />
   </svg>
 );
-
-// --- AUTHENTICATION HELPERS ---
 
 const CREDENTIALS: Record<string, {pass: string, role: UserRole, name: string, id: string}> = {
   '9999999999': { pass: '9999999999', role: UserRole.STUDENT, name: 'Alex Student', id: 's1' },
@@ -71,113 +64,52 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-
     try {
-        const account = CREDENTIALS[identifier];
-        if (account && account.pass === password) {
-            loginAs(identifier);
-            return;
-        }
-
-        const { data, error: dbError } = await supabase
-            .from('profiles')
-            .select('*')
-            .or(`student_id.eq.${identifier},email.eq.${identifier},phone.eq.${identifier}`)
-            .single();
-
+        const { data, error: dbError } = await supabase.from('profiles').select('*').or(`student_id.eq.${identifier},email.eq.${identifier},phone.eq.${identifier}`).single();
         if (dbError || !data) throw new Error('User not found');
         if (data.password !== password) throw new Error('Invalid password');
-
         onLogin({
-            id: data.id,
-            name: data.full_name,
-            role: data.role as UserRole,
-            email: data.email,
+            id: data.id, name: data.full_name, role: data.role as UserRole, email: data.email,
             avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.full_name)}&background=random`,
-            batch: data.batch,
-            phone: data.phone,
-            rollNumber: data.student_id
+            batch: data.batch, phone: data.phone, rollNumber: data.student_id
         });
-    } catch (err) {
-        setError('Invalid credentials. Please try again.');
-    } finally {
-        setLoading(false);
-    }
+    } catch (err) { setError('Invalid credentials.'); } finally { setLoading(false); }
   };
 
   return (
     <div className="min-h-screen bg-zenro-gray flex items-center justify-center p-4">
       <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-[600px]">
-        <div className="hidden md:flex md:w-1/2 bg-zenro-blue relative p-12 flex-col justify-between overflow-hidden">
+        <div className="hidden md:flex md:w-1/2 bg-zenro-blue relative p-12 flex-col justify-between">
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528360983277-13d9012356ee?auto=format&fit=crop&q=80&w=1000')] bg-cover bg-center opacity-10"></div>
             <div className="relative z-10 text-white">
-                <div className="flex items-center gap-4 mb-12">
-                    <div className="bg-white p-2.5 rounded-2xl shadow-xl transform rotate-3">
-                        <ZenroLogo className="w-12 h-12" />
-                    </div>
-                    <h1 className="text-3xl font-heading font-extrabold tracking-tighter">ZENRO</h1>
+                <div className="flex items-center gap-4 mb-8">
+                    <ZenroLogo className="w-12 h-12 bg-white p-1 rounded-xl shadow-lg" />
+                    <h1 className="text-3xl font-heading font-black">ZENRO</h1>
                 </div>
-                <h2 className="text-5xl font-heading font-bold leading-tight mb-6">
-                    Master Japanese <br/>
-                    <span className="text-zenro-red">Secure Your Future</span>
-                </h2>
-                <p className="text-blue-100 text-xl font-light leading-relaxed max-w-sm">Bridge cultures and unlock global opportunities with Zenro.</p>
+                <h2 className="text-5xl font-heading font-bold mb-6 text-zenro-red">Bridge to Japan</h2>
+                <p className="text-blue-100 text-xl font-light">The ultimate portal for language excellence.</p>
             </div>
-            <div className="relative z-10 text-xs text-blue-300/60 uppercase tracking-widest font-bold">
-                &copy; 2024 ZENRO JAPANESE INSTITUTE
-            </div>
+            <div className="relative z-10 text-xs text-blue-300/60 uppercase tracking-widest font-bold">© 2024 ZENRO JAPANESE INSTITUTE</div>
         </div>
-
         <div className="w-full md:w-1/2 p-8 md:p-20 flex flex-col justify-center bg-white relative">
             <div className="max-w-sm mx-auto w-full">
-                <h3 className="text-3xl font-heading font-bold text-zenro-slate mb-2">Welcome Back</h3>
-                <p className="text-gray-400 mb-8">Sign in to your learning portal.</p>
-
-                {/* RESTORED: Quick Login Buttons */}
-                <div className="grid grid-cols-3 gap-2 mb-8 p-1 bg-gray-50 rounded-2xl border border-gray-100">
+                <h3 className="text-3xl font-heading font-bold text-zenro-slate mb-8">Sign In</h3>
+                <div className="grid grid-cols-3 gap-2 mb-10 p-1 bg-gray-50 rounded-2xl border border-gray-100">
                     <button onClick={() => loginAs('8888888888')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Teacher</button>
                     <button onClick={() => loginAs('9999999999')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Student</button>
                     <button onClick={() => loginAs('7777777777')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-green-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Admin</button>
                 </div>
-
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-xs font-bold text-zenro-slate uppercase mb-2 tracking-widest">ID / Email</label>
-                        <div className="relative group">
-                            <UserIcon className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-zenro-red transition" />
-                            <input 
-                                type="text" 
-                                value={identifier}
-                                onChange={(e) => setIdentifier(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-zenro-slate focus:bg-white focus:border-zenro-red focus:ring-4 focus:ring-zenro-red/5 outline-none transition-all shadow-inner"
-                                placeholder="9999999999"
-                                required
-                            />
-                        </div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-widest">Login ID</label>
+                        <input type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-zenro-slate focus:bg-white focus:border-zenro-red focus:ring-4 focus:ring-zenro-red/5 outline-none transition-all" placeholder="Enter ID" required />
                     </div>
-                    
                     <div>
-                        <label className="block text-xs font-bold text-zenro-slate uppercase mb-2 tracking-widest">Password</label>
-                        <div className="relative group">
-                            <Settings className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-zenro-red transition" />
-                            <input 
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-zenro-slate focus:bg-white focus:border-zenro-red focus:ring-4 focus:ring-zenro-red/5 outline-none transition-all shadow-inner"
-                                placeholder="••••••••"
-                                required
-                            />
-                        </div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-widest">Password</label>
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-zenro-slate focus:bg-white focus:border-zenro-red focus:ring-4 focus:ring-zenro-red/5 outline-none transition-all" placeholder="••••••••" required />
                     </div>
-
                     {error && <div className="text-zenro-red text-sm font-bold text-center bg-red-50 p-3 rounded-xl border border-red-100">{error}</div>}
-
-                    <button 
-                        type="submit" 
-                        disabled={loading}
-                        className="w-full bg-zenro-blue hover:bg-slate-900 text-white font-bold py-4 rounded-2xl transition-all shadow-xl hover:shadow-zenro-blue/20 disabled:opacity-50 mt-4 active:scale-[0.98]"
-                    >
+                    <button type="submit" disabled={loading} className="w-full bg-zenro-blue hover:bg-slate-900 text-white font-bold py-4 rounded-2xl transition-all shadow-xl disabled:opacity-50 mt-4 active:scale-[0.98]">
                         {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto"/> : 'Sign In'}
                     </button>
                 </form>
@@ -187,8 +119,6 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
     </div>
   );
 };
-
-// ... Sidebar and Layout logic remains robustly handled in AppContent ...
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -203,40 +133,16 @@ export default function App() {
           const parsed = JSON.parse(stored);
           const { data } = await supabase.from('profiles').select('*').eq('id', parsed.id).single();
           if (data) {
-              const updated = {
-                  ...parsed,
-                  name: data.full_name,
-                  email: data.email,
-                  role: data.role,
-                  avatar: data.avatar_url || parsed.avatar,
-                  batch: data.batch || parsed.batch
-              };
+              const updated = { ...parsed, name: data.full_name, email: data.email, role: data.role, avatar: data.avatar_url || parsed.avatar, batch: data.batch || parsed.batch };
               setUser(updated);
-          } else {
-              setUser(parsed);
-          }
+          } else { setUser(parsed); }
         }
-      } catch (e) {
-        localStorage.removeItem('zenro_session');
-      } finally {
-        setIsSessionLoading(false);
-      }
+      } catch (e) { localStorage.removeItem('zenro_session'); } finally { setIsSessionLoading(false); }
     };
     restoreSession();
   }, []);
 
-  if (isSessionLoading) {
-     return (
-        <div className="h-screen w-full bg-zenro-blue flex flex-col items-center justify-center text-white">
-            <ZenroLogo className="w-32 h-32 animate-bounce-slow" />
-            <div className="mt-8 flex items-center gap-3">
-                <Loader2 className="w-6 h-6 animate-spin text-zenro-red" />
-                <span className="text-xl font-heading font-black tracking-tighter uppercase">Initializing Zenro Core...</span>
-            </div>
-        </div>
-     );
-  }
-
+  if (isSessionLoading) return <div className="h-screen w-full bg-zenro-blue flex flex-col items-center justify-center text-white"><ZenroLogo className="w-32 h-32 animate-bounce-slow" /><div className="mt-8 flex items-center gap-3"><Loader2 className="w-6 h-6 animate-spin text-zenro-red" /><span className="text-xl font-heading font-black tracking-tighter uppercase">Initializing Zenro Core...</span></div></div>;
   if (!user) return <LoginScreen onLogin={(u) => { setUser(u); localStorage.setItem('zenro_session', JSON.stringify(u)); }} />;
   if (isExamMode) return <ExamPortal onExit={() => setIsExamMode(false)} />;
 
@@ -253,16 +159,8 @@ const AppLayout = ({ user, onLogout }: any) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     return (
         <div className="flex h-screen bg-zenro-gray text-zenro-slate overflow-hidden">
-            {/* Sidebar Logic */}
-            <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 z-40 flex items-center justify-between px-6 shadow-sm">
-              <button onClick={() => setSidebarOpen(true)} className="p-2.5 bg-gray-50 text-zenro-blue rounded-xl"><Menu className="w-6 h-6" /></button>
-              <ZenroLogo className="w-10 h-10" />
-              <img src={user.avatar} className="w-9 h-9 rounded-xl border border-gray-200 object-cover" alt="" />
-            </div>
-
             <Sidebar user={user} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            
-            <main className="flex-1 overflow-auto p-4 lg:p-10 pt-20 lg:pt-10 scroll-smooth lg:ml-64 w-full bg-zenro-gray relative">
+            <main className="flex-1 overflow-auto p-4 lg:p-10 scroll-smooth lg:ml-64 w-full bg-zenro-gray relative">
                 <div className="max-w-7xl mx-auto min-h-full">
                     <Routes>
                         <Route path="/" element={<Navigate to={`/${user.role.toLowerCase()}/dashboard`} replace />} />
@@ -275,7 +173,6 @@ const AppLayout = ({ user, onLogout }: any) => {
                         <Route path="/student/report/:submissionId" element={<TestReport role="STUDENT" />} />
                         <Route path="/student/fees" element={<StudentFeesPage user={user} />} />
                         <Route path="/student/profile" element={<StudentProfilePage user={user} />} />
-                        
                         <Route path="/teacher/dashboard" element={<TeacherDashboardHome />} />
                         <Route path="/teacher/schedule" element={<TeacherSchedulePage />} />
                         <Route path="/teacher/courses" element={<TeacherCoursesPage />} />
@@ -283,7 +180,6 @@ const AppLayout = ({ user, onLogout }: any) => {
                         <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
                         <Route path="/teacher/reports" element={<TeacherReportsPage />} />
                         <Route path="/teacher/live" element={<LiveClassConsole />} />
-                        
                         <Route path="/admin/dashboard" element={<AdminDashboard />} />
                         <Route path="/admin/users" element={<AdminUserManagement />} />
                         <Route path="/admin/schedule" element={<AdminScheduleView />} />
@@ -296,27 +192,24 @@ const AppLayout = ({ user, onLogout }: any) => {
     );
 };
 
-// --- CORE UI: SIDEBAR ---
 const Sidebar = ({ user, onLogout, isOpen, onClose }: any) => {
     const location = useLocation();
     const isActive = (path: string) => location.pathname.startsWith(path) ? "bg-white/15 text-white border-l-4 border-zenro-red font-bold" : "text-blue-100/70 hover:text-white hover:bg-white/5";
-    
     return (
         <>
             <div className={`fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-md transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
             <div className={`w-64 bg-zenro-blue flex flex-col h-screen fixed left-0 top-0 z-50 shadow-2xl transition-transform duration-500 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
                 <div className="p-8 flex items-center gap-4 border-b border-white/5">
-                    <div className="bg-white p-1.5 rounded-xl shadow-lg"><ZenroLogo className="w-10 h-10" /></div>
+                    <ZenroLogo className="w-10 h-10 bg-white p-1 rounded-xl shadow-lg" />
                     <h1 className="text-xl font-heading font-black text-white tracking-tighter">ZENRO</h1>
                 </div>
-                <nav className="flex-1 px-4 space-y-1.5 mt-8 overflow-y-auto custom-scrollbar">
+                <nav className="flex-1 px-4 space-y-1.5 mt-8 overflow-y-auto">
                     {user.role === 'STUDENT' && (
                         <>
                             <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/dashboard')}`}><Layout className="w-5 h-5" /> Dashboard</Link>
                             <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/schedule')}`}><Calendar className="w-5 h-5" /> Schedule</Link>
                             <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/courses')}`}><BookOpen className="w-5 h-5" /> Curriculum</Link>
                             <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/tests')}`}><FileCheck className="w-5 h-5" /> Tests</Link>
-                            <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/fees')}`}><CreditCard className="w-5 h-5" /> Fees</Link>
                         </>
                     )}
                     {user.role === 'TEACHER' && (
@@ -326,13 +219,6 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: any) => {
                             <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/courses')}`}><Layers className="w-5 h-5" /> Courses</Link>
                             <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/tests')}`}><FileCheck className="w-5 h-5" /> Tests</Link>
                             <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/assignments')}`}><FileText className="w-5 h-5" /> Assignments</Link>
-                        </>
-                    )}
-                    {user.role === 'ADMIN' && (
-                        <>
-                            <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/dashboard')}`}><ShieldAlert className="w-5 h-5" /> Console</Link>
-                            <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/users')}`}><Users className="w-5 h-5" /> Users</Link>
-                            <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/finance')}`}><DollarSign className="w-5 h-5" /> Financials</Link>
                         </>
                     )}
                 </nav>
