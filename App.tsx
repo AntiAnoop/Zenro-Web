@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap, Loader2, Menu, X, FileCheck, Calendar } from 'lucide-react';
+import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+// Fixed: Changed 'Book' to 'BookOpen' as it's used in the sidebar
+import { Layout, LogOut, User as UserIcon, Settings, Menu, Loader2, Calendar, BookOpen, FileCheck, CreditCard, ShieldAlert, Users, DollarSign, FileText, Layers, Video } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
-import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom, StudentCoursePlayer, StudentSchedulePage } from './components/StudentViews';
+import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentAssignmentsPage, StudentLiveRoom, StudentSchedulePage } from './components/StudentViews';
 import { StudentTestPlayer } from './components/StudentTestPlayer';
 import { TestReport } from './components/TestReport';
-import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage, TeacherSchedulePage, CourseContentManager, TeacherProfilePage } from './components/TeacherViews';
+import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole, TeacherTestsPage, TeacherSchedulePage, TeacherProfilePage } from './components/TeacherViews';
 import { AdminDashboard, AdminUserManagement, AdminFinancials, AdminTeacherAnalytics, AdminScheduleView } from './components/AdminViews';
 import { LiveProvider } from './context/LiveContext';
 import { supabase } from './services/supabaseClient';
@@ -30,7 +31,6 @@ const ZenroLogo = ({ className }: { className?: string }) => (
         ))}
       </g>
     </g>
-    <circle cx="50" cy="50" r="49.5" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="1" />
   </svg>
 );
 
@@ -50,9 +50,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
     const account = CREDENTIALS[id];
     if (account) {
         onLogin({
-            id: account.id,
-            name: account.name,
-            role: account.role,
+            id: account.id, name: account.name, role: account.role,
             email: `${id}@zenro.jp`,
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=1A237E&color=fff`,
             batch: '2024-A'
@@ -93,7 +91,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         </div>
         <div className="w-full md:w-1/2 p-8 md:p-20 flex flex-col justify-center bg-white relative">
             <div className="max-w-sm mx-auto w-full">
-                <h3 className="text-3xl font-heading font-bold text-zenro-slate mb-8">Sign In</h3>
+                <h3 className="text-3xl font-heading font-bold text-zenro-slate mb-8">Portal Login</h3>
                 <div className="grid grid-cols-3 gap-2 mb-10 p-1 bg-gray-50 rounded-2xl border border-gray-100">
                     <button onClick={() => loginAs('8888888888')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Teacher</button>
                     <button onClick={() => loginAs('9999999999')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Student</button>
@@ -101,7 +99,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-widest">Login ID</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-widest">ID / Email</label>
                         <input type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-zenro-slate focus:bg-white focus:border-zenro-red focus:ring-4 focus:ring-zenro-red/5 outline-none transition-all" placeholder="Enter ID" required />
                     </div>
                     <div>
@@ -142,7 +140,7 @@ export default function App() {
     restoreSession();
   }, []);
 
-  if (isSessionLoading) return <div className="h-screen w-full bg-zenro-blue flex flex-col items-center justify-center text-white"><ZenroLogo className="w-32 h-32 animate-bounce-slow" /><div className="mt-8 flex items-center gap-3"><Loader2 className="w-6 h-6 animate-spin text-zenro-red" /><span className="text-xl font-heading font-black tracking-tighter uppercase">Initializing Zenro Core...</span></div></div>;
+  if (isSessionLoading) return <div className="h-screen w-full bg-zenro-blue flex flex-col items-center justify-center text-white font-heading font-black">ZENRO INITIALIZING...</div>;
   if (!user) return <LoginScreen onLogin={(u) => { setUser(u); localStorage.setItem('zenro_session', JSON.stringify(u)); }} />;
   if (isExamMode) return <ExamPortal onExit={() => setIsExamMode(false)} />;
 
@@ -169,10 +167,12 @@ const AppLayout = ({ user, onLogout }: any) => {
                         <Route path="/student/courses" element={<StudentCoursesPage />} />
                         <Route path="/student/live" element={<StudentLiveRoom user={user} />} />
                         <Route path="/student/tests" element={<StudentTestsPage />} />
+                        <Route path="/student/assignments" element={<StudentAssignmentsPage />} />
                         <Route path="/student/test/:testId" element={<StudentTestPlayer />} />
                         <Route path="/student/report/:submissionId" element={<TestReport role="STUDENT" />} />
                         <Route path="/student/fees" element={<StudentFeesPage user={user} />} />
                         <Route path="/student/profile" element={<StudentProfilePage user={user} />} />
+                        
                         <Route path="/teacher/dashboard" element={<TeacherDashboardHome />} />
                         <Route path="/teacher/schedule" element={<TeacherSchedulePage />} />
                         <Route path="/teacher/courses" element={<TeacherCoursesPage />} />
@@ -180,6 +180,8 @@ const AppLayout = ({ user, onLogout }: any) => {
                         <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
                         <Route path="/teacher/reports" element={<TeacherReportsPage />} />
                         <Route path="/teacher/live" element={<LiveClassConsole />} />
+                        <Route path="/teacher/profile" element={<TeacherProfilePage user={user} />} />
+                        
                         <Route path="/admin/dashboard" element={<AdminDashboard />} />
                         <Route path="/admin/users" element={<AdminUserManagement />} />
                         <Route path="/admin/schedule" element={<AdminScheduleView />} />
@@ -207,18 +209,27 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: any) => {
                     {user.role === 'STUDENT' && (
                         <>
                             <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/dashboard')}`}><Layout className="w-5 h-5" /> Dashboard</Link>
-                            <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/schedule')}`}><Calendar className="w-5 h-5" /> Schedule</Link>
+                            <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/schedule')}`}><Calendar className="w-5 h-5" /> Weekly Schedule</Link>
                             <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/courses')}`}><BookOpen className="w-5 h-5" /> Curriculum</Link>
-                            <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/tests')}`}><FileCheck className="w-5 h-5" /> Tests</Link>
+                            <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/tests')}`}><FileCheck className="w-5 h-5" /> Exam Portal</Link>
+                            <Link to="/student/assignments" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/assignments')}`}><FileText className="w-5 h-5" /> Assignments</Link>
+                            <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/fees')}`}><CreditCard className="w-5 h-5" /> Fees & Dues</Link>
                         </>
                     )}
                     {user.role === 'TEACHER' && (
                         <>
                             <Link to="/teacher/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/dashboard')}`}><Layout className="w-5 h-5" /> Overview</Link>
-                            <Link to="/teacher/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/schedule')}`}><Calendar className="w-5 h-5" /> Calendar</Link>
+                            <Link to="/teacher/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/schedule')}`}><Calendar className="w-5 h-5" /> Master Calendar</Link>
                             <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/courses')}`}><Layers className="w-5 h-5" /> Courses</Link>
-                            <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/tests')}`}><FileCheck className="w-5 h-5" /> Tests</Link>
+                            <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/tests')}`}><FileCheck className="w-5 h-5" /> Test Engine</Link>
                             <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/assignments')}`}><FileText className="w-5 h-5" /> Assignments</Link>
+                        </>
+                    )}
+                     {user.role === 'ADMIN' && (
+                        <>
+                            <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/dashboard')}`}><ShieldAlert className="w-5 h-5" /> Admin Console</Link>
+                            <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/users')}`}><Users className="w-5 h-5" /> User Directory</Link>
+                            <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/finance')}`}><DollarSign className="w-5 h-5" /> Global Revenue</Link>
                         </>
                     )}
                 </nav>
