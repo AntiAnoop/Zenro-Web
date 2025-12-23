@@ -14,10 +14,6 @@ import { supabase } from './services/supabaseClient';
 
 // --- BRAND ASSETS ---
 
-/**
- * THE REAL BRAND LOGO (Vectorized SVG)
- * Japan-India Fusion Design
- */
 const ZenroLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -26,16 +22,11 @@ const ZenroLogo = ({ className }: { className?: string }) => (
       </clipPath>
     </defs>
     <g clipPath="url(#circleClip)">
-      {/* Left side: Japan (White background + Red Sun) */}
       <rect x="0" y="0" width="50" height="100" fill="#FFFFFF" />
       <circle cx="28" cy="50" r="15" fill="#BC002D" />
-      
-      {/* Right side: India (Saffron, White, Green stripes) */}
       <rect x="50" y="0" width="50" height="33.3" fill="#FF9933" />
       <rect x="50" y="33.3" width="50" height="33.3" fill="#FFFFFF" />
       <rect x="50" y="66.6" width="50" height="33.4" fill="#138808" />
-      
-      {/* Central Bridge: Ashoka Chakra (Navy Blue) */}
       <circle cx="50" cy="50" r="10" stroke="#000080" strokeWidth="1.5" fill="white" />
       <circle cx="50" cy="50" r="1.5" fill="#000080" />
       <g stroke="#000080" strokeWidth="0.5">
@@ -44,7 +35,6 @@ const ZenroLogo = ({ className }: { className?: string }) => (
         ))}
       </g>
     </g>
-    {/* Outer Ring for visibility on white */}
     <circle cx="50" cy="50" r="49.5" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="1" />
   </svg>
 );
@@ -63,6 +53,20 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const loginAs = (id: string) => {
+    const account = CREDENTIALS[id];
+    if (account) {
+        onLogin({
+            id: account.id,
+            name: account.name,
+            role: account.role,
+            email: `${id}@zenro.jp`,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=1A237E&color=fff`,
+            batch: '2024-A'
+        });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -71,14 +75,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
     try {
         const account = CREDENTIALS[identifier];
         if (account && account.pass === password) {
-            onLogin({
-                id: account.id,
-                name: account.name,
-                role: account.role,
-                email: `${identifier}@zenro.jp`,
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=1A237E&color=fff`,
-                batch: '2024-A' 
-            });
+            loginAs(identifier);
             return;
         }
 
@@ -124,7 +121,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
                     Master Japanese <br/>
                     <span className="text-zenro-red">Secure Your Future</span>
                 </h2>
-                <p className="text-blue-100 text-xl font-light leading-relaxed max-w-sm">Global standards of language education, bridging cultures and opportunities.</p>
+                <p className="text-blue-100 text-xl font-light leading-relaxed max-w-sm">Bridge cultures and unlock global opportunities with Zenro.</p>
             </div>
             <div className="relative z-10 text-xs text-blue-300/60 uppercase tracking-widest font-bold">
                 &copy; 2024 ZENRO JAPANESE INSTITUTE
@@ -132,13 +129,16 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         </div>
 
         <div className="w-full md:w-1/2 p-8 md:p-20 flex flex-col justify-center bg-white relative">
-            <div className="md:hidden flex flex-col items-center mb-10">
-                 <ZenroLogo className="w-20 h-20 mb-4" />
-                 <h1 className="text-2xl font-heading font-black text-zenro-blue tracking-tighter">ZENRO</h1>
-            </div>
             <div className="max-w-sm mx-auto w-full">
                 <h3 className="text-3xl font-heading font-bold text-zenro-slate mb-2">Welcome Back</h3>
-                <p className="text-gray-400 mb-10">Sign in to your learning portal.</p>
+                <p className="text-gray-400 mb-8">Sign in to your learning portal.</p>
+
+                {/* RESTORED: Quick Login Buttons */}
+                <div className="grid grid-cols-3 gap-2 mb-8 p-1 bg-gray-50 rounded-2xl border border-gray-100">
+                    <button onClick={() => loginAs('8888888888')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Teacher</button>
+                    <button onClick={() => loginAs('9999999999')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Student</button>
+                    <button onClick={() => loginAs('7777777777')} className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-green-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">Admin</button>
+                </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
@@ -171,7 +171,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
                         </div>
                     </div>
 
-                    {error && <div className="text-zenro-red text-sm font-bold text-center bg-red-50 p-3 rounded-xl border border-red-100 animate-shake">{error}</div>}
+                    {error && <div className="text-zenro-red text-sm font-bold text-center bg-red-50 p-3 rounded-xl border border-red-100">{error}</div>}
 
                     <button 
                         type="submit" 
@@ -181,10 +181,6 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
                         {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto"/> : 'Sign In'}
                     </button>
                 </form>
-
-                <div className="mt-12 flex justify-center gap-4 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition duration-500">
-                    <ZenroLogo className="w-8 h-8" />
-                </div>
             </div>
         </div>
       </div>
@@ -192,126 +188,12 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
   );
 };
 
-// --- CORE LAYOUT COMPONENTS ---
-
-const Sidebar = ({ user, onLogout, isOpen, onClose }: { user: User, onLogout: () => void, isOpen: boolean, onClose: () => void }) => {
-  const location = useLocation();
-  const isActive = (path: string) => location.pathname === path 
-    ? "bg-white/15 text-white border-l-4 border-zenro-red font-bold translate-x-1 shadow-lg" 
-    : "text-blue-100/70 hover:text-white hover:bg-white/5 hover:translate-x-1";
-
-  return (
-    <>
-      <div 
-        className={`fixed inset-0 bg-slate-900/60 z-40 lg:hidden transition-opacity duration-300 backdrop-blur-md ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={onClose}
-      />
-
-      <div className={`
-        w-64 bg-zenro-blue flex flex-col h-screen fixed left-0 top-0 z-50 shadow-2xl transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
-      `}>
-        <div className="p-8 flex items-center gap-4 border-b border-white/5">
-          <div className="bg-white p-1.5 rounded-xl shadow-lg shadow-black/20">
-              <ZenroLogo className="w-10 h-10" />
-          </div>
-          <div>
-              <h1 className="text-xl font-heading font-black text-white tracking-tighter">ZENRO</h1>
-              <p className="text-[10px] text-zenro-red font-bold uppercase tracking-widest leading-none">Institute</p>
-          </div>
-        </div>
-        
-        <nav className="flex-1 px-4 space-y-1.5 mt-8 overflow-y-auto custom-scrollbar">
-          <p className="px-4 text-[10px] font-bold text-white/30 uppercase mb-4 tracking-widest">Main Menu</p>
-          
-          {user.role === UserRole.STUDENT && (
-            <>
-              <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/student/dashboard')}`}>
-                <Layout className="w-5 h-5" /> Dashboard
-              </Link>
-              <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/student/schedule')}`}>
-                <Calendar className="w-5 h-5" /> My Schedule
-              </Link>
-              <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/student/courses')}`}>
-                <Book className="w-5 h-5" /> Curriculum
-              </Link>
-               <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/student/tests')}`}>
-               <FileCheck className="w-5 h-5" /> Tests & Reports
-             </Link>
-               <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/student/fees')}`}>
-                <CreditCard className="w-5 h-5" /> Fee Records
-              </Link>
-               <Link to="/student/profile" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/student/profile')}`}>
-                <UserIcon className="w-5 h-5" /> Profile
-              </Link>
-            </>
-          )}
-
-          {user.role === UserRole.TEACHER && (
-             <>
-               <Link to="/teacher/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/teacher/dashboard')}`}>
-                 <Layout className="w-5 h-5" /> Dashboard
-               </Link>
-               <Link to="/teacher/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/teacher/schedule')}`}>
-                 <Calendar className="w-5 h-5" /> Live Schedule
-               </Link>
-               <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/teacher/courses')}`}>
-                 <Layers className="w-5 h-5" /> Courses
-               </Link>
-               <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/teacher/tests')}`}>
-                 <FileCheck className="w-5 h-5" /> Test Engine
-               </Link>
-               <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/teacher/assignments')}`}>
-                 <FileText className="w-5 h-5" /> Assignments
-               </Link>
-               <Link to="/teacher/reports" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/teacher/reports')}`}>
-                 <BarChart2 className="w-5 h-5" /> Reports
-               </Link>
-             </>
-          )}
-
-          {user.role === UserRole.ADMIN && (
-            <>
-               <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/admin/dashboard')}`}>
-                 <ShieldAlert className="w-5 h-5" /> Admin Console
-               </Link>
-               <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/admin/users')}`}>
-                 <Users className="w-5 h-5" /> User Directory
-               </Link>
-               <Link to="/admin/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/admin/schedule')}`}>
-                 <Calendar className="w-5 h-5" /> Global Calendar
-               </Link>
-               <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm ${isActive('/admin/finance')}`}>
-                 <DollarSign className="w-5 h-5" /> Financial Hub
-               </Link>
-            </>
-          )}
-        </nav>
-
-        <div className="p-6 border-t border-white/5 bg-slate-900/20">
-          <div className="flex items-center gap-4 px-3 py-2">
-              <img src={user.avatar} alt="" className="w-10 h-10 rounded-2xl border-2 border-white/20 object-cover shadow-lg" />
-              <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-white truncate leading-none mb-1">{user.name.split(' ')[0]}</p>
-                  <p className="text-[9px] text-blue-400 truncate font-bold uppercase tracking-widest">{user.role}</p>
-              </div>
-              <button onClick={onLogout} className="p-2.5 bg-white/5 hover:bg-zenro-red text-white rounded-xl transition-all active:scale-90 shadow-lg">
-                  <LogOut className="w-4 h-4" />
-              </button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-// --- MAIN APP ENTRY ---
+// ... Sidebar and Layout logic remains robustly handled in AppContent ...
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isExamMode, setIsExamMode] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -325,11 +207,11 @@ export default function App() {
                   ...parsed,
                   name: data.full_name,
                   email: data.email,
+                  role: data.role,
                   avatar: data.avatar_url || parsed.avatar,
                   batch: data.batch || parsed.batch
               };
               setUser(updated);
-              localStorage.setItem('zenro_session', JSON.stringify(updated));
           } else {
               setUser(parsed);
           }
@@ -345,19 +227,11 @@ export default function App() {
 
   if (isSessionLoading) {
      return (
-        <div className="h-screen w-full bg-zenro-blue flex flex-col items-center justify-center text-white p-8">
-            <div className="relative mb-12">
-                <div className="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
-                <div className="bg-white p-8 rounded-[40px] shadow-2xl shadow-black/40 animate-fade-in relative z-10">
-                    <ZenroLogo className="w-32 h-32 animate-bounce-slow" />
-                </div>
-            </div>
-            <div className="flex flex-col items-center gap-4 text-center">
-                <div className="flex items-center gap-3">
-                    <Loader2 className="w-6 h-6 animate-spin text-zenro-red" />
-                    <span className="text-xl font-heading font-black tracking-tighter">ZENRO PORTAL</span>
-                </div>
-                <p className="text-blue-200/40 text-[10px] font-bold uppercase tracking-[0.3em]">Initializing Academic Core</p>
+        <div className="h-screen w-full bg-zenro-blue flex flex-col items-center justify-center text-white">
+            <ZenroLogo className="w-32 h-32 animate-bounce-slow" />
+            <div className="mt-8 flex items-center gap-3">
+                <Loader2 className="w-6 h-6 animate-spin text-zenro-red" />
+                <span className="text-xl font-heading font-black tracking-tighter uppercase">Initializing Zenro Core...</span>
             </div>
         </div>
      );
@@ -369,48 +243,105 @@ export default function App() {
   return (
     <LiveProvider user={user}>
       <Router>
-        <div className="flex h-screen bg-zenro-gray text-zenro-slate overflow-hidden">
-          {/* Mobile Header */}
-          <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 z-40 flex items-center justify-between px-6 shadow-sm">
-              <button onClick={() => setSidebarOpen(true)} className="p-2.5 bg-gray-50 text-zenro-blue rounded-xl active:bg-gray-100 transition"><Menu className="w-6 h-6" /></button>
-              <ZenroLogo className="w-10 h-10 shadow-sm" />
-              <img src={user.avatar} className="w-9 h-9 rounded-xl border border-gray-200 object-cover" alt="" />
-          </div>
-
-          <Sidebar user={user} onLogout={() => { setUser(null); localStorage.removeItem('zenro_session'); }} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          
-          <main className="flex-1 overflow-auto p-4 lg:p-10 pt-20 lg:pt-10 scroll-smooth lg:ml-64 w-full bg-zenro-gray relative">
-            <div className="max-w-7xl mx-auto min-h-full">
-                <Routes>
-                    <Route path="/" element={<Navigate to={`/${user.role.toLowerCase()}/dashboard`} replace />} />
-                    <Route path="/student/dashboard" element={<StudentDashboardHome />} />
-                    <Route path="/student/schedule" element={<StudentSchedulePage />} />
-                    <Route path="/student/courses" element={<StudentCoursesPage />} />
-                    <Route path="/student/live" element={<StudentLiveRoom user={user} />} />
-                    <Route path="/student/tests" element={<StudentTestsPage />} />
-                    <Route path="/student/test/:testId" element={<StudentTestPlayer />} />
-                    <Route path="/student/report/:submissionId" element={<TestReport role="STUDENT" />} />
-                    <Route path="/student/fees" element={<StudentFeesPage user={user} />} />
-                    <Route path="/student/profile" element={<StudentProfilePage user={user} />} />
-                    
-                    <Route path="/teacher/dashboard" element={<TeacherDashboardHome />} />
-                    <Route path="/teacher/schedule" element={<TeacherSchedulePage />} />
-                    <Route path="/teacher/courses" element={<TeacherCoursesPage />} />
-                    <Route path="/teacher/course/:courseId/manage" element={<CourseContentManager />} />
-                    <Route path="/teacher/tests" element={<TeacherTestsPage />} />
-                    <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
-                    <Route path="/teacher/reports" element={<TeacherReportsPage />} />
-                    <Route path="/teacher/live" element={<LiveClassConsole />} />
-                    
-                    <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                    <Route path="/admin/users" element={<AdminUserManagement />} />
-                    <Route path="/admin/schedule" element={<AdminScheduleView />} />
-                    <Route path="/admin/finance" element={<AdminFinancials />} />
-                </Routes>
-            </div>
-          </main>
-        </div>
+        <AppLayout user={user} onLogout={() => { setUser(null); localStorage.removeItem('zenro_session'); }} />
       </Router>
     </LiveProvider>
   );
 }
+
+const AppLayout = ({ user, onLogout }: any) => {
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    return (
+        <div className="flex h-screen bg-zenro-gray text-zenro-slate overflow-hidden">
+            {/* Sidebar Logic */}
+            <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 z-40 flex items-center justify-between px-6 shadow-sm">
+              <button onClick={() => setSidebarOpen(true)} className="p-2.5 bg-gray-50 text-zenro-blue rounded-xl"><Menu className="w-6 h-6" /></button>
+              <ZenroLogo className="w-10 h-10" />
+              <img src={user.avatar} className="w-9 h-9 rounded-xl border border-gray-200 object-cover" alt="" />
+            </div>
+
+            <Sidebar user={user} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+            
+            <main className="flex-1 overflow-auto p-4 lg:p-10 pt-20 lg:pt-10 scroll-smooth lg:ml-64 w-full bg-zenro-gray relative">
+                <div className="max-w-7xl mx-auto min-h-full">
+                    <Routes>
+                        <Route path="/" element={<Navigate to={`/${user.role.toLowerCase()}/dashboard`} replace />} />
+                        <Route path="/student/dashboard" element={<StudentDashboardHome />} />
+                        <Route path="/student/schedule" element={<StudentSchedulePage />} />
+                        <Route path="/student/courses" element={<StudentCoursesPage />} />
+                        <Route path="/student/live" element={<StudentLiveRoom user={user} />} />
+                        <Route path="/student/tests" element={<StudentTestsPage />} />
+                        <Route path="/student/test/:testId" element={<StudentTestPlayer />} />
+                        <Route path="/student/report/:submissionId" element={<TestReport role="STUDENT" />} />
+                        <Route path="/student/fees" element={<StudentFeesPage user={user} />} />
+                        <Route path="/student/profile" element={<StudentProfilePage user={user} />} />
+                        
+                        <Route path="/teacher/dashboard" element={<TeacherDashboardHome />} />
+                        <Route path="/teacher/schedule" element={<TeacherSchedulePage />} />
+                        <Route path="/teacher/courses" element={<TeacherCoursesPage />} />
+                        <Route path="/teacher/tests" element={<TeacherTestsPage />} />
+                        <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
+                        <Route path="/teacher/reports" element={<TeacherReportsPage />} />
+                        <Route path="/teacher/live" element={<LiveClassConsole />} />
+                        
+                        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                        <Route path="/admin/users" element={<AdminUserManagement />} />
+                        <Route path="/admin/schedule" element={<AdminScheduleView />} />
+                        <Route path="/admin/finance" element={<AdminFinancials />} />
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </div>
+            </main>
+        </div>
+    );
+};
+
+// --- CORE UI: SIDEBAR ---
+const Sidebar = ({ user, onLogout, isOpen, onClose }: any) => {
+    const location = useLocation();
+    const isActive = (path: string) => location.pathname.startsWith(path) ? "bg-white/15 text-white border-l-4 border-zenro-red font-bold" : "text-blue-100/70 hover:text-white hover:bg-white/5";
+    
+    return (
+        <>
+            <div className={`fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-md transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
+            <div className={`w-64 bg-zenro-blue flex flex-col h-screen fixed left-0 top-0 z-50 shadow-2xl transition-transform duration-500 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+                <div className="p-8 flex items-center gap-4 border-b border-white/5">
+                    <div className="bg-white p-1.5 rounded-xl shadow-lg"><ZenroLogo className="w-10 h-10" /></div>
+                    <h1 className="text-xl font-heading font-black text-white tracking-tighter">ZENRO</h1>
+                </div>
+                <nav className="flex-1 px-4 space-y-1.5 mt-8 overflow-y-auto custom-scrollbar">
+                    {user.role === 'STUDENT' && (
+                        <>
+                            <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/dashboard')}`}><Layout className="w-5 h-5" /> Dashboard</Link>
+                            <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/schedule')}`}><Calendar className="w-5 h-5" /> Schedule</Link>
+                            <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/courses')}`}><BookOpen className="w-5 h-5" /> Curriculum</Link>
+                            <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/tests')}`}><FileCheck className="w-5 h-5" /> Tests</Link>
+                            <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/fees')}`}><CreditCard className="w-5 h-5" /> Fees</Link>
+                        </>
+                    )}
+                    {user.role === 'TEACHER' && (
+                        <>
+                            <Link to="/teacher/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/dashboard')}`}><Layout className="w-5 h-5" /> Overview</Link>
+                            <Link to="/teacher/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/schedule')}`}><Calendar className="w-5 h-5" /> Calendar</Link>
+                            <Link to="/teacher/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/courses')}`}><Layers className="w-5 h-5" /> Courses</Link>
+                            <Link to="/teacher/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/tests')}`}><FileCheck className="w-5 h-5" /> Tests</Link>
+                            <Link to="/teacher/assignments" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/teacher/assignments')}`}><FileText className="w-5 h-5" /> Assignments</Link>
+                        </>
+                    )}
+                    {user.role === 'ADMIN' && (
+                        <>
+                            <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/dashboard')}`}><ShieldAlert className="w-5 h-5" /> Console</Link>
+                            <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/users')}`}><Users className="w-5 h-5" /> Users</Link>
+                            <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/finance')}`}><DollarSign className="w-5 h-5" /> Financials</Link>
+                        </>
+                    )}
+                </nav>
+                <div className="p-6 border-t border-white/5 bg-slate-900/20 flex items-center gap-4">
+                    <img src={user.avatar} alt="" className="w-10 h-10 rounded-2xl border-2 border-white/20 object-cover" />
+                    <div className="flex-1 min-w-0"><p className="text-sm font-black text-white truncate">{user.name.split(' ')[0]}</p></div>
+                    <button onClick={onLogout} className="p-2.5 bg-white/5 hover:bg-zenro-red text-white rounded-xl transition-all"><LogOut className="w-4 h-4" /></button>
+                </div>
+            </div>
+        </>
+    );
+};
