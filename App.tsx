@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-// Fixed: Changed 'Book' to 'BookOpen' as it's used in the sidebar
-import { Layout, LogOut, User as UserIcon, Settings, Menu, Loader2, Calendar, BookOpen, FileCheck, CreditCard, ShieldAlert, Users, DollarSign, FileText, Layers, Video } from 'lucide-react';
+import { Layout, LogOut, User as UserIcon, Settings, Menu, Loader2, Calendar, BookOpen, FileCheck, CreditCard, ShieldAlert, Users, DollarSign, FileText, Layers, Video, X } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentAssignmentsPage, StudentLiveRoom, StudentSchedulePage } from './components/StudentViews';
@@ -165,7 +164,7 @@ const AppLayout = ({ user, onLogout }: any) => {
                         <Route path="/student/dashboard" element={<StudentDashboardHome />} />
                         <Route path="/student/schedule" element={<StudentSchedulePage />} />
                         <Route path="/student/courses" element={<StudentCoursesPage />} />
-                        <Route path="/student/live" element={<StudentLiveRoom user={user} />} />
+                        <Route path="/student/live" element={<StudentLiveRoom />} />
                         <Route path="/student/tests" element={<StudentTestsPage />} />
                         <Route path="/student/assignments" element={<StudentAssignmentsPage />} />
                         <Route path="/student/test/:testId" element={<StudentTestPlayer />} />
@@ -209,11 +208,11 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: any) => {
                     {user.role === 'STUDENT' && (
                         <>
                             <Link to="/student/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/dashboard')}`}><Layout className="w-5 h-5" /> Dashboard</Link>
-                            <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/schedule')}`}><Calendar className="w-5 h-5" /> Weekly Schedule</Link>
+                            <Link to="/student/schedule" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/schedule')}`}><Calendar className="w-5 h-5" /> Schedule</Link>
                             <Link to="/student/courses" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/courses')}`}><BookOpen className="w-5 h-5" /> Curriculum</Link>
-                            <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/tests')}`}><FileCheck className="w-5 h-5" /> Exam Portal</Link>
+                            <Link to="/student/tests" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/tests')}`}><FileCheck className="w-5 h-5" /> Exams</Link>
                             <Link to="/student/assignments" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/assignments')}`}><FileText className="w-5 h-5" /> Assignments</Link>
-                            <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/fees')}`}><CreditCard className="w-5 h-5" /> Fees & Dues</Link>
+                            <Link to="/student/fees" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/student/fees')}`}><CreditCard className="w-5 h-5" /> Fees</Link>
                         </>
                     )}
                     {user.role === 'TEACHER' && (
@@ -227,8 +226,8 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }: any) => {
                     )}
                      {user.role === 'ADMIN' && (
                         <>
-                            <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/dashboard')}`}><ShieldAlert className="w-5 h-5" /> Admin Console</Link>
-                            <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/users')}`}><Users className="w-5 h-5" /> User Directory</Link>
+                            <Link to="/admin/dashboard" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/dashboard')}`}><ShieldAlert className="w-5 h-5" /> Console</Link>
+                            <Link to="/admin/users" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/users')}`}><Users className="w-5 h-5" /> Users</Link>
                             <Link to="/admin/finance" onClick={onClose} className={`flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm ${isActive('/admin/finance')}`}><DollarSign className="w-5 h-5" /> Global Revenue</Link>
                         </>
                     )}

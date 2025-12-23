@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-// Fixed: Added 'BarChart2' to imports
 import { Users, BookOpen, Clock, Plus, Video, Calendar, FileText, CheckCircle, AlertTriangle, Loader2, FileCheck, Layers, Trash2, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
@@ -184,6 +183,7 @@ export const TeacherAssignmentsPage = () => {
     const [loading, setLoading] = useState(true);
     useEffect(() => {
         const fetch = async () => {
+            setLoading(true);
             const { data } = await supabase.from('assignments').select('*, assignment_batches(batch_name)').order('created_at', { ascending: false });
             if (data) setAssignments(data);
             setLoading(false);
@@ -203,6 +203,7 @@ export const TeacherAssignmentsPage = () => {
                             <button className="w-full bg-gray-50 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zenro-blue hover:text-white transition-all">Review Submissions</button>
                         </div>
                     ))}
+                    {assignments.length === 0 && <div className="col-span-full py-20 text-center text-gray-300 font-bold italic">No assignments found.</div>}
                 </div>
             )}
         </div>
@@ -214,6 +215,7 @@ export const TeacherTestsPage = () => {
     const [loading, setLoading] = useState(true);
     useEffect(() => {
         const fetch = async () => {
+            setLoading(true);
             const { data } = await supabase.from('tests').select('*, test_batches(batch_name)').order('created_at', { ascending: false });
             if (data) setTests(data);
             setLoading(false);
@@ -233,6 +235,7 @@ export const TeacherTestsPage = () => {
                             <button className="w-full bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Manage Questions</button>
                         </div>
                     ))}
+                    {tests.length === 0 && <div className="col-span-full py-20 text-center text-gray-300 font-bold italic">No exams found.</div>}
                 </div>
             )}
         </div>
@@ -244,6 +247,7 @@ export const TeacherCoursesPage = () => {
     const [loading, setLoading] = useState(true);
     useEffect(() => {
         const fetch = async () => {
+            setLoading(true);
             const { data } = await supabase.from('courses').select('*, course_batches(batch_name)').order('created_at', { ascending: false });
             if (data) setCourses(data);
             setLoading(false);
@@ -265,6 +269,7 @@ export const TeacherCoursesPage = () => {
                             </div>
                         </div>
                     ))}
+                    {courses.length === 0 && <div className="col-span-full py-20 text-center text-gray-300 font-bold italic">No courses created yet.</div>}
                 </div>
             )}
         </div>
@@ -273,4 +278,4 @@ export const TeacherCoursesPage = () => {
 
 export const TeacherReportsPage = () => <div className="p-20 text-center"><BarChart2 className="w-12 h-12 text-gray-100 mx-auto mb-4" /><p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-xs">Analytics Syncing...</p></div>;
 export const LiveClassConsole = () => <div className="h-[75vh] flex flex-col items-center justify-center bg-slate-900 rounded-[50px] shadow-2xl relative overflow-hidden"><div className="absolute inset-0 bg-gradient-to-br from-zenro-blue/40 to-transparent"></div><div className="relative z-10 text-center text-white"><Video className="w-16 h-16 text-zenro-red mx-auto mb-10 animate-pulse" /><h2 className="text-4xl font-heading font-black tracking-tighter mb-4">Broadcasting Studio</h2><button className="bg-white text-zenro-blue px-12 py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:scale-105 transition-all">Go Live</button></div></div>;
-export const TeacherProfilePage = ({user}: any) => <div className="p-20 bg-white rounded-[40px] border border-gray-100 text-center"><img src={user.avatar} className="w-32 h-32 rounded-[40px] border-4 border-gray-50 mx-auto mb-6 shadow-xl" /><h2 className="text-3xl font-black text-slate-800 tracking-tighter">{user.name}</h2><p className="text-gray-400 font-bold uppercase tracking-[0.3em] text-xs mt-2">{user.role}</p></div>;
+export const TeacherProfilePage = ({user}: any) => <div className="p-20 bg-white rounded-[40px] border border-gray-100 text-center"><img src={user.avatar} className="w-32 h-32 rounded-[40px] border-4 border-gray-50 mx-auto mb-6 shadow-xl object-cover" /><h2 className="text-3xl font-black text-slate-800 tracking-tighter">{user.name}</h2><p className="text-gray-400 font-bold uppercase tracking-[0.3em] text-xs mt-2">{user.role}</p></div>;
