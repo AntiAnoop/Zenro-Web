@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 let aiClient: GoogleGenAI | null = null;
@@ -14,7 +15,8 @@ export const generateClassSummary = async (transcript: string): Promise<string> 
   const client = getAiClient();
 
   try {
-    const model = 'gemini-2.5-flash';
+    // Basic Text Tasks (e.g., summarization, proofreading, and simple Q&A): 'gemini-3-flash-preview'
+    const model = 'gemini-3-flash-preview';
     const prompt = `
       You are an expert educational assistant. 
       Summarize the following live class transcript into a concise "Class Summary PDF" format.
@@ -32,7 +34,7 @@ export const generateClassSummary = async (transcript: string): Promise<string> 
       model: model,
       contents: prompt,
       config: {
-        systemInstruction: "Format the output using Markdown.",
+        systemInstruction: "You are an expert educational assistant. Format the output using Markdown.",
         temperature: 0.3, 
       }
     });
@@ -49,7 +51,8 @@ export const analyzeProctoringImage = async (base64Image: string): Promise<{ sus
 
   try {
     const response = await client.models.generateContent({
-        model: 'gemini-2.5-flash',
+        // General Image Generation and Editing Tasks: 'gemini-2.5-flash-image'
+        model: 'gemini-2.5-flash-image',
         contents: {
             parts: [
                 {
